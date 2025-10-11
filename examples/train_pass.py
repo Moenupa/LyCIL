@@ -1,6 +1,6 @@
 import lightning.pytorch as pl
 from lightning.pytorch import cli
-from lightning_cil.methods.pass_method import PASS
+from lightning_cil.methods.pass_v1 import PASSV1
 from data.datamodule_cifar100 import CIFAR100DataModule
 from data.datamodule_imagenet import ImageNetDataModule
 
@@ -17,7 +17,7 @@ class CLI(cli.LightningCLI):
     def run(self):
         pl.seed_everything(self.config.get("seed_everything", None))
         dm = self.datamodule
-        model: PASS = self.model
+        model: PASSV1 = self.model
         trainer = self.trainer
 
         dm.setup()
@@ -41,4 +41,4 @@ class CLI(cli.LightningCLI):
         trainer.test(model, dm)
 
 if __name__ == "__main__":
-    CLI(PASS, CIFAR100DataModule, save_config_callback=None, run=True)
+    CLI(PASSV1, CIFAR100DataModule, save_config_callback=None, run=True)

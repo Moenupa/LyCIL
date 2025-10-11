@@ -12,7 +12,7 @@ def nt_xent(z1, z2, T=0.2):
     targets = torch.arange(B, device=z1.device)
     return F.cross_entropy(sim, targets)
 
-class PASS(BaseIncremental):
+class PASSV1(BaseIncremental):
     """PASS: prototype augmentation + self-supervision (contrastive)."""
     def __init__(
         self, *args,
