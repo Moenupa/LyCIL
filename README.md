@@ -63,3 +63,38 @@ lightning_cil/
 - This code aims for **complete** functionality with standard losses and training flows (not pedagogical simplifications), while keeping the interfaces clean.
 - For research use, tune `--trainer.max_epochs`, LR milestones/schedulers, and augmentation settings to match specific papers.
 - Reproducibility: set `--seed_everything <seed>` if needed.
+
+
+## LWF (no memory)
+
+```bash
+python examples/train_lwf.py       --data.root ./data_cache       --data.increment 10       --model.backbone_name resnet18       --model.head linear       --model.lr 0.1 --model.weight_decay 1e-4       --model.mem_size 0       --model.distill_T 2.0 --model.lambda_distill 1.0       --trainer.max_epochs 70
+```
+
+
+## Baselines & Regularization
+
+**FineTune** (no memory):
+```bash
+python examples/train_finetune.py --data.root ./data_cache --data.increment 10       --model.backbone_name resnet18 --model.head linear --trainer.max_epochs 70
+```
+
+**Replay** (exemplar rehearsal):
+```bash
+python examples/train_replay.py --data.root ./data_cache --data.increment 10       --model.backbone_name resnet18 --model.mem_size 2000 --trainer.max_epochs 70
+```
+
+**EWC** (no memory):
+```bash
+python examples/train_ewc.py --data.root ./data_cache --data.increment 10       --model.backbone_name resnet18 --model.ewc_lambda 30.0 --trainer.max_epochs 70
+```
+
+**GEM** (episodic memory + gradient projection):
+```bash
+python examples/train_gem.py --data.root ./data_cache --data.increment 10       --model.backbone_name resnet18 --model.mem_size 2000 --trainer.max_epochs 70
+```
+
+**BiC** (memory + bias correction stage):
+```bash
+python examples/train_bic.py --data.root ./data_cache --data.increment 10       --model.backbone_name resnet18 --model.mem_size 2000 --trainer.max_epochs 70
+```
