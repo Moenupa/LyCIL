@@ -1,10 +1,14 @@
-from typing import Tuple
+from typing import Tuple, Dict
 import torch
 import torch.nn as nn
 import torchvision.models as tvm
 
 class ResNetBackbone(nn.Module):
-    """ResNet backbone returning pooled features and classifier-ready dim."""
+    """ResNet backbone returning pooled features and intermediates for POD.
+
+    - forward(x): returns global pooled feature (B, D)
+    - forward_feats(x): returns dict of feature maps from layers { 'l2','l3','l4' }
+    """
     def __init__(self, name: str = "resnet18", pretrained: bool = False):
         super().__init__()
         assert name in ["resnet18", "resnet34", "resnet50"], "Unsupported backbone"
@@ -17,17 +21,27 @@ class ResNetBackbone(nn.Module):
         else:
             net = tvm.resnet50(weights=tvm.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
             feat_dim = 2048
-        # keep everything up to global pooling
-        self.features = nn.Sequential(
-            net.conv1, net.bn1, net.relu, net.maxpool,
-            net.layer1, net.layer2, net.layer3, net.layer4
-        )
+
+        self.stem = nn.Sequential(net.conv1, net.bn1, net.relu, net.maxpool)
+        self.layer1 = net.layer1
+        self.layer2 = net.layer2
+        self.layer3 = net.layer3
+        self.layer4 = net.layer4
+
         self.pool = nn.AdaptiveAvgPool2d((1,1))
         self.out_dim = feat_dim
 
+    def forward_feats(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        x = self.stem(x)
+        x1 = self.layer1(x)
+        x2 = self.layer2(x1)
+        x3 = self.layer3(x2)
+        x4 = self.layer4(x3)
+        return {"l2": x2, "l3": x3, "l4": x4}
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = self.pool(x).flatten(1)
+        feats = self.forward_feats(x)["l4"]
+        x = self.pool(feats).flatten(1)
         return x
 
     @property

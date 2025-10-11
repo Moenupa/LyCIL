@@ -39,12 +39,8 @@ class BaseIncremental(pl.LightningModule):
         self.feature_dim = self.backbone.feature_dim
         self.head_type = head
 
-        if head == "linear":
-            self.classifier = nn.Linear(self.feature_dim, 0, bias=True)  # init as empty; expand on task 0
-        elif head == "cosine":
-            self.classifier = CosineClassifier(self.feature_dim, 0, learn_scale=True)
-        else:
-            raise ValueError("Unsupported head")
+        # Delay classifier creation until first task
+        self.classifier: Optional[nn.Module] = None
 
         self.buffer = ExemplarBuffer(mem_size=mem_size)
         self.prev_model: Optional[nn.Module] = None  # frozen copy for distillation
@@ -57,18 +53,27 @@ class BaseIncremental(pl.LightningModule):
         self.current_classes = list(current_classes)
         self.seen_classes = list(seen_classes)
 
+    def _make_head(self, out_features: int) -> nn.Module:
+        if self.head_type == "linear":
+            return nn.Linear(self.feature_dim, out_features, bias=True)
+        elif self.head_type == "cosine":
+            return CosineClassifier(self.feature_dim, out_features, learn_scale=True)
+        else:
+            raise ValueError("Unsupported head")
+
     def expand_head(self, num_new: int):
         """Expand classifier to accommodate `num_new` new classes."""
         if num_new <= 0:
             return
+        if self.classifier is None:
+            self.classifier = self._make_head(num_new)
+            return
         if isinstance(self.classifier, nn.Linear):
             old_out = self.classifier.out_features
             new_linear = nn.Linear(self.feature_dim, old_out + num_new, bias=True)
-            # copy old weights if exist
-            if old_out > 0:
-                with torch.no_grad():
-                    new_linear.weight[:old_out] = self.classifier.weight.data
-                    new_linear.bias[:old_out] = self.classifier.bias.data
+            with torch.no_grad():
+                new_linear.weight[:old_out] = self.classifier.weight.data
+                new_linear.bias[:old_out] = self.classifier.bias.data
             self.classifier = new_linear
         elif isinstance(self.classifier, CosineClassifier):
             self.classifier.expand(num_new)
@@ -80,6 +85,8 @@ class BaseIncremental(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         f = self.feature_extractor(x)
+        if self.classifier is None:
+            raise RuntimeError("Classifier head is not initialized. Call expand_head before training.")
         logits = self.classifier(f)
         return logits
 
@@ -119,7 +126,7 @@ class BaseIncremental(pl.LightningModule):
         return self.prev_model(x)
 
     def training_step(self, batch, batch_idx):
-        """Must be implemented in subclasses (iCaRL / LUCIR)."""
+        """Must be implemented in subclasses (iCaRL / LUCIR / ...)."""
         raise NotImplementedError
 
     def validation_step(self, batch, batch_idx):
@@ -135,7 +142,6 @@ class BaseIncremental(pl.LightningModule):
     def predict_nme(self, x: torch.Tensor) -> torch.Tensor:
         """Return logits built from NME distances to exemplar means."""
         device = x.device
-        # build nme table on the fly
         nme = self.buffer.compute_nme_classifier(self, self.feature_extractor, device)
         if not nme:
             return self(x)
@@ -144,10 +150,9 @@ class BaseIncremental(pl.LightningModule):
         f = self.feature_extractor(x)
         f = F.normalize(f, dim=1)
         means = F.normalize(means, dim=1)
-        # cosine similarity as logits
         logits = f @ means.t()
         # map to full class space
-        full = x.new_zeros((x.size(0), self.classifier.weight.size(0))) if hasattr(self.classifier, "weight") else x.new_zeros((x.size(0), 0))
-        full = full.to(x.device)
+        out_dim = self.classifier.weight.size(0) if hasattr(self.classifier, "weight") else max(class_ids)+1
+        full = x.new_zeros((x.size(0), out_dim), device=device)
         full[:, class_ids] = logits
         return full
