@@ -1,0 +1,35 @@
+[project]
+name = "lightning-cil"
+version = "0.1.0"
+description = "A clean, PyTorch Lightning (>2.0) continual/incremental learning (CIL) library with standard iCaRL and LUCIR implementations, exemplar memory, cosine classifier, and ready-to-run CLI examples."
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+dependencies = [
+    'torch==2.1.0',
+    'torchvision==0.16.0',
+    'tqdm==4.65.0',
+    'numpy==1.24.0',
+    'Pillow==9.4.0',
+    'scikit-learn==1.3.0',
+    'yamlable==1.1.1'
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "ruff>=0.14.0",
+]
+
+# conflict lightning and lightning-npu
+[project.optional-dependencies]
+lightning = ["lightning==2.2.0"]
+lightning-npu = ["lightning @ git+https://github.com/SmallPigPeppa/pytorch-lightning.git@npu_support_fp16_mixed"]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "lightning" },
+        { extra = "lightning-npu" },
+    ]
+]
