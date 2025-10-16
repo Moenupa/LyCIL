@@ -1,4 +1,3 @@
-from math import ceil
 from typing import Optional
 
 import lightning.pytorch as pl
@@ -7,7 +6,6 @@ import torchvision.transforms as T
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR100
 
-from ..buffer import ExemplarBuffer
 from ..cil_datamodule import AbstractCILDataModule
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
@@ -59,7 +57,7 @@ class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
         self.set_task(0)
 
         self.train_tf, self.test_tf = _make_transforms(32)
-        self.buffer: Optional[ExemplarBuffer] = None  # will be set by trainer loop
+        self.buffer = None  # will be set by trainer loop
 
     def prepare_data(self):
         CIFAR100(self.root, train=True, download=self.download)
@@ -72,26 +70,6 @@ class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
         self.cifar100_test = CIFAR100(
             self.root, train=False, transform=self.test_tf, download=False
         )
-
-    @property
-    def num_tasks(self) -> int:
-        return ceil((self.num_class_total / self.num_class_per_task))
-
-    def set_task(self, task_id: int) -> None:
-        assert isinstance(task_id, int), (
-            f"{self.__class__.__name__}: task_id must be int, got {type(task_id)}"
-        )
-        assert 0 <= task_id < self.num_tasks, (
-            f"{self.__class__.__name__}: task_id must be in [0, {self.num_tasks - 1}], got {task_id}"
-        )
-
-        self.task_id = task_id
-
-        _index_l = task_id * self.num_class_per_task
-        _index_r = min(_index_l + self.num_class_per_task, self.num_class_total)
-
-        self.classes_current = self.class_order[_index_l:_index_r]
-        self.classes_seen = self.class_order[:_index_r]
 
     def _filter_dataset(self, dataset: CIFAR100, class_ids: list[int]) -> Dataset:
         idx = [i for i, (_, label) in enumerate(dataset) if label in class_ids]

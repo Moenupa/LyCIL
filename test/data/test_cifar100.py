@@ -29,7 +29,9 @@ def test_cifar100_datamodule_task(task_id: int):
     dm.set_task(task_id)
 
     assert len(dm.classes_current) == 10
+    assert set(dm.classes_current) == set(range(task_id * 10, (task_id + 1) * 10))
     assert len(dm.classes_seen) == (task_id + 1) * 10
+    assert set(dm.classes_seen) == set(range(0, (task_id + 1) * 10))
 
     train_dataset = dm._dataset_train
     test_dataset = dm._dataset_test
