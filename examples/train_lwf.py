@@ -6,6 +6,17 @@ from lightning_cil.methods.lwf import LWF
 
 
 class CLI(cli.LightningCLI):
+    """
+    Train a model using the LwF (`Learning without Forgetting`_) method.
+
+    Examples::
+
+        python examples/train_lwf.py -c configs/lwf.yml --data configs/data/cifar100.yml
+
+    .. _Learning without Forgetting:
+        https://arxiv.org/abs/1606.09282
+    """
+
     model: LWF
     datamodule: BaseCILDataModule
 
