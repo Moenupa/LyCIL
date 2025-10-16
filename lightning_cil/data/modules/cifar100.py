@@ -1,14 +1,11 @@
-from math import ceil
 from typing import Optional
 
-import lightning.pytorch as pl
 import numpy as np
 import torchvision.transforms as T
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR100
 
-from ..buffer import ExemplarBuffer
-from ..cil_datamodule import AbstractCILDataModule
+from ..cil_datamodule import BaseCILDataModule
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
@@ -32,34 +29,54 @@ def _make_transforms(image_size: int = 32):
     return train_tf, test_tf
 
 
-class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
+def _filter_dataset_by_classid(dataset: CIFAR100, class_ids: list[int]) -> Dataset:
+    # Optimized: use numpy for fast indexing
+    targets = np.array(dataset.targets)
+    idx = np.where(np.isin(targets, set(class_ids)))[0].tolist()
+    return Subset(dataset, idx)
+
+
+class CIFAR100DataModule(BaseCILDataModule):
+    """
+    Data module for CIFAR100.
+
+    Args:
+        root (str, optional): root directory of the dataset. Default: "./data".
+        download (bool, optional): whether to download data. Default: True.
+        num_class_per_task (int, optional): increment per task. Default: 10.
+        batch_size (int, optional): batch size. Default: 128.
+        num_workers (int, optional): number of workers. Default: 4.
+        class_order (list[int] | None, optional): list of orders, see :ref:`BaseCILDataModule`. Default: None.
+        seed (int, optional): random seed. Default: 0.
+    """
+
     def __init__(
         self,
-        root: str = "./datasets",
+        root: str = "./data",
         download: bool = True,
         num_class_per_task: int = 10,
-        batch_size: int = 128,
+        batch_size: int = 64,
         num_workers: int = 4,
         class_order: list[int] | None = None,
         seed: int = 0,
     ):
-        super().__init__()
-        self.root = root
+        super().__init__(
+            root=root,
+            num_class_per_task=num_class_per_task,
+            num_class_total=100,
+            batch_size=batch_size,
+            num_workers=num_workers,
+        )
         self.download = download
-        self.batch_size = batch_size
-        self.num_workers = num_workers
 
-        self.num_class_total = 100
-        self.num_class_per_task = num_class_per_task
-        self.seed = seed
         self.class_order = class_order or list(range(self.num_class_total))
         if class_order is None:
-            np.random.RandomState(self.seed).shuffle(self.class_order)
+            np.random.RandomState(seed).shuffle(self.class_order)
 
         self.set_task(0)
 
         self.train_tf, self.test_tf = _make_transforms(32)
-        self.buffer: Optional[ExemplarBuffer] = None  # will be set by trainer loop
+        self.buffer = None  # will be set by trainer loop
 
     def prepare_data(self):
         CIFAR100(self.root, train=True, download=self.download)
@@ -74,36 +91,12 @@ class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
         )
 
     @property
-    def num_tasks(self) -> int:
-        return ceil((self.num_class_total / self.num_class_per_task))
-
-    def set_task(self, task_id: int) -> None:
-        assert isinstance(task_id, int), (
-            f"{self.__class__.__name__}: task_id must be int, got {type(task_id)}"
-        )
-        assert 0 <= task_id < self.num_tasks, (
-            f"{self.__class__.__name__}: task_id must be in [0, {self.num_tasks - 1}], got {task_id}"
-        )
-
-        self.task_id = task_id
-
-        _index_l = task_id * self.num_class_per_task
-        _index_r = min(_index_l + self.num_class_per_task, self.num_class_total)
-
-        self.classes_current = self.class_order[_index_l:_index_r]
-        self.classes_seen = self.class_order[:_index_r]
-
-    def _filter_dataset(self, dataset: CIFAR100, class_ids: list[int]) -> Dataset:
-        idx = [i for i, (_, label) in enumerate(dataset) if label in class_ids]
-        return Subset(dataset, idx)
-
-    @property
     def _dataset_train(self) -> Dataset:
-        return self._filter_dataset(self.cifar100_train, self.classes_current)
+        return _filter_dataset_by_classid(self.cifar100_train, self.classes_current)
 
     @property
     def _dataset_test(self) -> Dataset:
-        return self._filter_dataset(self.cifar100_test, self.classes_seen)
+        return _filter_dataset_by_classid(self.cifar100_test, self.classes_seen)
 
     def train_dataloader(self):
         if self.buffer is not None and len(self.buffer) > 0:

@@ -1,0 +1,20 @@
+model:
+  backbone_name: "resnet18"
+  head: "linear"
+  pretrained_backbone: true
+  lr: 0.1
+  weight_decay: 0.0005
+  optimizer: "sgd"
+  momentum: 0.9
+  nesterov: true
+  distill_T: 2.0
+  lambda_distill: 1.0
+
+trainer:
+  max_epochs: 100
+  accelerator: "auto"
+  devices: 1
+  precision: 32
+  enable_checkpointing: true
+  enable_progress_bar: true
+  log_every_n_steps: 50

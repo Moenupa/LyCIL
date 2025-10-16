@@ -1,10 +1,12 @@
-import random
+from typing import Dict, Iterable, List, Tuple
+
 import torch
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Iterable
+
 
 class ExemplarDataset(Dataset):
     """Dataset wrapper around exemplars stored as tensors (C,H,W) and labels."""
+
     def __init__(self, items: List[Tuple[torch.Tensor, int]]):
         self.items = items
 
@@ -15,11 +17,13 @@ class ExemplarDataset(Dataset):
         img, label = self.items[idx]
         return img, label
 
+
 class ExemplarBuffer:
     """Fixed-size memory with per-class lists and herding selection.
 
     Stores exemplar images as float tensors already normalized to dataset stats.
     """
+
     def __init__(self, mem_size: int = 2000):
         self.mem_size = int(mem_size)
         self.storage: Dict[int, List[torch.Tensor]] = {}
@@ -51,7 +55,7 @@ class ExemplarBuffer:
         feats = []
         imgs = []
         for x, y in dataloader:
-            mask = (y == class_id)
+            mask = y == class_id
             if mask.sum() == 0:
                 continue
             x = x[mask].to(device, non_blocking=True)
@@ -62,7 +66,7 @@ class ExemplarBuffer:
         if not feats:
             return
         feats = torch.cat(feats, dim=0)  # (N,d)
-        imgs = torch.cat(imgs, dim=0)    # (N,C,H,W)
+        imgs = torch.cat(imgs, dim=0)  # (N,C,H,W)
 
         mu = feats.mean(dim=0, keepdim=True)  # (1,d)
         selected = []
@@ -106,7 +110,9 @@ class ExemplarBuffer:
         return ExemplarDataset(items)
 
     @torch.no_grad()
-    def compute_nme_classifier(self, model, feature_extractor, device: torch.device) -> Dict[int, torch.Tensor]:
+    def compute_nme_classifier(
+        self, model, feature_extractor, device: torch.device
+    ) -> Dict[int, torch.Tensor]:
         """Compute mean feature per class from exemplars (for iCaRL NME inference)."""
         nme = {}
         for c, imgs in self.storage.items():
