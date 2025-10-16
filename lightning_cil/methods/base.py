@@ -1,14 +1,17 @@
-from typing import List, Dict, Optional, Tuple
 import copy
+from typing import List, Optional
+
+import lightning.pytorch as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import lightning.pytorch as pl
-from torch.utils.data import ConcatDataset, DataLoader
+
 from models.backbone.resnet import ResNetBackbone
 from models.classifier.cosine_classifier import CosineClassifier
-from data.buffer import ExemplarBuffer
 from utils.metrics import accuracy, accuracy_topk
+
+from ..data.buffer import ExemplarBuffer
+
 
 class BaseIncremental(pl.LightningModule):
     """Base class providing backbone, head expansion, optimizer, and memory plumbing.
@@ -18,11 +21,12 @@ class BaseIncremental(pl.LightningModule):
       - update_memory() to (re)build exemplars for the new classes
       - validation logic (optionally override `validation_step` or `on_validation_epoch_end`)
     """
+
     def __init__(
         self,
         num_classes_total: int,
         backbone_name: str = "resnet18",
-        head: str = "linear",           # "linear" or "cosine"
+        head: str = "linear",  # "linear" or "cosine"
         pretrained_backbone: bool = False,
         lr: float = 0.1,
         weight_decay: float = 1e-4,
@@ -86,7 +90,9 @@ class BaseIncremental(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         f = self.feature_extractor(x)
         if self.classifier is None:
-            raise RuntimeError("Classifier head is not initialized. Call expand_head before training.")
+            raise RuntimeError(
+                "Classifier head is not initialized. Call expand_head before training."
+            )
         logits = self.classifier(f)
         return logits
 
@@ -99,18 +105,26 @@ class BaseIncremental(pl.LightningModule):
         params = [p for p in self.parameters() if p.requires_grad]
         if self.hparams.optimizer.lower() == "sgd":
             opt = torch.optim.SGD(
-                params, lr=self.hparams.lr,
+                params,
+                lr=self.hparams.lr,
                 momentum=self.hparams.momentum,
                 nesterov=self.hparams.nesterov,
                 weight_decay=self.hparams.weight_decay,
             )
         elif self.hparams.optimizer.lower() == "adamw":
-            opt = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
+            opt = torch.optim.AdamW(
+                params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay
+            )
         else:
             raise ValueError("Unsupported optimizer")
         # Cosine annealing commonly used in CIL
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=self.trainer.max_epochs)
-        return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval":"epoch"}}
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt, T_max=self.trainer.max_epochs
+        )
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+        }
 
     # ----- helpers -----
     @torch.no_grad()
@@ -152,7 +166,11 @@ class BaseIncremental(pl.LightningModule):
         means = F.normalize(means, dim=1)
         logits = f @ means.t()
         # map to full class space
-        out_dim = self.classifier.weight.size(0) if hasattr(self.classifier, "weight") else max(class_ids)+1
+        out_dim = (
+            self.classifier.weight.size(0)
+            if hasattr(self.classifier, "weight")
+            else max(class_ids) + 1
+        )
         full = x.new_zeros((x.size(0), out_dim), device=device)
         full[:, class_ids] = logits
         return full

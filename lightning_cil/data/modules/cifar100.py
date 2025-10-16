@@ -35,7 +35,7 @@ def _make_transforms(image_size: int = 32):
 class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
     def __init__(
         self,
-        root: str = "./datasets",
+        root: str = "./data",
         download: bool = True,
         num_class_per_task: int = 10,
         batch_size: int = 128,
