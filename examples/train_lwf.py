@@ -1,18 +1,19 @@
 import lightning.pytorch as pl
 from lightning.pytorch import cli
+
+from lightning_cil.data.cil_datamodule import BaseCILDataModule
 from lightning_cil.methods.lwf import LWF
-from data.datamodule_cifar100 import CIFAR100DataModule
-from data.datamodule_imagenet import ImageNetDataModule
+
 
 class CLI(cli.LightningCLI):
-    def add_arguments_to_parser(self, parser):
-        parser.add_argument("--data.dataset", type=str, default="cifar100", choices=["cifar100", "imagenet"],
-                            help="Choose dataset. Controls the DataModule class.")
+    model: LWF
+    datamodule: BaseCILDataModule
 
     def instantiate_classes(self):
-        args = self.parser.parse_args()
-        self.datamodule_class = CIFAR100DataModule if getattr(args, "data_dataset", "cifar100") == "cifar100" else ImageNetDataModule
         super().instantiate_classes()
+
+        # init first task to pass sanity checks
+        self.model.expand_head(self.datamodule.num_class_per_task)
 
     def run(self):
         pl.seed_everything(self.config.get("seed_everything", None))
@@ -20,19 +21,13 @@ class CLI(cli.LightningCLI):
         model: LWF = self.model
         trainer = self.trainer
 
-        dm.setup()
-        num_tasks = dm.num_tasks()
-
-        # Do NOT use exemplar memory for LwF
-        dm.buffer = None
-
-        for task_id in range(num_tasks):
-            dm.set_task_id(task_id)
-            cur = dm.current_classes
-            seen = dm.seen_classes
-
-            model.expand_head(len(cur))
+        for task_id in range(dm.num_tasks):
+            dm.set_task(task_id)
+            cur = dm.classes_current
+            seen = dm.classes_seen
             model.set_task_info(cur, seen)
+            # first task already expanded in instantiate_classes()
+            model.expand_head(0 if len(cur) == 0 else len(cur))
 
             trainer.fit(model=model, datamodule=dm)
             trainer.validate(model=model, datamodule=dm)
@@ -42,5 +37,12 @@ class CLI(cli.LightningCLI):
 
         trainer.test(model=model, datamodule=dm)
 
+
 if __name__ == "__main__":
-    CLI(LWF, CIFAR100DataModule, save_config_callback=None, run=True)
+    CLI(
+        LWF,
+        pl.LightningDataModule,
+        save_config_callback=None,
+        run=True,
+        subclass_mode_data=True,
+    )
