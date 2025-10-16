@@ -1,9 +1,11 @@
 from math import ceil
 
+import lightning.pytorch as pl
+
 from .buffer import ExemplarBuffer
 
 
-class AbstractCILDataModule:
+class BaseCILDataModule(pl.LightningDataModule):
     """
     API class for data modules with Continual/Incremental Learning (CIL) features.
 
@@ -19,8 +21,8 @@ class AbstractCILDataModule:
 
     Examples::
 
-        >>> class MyCILDataModule(LightningDataModule, AbstractCILDataModule):
-        ...     # implement all abstract methods
+        >>> class MyCILDataModule(BaseCILDataModule):
+        ...     # implement methods
         ...     pass
     """
 

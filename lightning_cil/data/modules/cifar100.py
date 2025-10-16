@@ -1,12 +1,11 @@
 from typing import Optional
 
-import lightning.pytorch as pl
 import numpy as np
 import torchvision.transforms as T
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR100
 
-from ..cil_datamodule import AbstractCILDataModule
+from ..cil_datamodule import BaseCILDataModule
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
@@ -30,7 +29,7 @@ def _make_transforms(image_size: int = 32):
     return train_tf, test_tf
 
 
-class CIFAR100DataModule(pl.LightningDataModule, AbstractCILDataModule):
+class CIFAR100DataModule(BaseCILDataModule):
     def __init__(
         self,
         root: str = "./data",
