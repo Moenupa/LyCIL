@@ -68,21 +68,19 @@ class BaseIncremental(pl.LightningModule):
         assert self.head_type in _CLASSIFIER_HEADS, (
             f"Unknown head type: {self.head_type} not in {_CLASSIFIER_HEADS.keys()}"
         )
-        assert out_features > 0, (
-            f"Classifier head's out_features {out_features} not > 0"
-        )
 
         cls, kwargs = _CLASSIFIER_HEADS[self.head_type]
         return cls(self.feature_dim, out_features, **kwargs)
 
     def expand_head(self, num_new: int):
         """Expand classifier to accommodate `num_new` new classes."""
-        assert num_new > 0, f"num_new {num_new} not > 0"
+        assert num_new >= 0, f"num_new {num_new} not >= 0"
         if num_new == 0:
             return
         if self.classifier is None:
             self.classifier = self._make_head(num_new)
             return
+
         if isinstance(self.classifier, nn.Linear):
             old_out = self.classifier.out_features
             new_linear = nn.Linear(self.feature_dim, old_out + num_new, bias=True)
@@ -90,10 +88,13 @@ class BaseIncremental(pl.LightningModule):
                 new_linear.weight[:old_out] = self.classifier.weight.data
                 new_linear.bias[:old_out] = self.classifier.bias.data
             self.classifier = new_linear
-        elif isinstance(self.classifier, CosineClassifier):
+            return
+
+        if isinstance(self.classifier, CosineClassifier):
             self.classifier.expand(num_new)
-        else:
-            raise RuntimeError("Unknown head type")
+            return
+
+        raise RuntimeError("Unknown head type")
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(x)
