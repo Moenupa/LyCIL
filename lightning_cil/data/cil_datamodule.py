@@ -1,49 +1,9 @@
 from math import ceil
 
 import lightning.pytorch as pl
-from torch.utils.data import ConcatDataset, Dataset, Subset, DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 
 from .buffer import ExemplarBuffer
-
-
-def dataset_by_target(
-    dataset: Dataset,
-    selected_targets: set,
-) -> Dataset:
-    """
-    Returns a filtered dataset
-
-    Args:
-        dataset (Dataset): dataset to be filtered
-        selected_targets (set): real targets to keep
-
-    Returns:
-        Dataset: filtered dataset
-    """
-    idx = [i for i, (_, t) in enumerate(dataset) if t in selected_targets]
-    return Subset(dataset, idx)
-
-
-def dataset_by_class_index(
-    dataset: Dataset,
-    selected_class_indices: set,
-    mapper_index2target: list | dict,
-) -> Dataset:
-    """
-    Returns a filtered dataset
-
-    Args:
-        dataset (Dataset): dataset to be filtered
-        selected_class_indices (set): fake class indices to keep
-        mapper_index2target (list | dict): mapping from index to target
-
-    Returns:
-        Dataset: filtered dataset
-    """
-    return dataset_by_target(
-        dataset,
-        set(mapper_index2target[i] for i in selected_class_indices),
-    )
 
 
 class CILDataset(Dataset):
@@ -52,14 +12,12 @@ class CILDataset(Dataset):
 
     Args:
         dataset (Dataset): Base dataset.
-        target_transform (callable, optional): Typically classid-to-index mapping. Default: None.
         buffer (ExemplarBuffer, optional): Buffer for replaying, etc. Default: None.
     """
 
     def __init__(
         self,
         dataset: Dataset,
-        target_transform: callable = None,
         buffer: ExemplarBuffer = None,
     ) -> None:
         super().__init__()
@@ -75,19 +33,11 @@ class CILDataset(Dataset):
 
         assert len(self.dataset) > 0, f"{self.__class__.__name__}: dataset is empty"
 
-        if target_transform is None:
-            # warning?
-            # print(f"{self.__class__.__name__}: target_transform is None")
-            pass
-        self.target_transform = target_transform
-
     def __len__(self) -> int:
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> tuple:
         x, y = self.dataset[index]
-        if self.target_transform is not None:
-            y = self.target_transform(y)
         return x, y
 
 
@@ -101,13 +51,13 @@ class BaseCILDataModule(pl.LightningDataModule):
         num_class_per_task: number of classes per task.
         batch_size: batch size for data loaders. Default: 64.
         num_workers: number of workers for data loaders. Default: 4.
+        target_transform: list of class indices in the order they will appear. Default: None (random).
 
     Attributes:
-        class_order: optional list specifying the order of class IDs. If None, random shuffled by ``self.seed``.
         buffer: exemplar buffer to store samples from previous tasks, can be set externally.
+        task_id: current task ID, set by ``set_task()``
         classes_current: indices in ``class_order`` for the current task, set by ``set_task()``
         classes_seen: indices in ``class_order`` seen so far, set by ``set_task()``
-        task_id: current task ID, set by ``set_task()``
 
     Examples::
 
@@ -116,8 +66,8 @@ class BaseCILDataModule(pl.LightningDataModule):
         ...     pass
     """
 
-    # class-ids in the order they will appear, i.e. order-index -> actual classid
-    class_order: list[int | str] | None
+    # real classid -> fake index mapping, smaller index appear in earlier tasks
+    target_transform: callable
     # buffer
     buffer: ExemplarBuffer | None
 
@@ -135,6 +85,7 @@ class BaseCILDataModule(pl.LightningDataModule):
         num_class_per_task: int,
         batch_size: int = 64,
         num_workers: int = 4,
+        target_transform: callable = None,
     ):
         super().__init__()
         # root dir of the dataset
@@ -150,9 +101,31 @@ class BaseCILDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
 
+        # target transforms
+        self.target_transform = target_transform
+
     @property
     def num_tasks(self) -> int:
         return ceil((self.num_class_total / self.num_class_per_task))
+
+    @staticmethod
+    def dataset_by_target(
+        dataset: Dataset,
+        selected_targets: set,
+    ) -> Dataset:
+        """
+        Returns a filtered dataset
+
+        Args:
+            dataset (Dataset): dataset to be filtered
+            selected_targets (set): targets to keep
+
+        Returns:
+            Dataset: filtered dataset
+        """
+        return Subset(
+            dataset, [i for i, (_, y) in enumerate(dataset) if y in selected_targets]
+        )
 
     def set_task(self, task_id: int | str) -> None:
         """Set the current task ID. This will also update `classes_current` and `classes_seen`."""
@@ -182,9 +155,6 @@ class BaseCILDataModule(pl.LightningDataModule):
         Returns:
             DataLoader: The data loader for the dataset.
         """
-        return DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            **kwargs,
-        )
+        kwargs.setdefault("batch_size", self.batch_size)
+        kwargs.setdefault("num_workers", self.num_workers)
+        return DataLoader(dataset, **kwargs)

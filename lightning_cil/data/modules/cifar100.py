@@ -1,10 +1,10 @@
 from typing import Optional
 
-import numpy as np
 import torchvision.transforms as T
+from numpy.random import RandomState
 from torchvision.datasets import CIFAR100
 
-from ..cil_datamodule import BaseCILDataModule, CILDataset, dataset_by_class_index
+from ..cil_datamodule import BaseCILDataModule, CILDataset
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
@@ -62,19 +62,17 @@ class CIFAR100DataModule(BaseCILDataModule):
         self.download = download
 
         # no dup in class_order
-        if class_order is not None:
-            assert len(class_order) == len(set(class_order)), (
-                f"{self.__class__.__name__}: class_order has duplicate entries {class_order}"
+        if class_order is None:
+            index2target = RandomState(seed).permutation(self.num_class_total)
+        else:
+            assert len(class_order) == self.num_class_total, (
+                f"{self.__class__.__name__}: class_order expects {self.num_class_total} entries, got {class_order}"
             )
-
-        self._index_to_target = class_order or np.random.RandomState(seed).permutation(
-            self.num_class_total
-        )
-        self._target_to_index = {
-            target: order_index
-            for order_index, target in enumerate(self._index_to_target)
+            index2target = class_order
+        self._target2index = {
+            target: order_index for order_index, target in enumerate(index2target)
         }
-        self.target_transform = lambda x: self._target_to_index[x]
+        self.target_transform = lambda x: self._target2index[x]
 
         self.set_task(0)
 
@@ -86,21 +84,28 @@ class CIFAR100DataModule(BaseCILDataModule):
         CIFAR100(self.root, train=False, download=self.download)
 
     def setup(self, stage: Optional[str] = None):
+        # target transformed to fake index
         self.cifar100_train = CIFAR100(
-            self.root, train=True, transform=self.train_tf, download=False
+            self.root,
+            train=True,
+            transform=self.train_tf,
+            target_transform=self.target_transform,
+            download=False,
         )
         self.cifar100_test = CIFAR100(
-            self.root, train=False, transform=self.test_tf, download=False
+            self.root,
+            train=False,
+            transform=self.test_tf,
+            target_transform=self.target_transform,
+            download=False,
         )
 
     def train_dataloader(self):
-        train_dataset = dataset_by_class_index(
-            self.cifar100_train, self.classes_current, self._index_to_target
-        )
         return self.build_loader(
             CILDataset(
-                train_dataset,
-                target_transform=self.target_transform,
+                BaseCILDataModule.dataset_by_target(
+                    self.cifar100_train, self.classes_current
+                ),
                 buffer=self.buffer,
             ),
             shuffle=True,
@@ -108,15 +113,8 @@ class CIFAR100DataModule(BaseCILDataModule):
         )
 
     def val_dataloader(self):
-        test_dataset = dataset_by_class_index(
-            self.cifar100_test, self.classes_seen, self._index_to_target
-        )
-
         return self.build_loader(
-            CILDataset(
-                test_dataset,
-                target_transform=self.target_transform,
-            ),
+            BaseCILDataModule.dataset_by_target(self.cifar100_test, self.classes_seen),
             shuffle=False,
             pin_memory=True,
         )
