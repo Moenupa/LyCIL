@@ -1,13 +1,14 @@
-from typing import Dict, Iterable, List, Tuple
+from typing import Iterable
 
 import torch
+from torch.nn import functional as F
 from torch.utils.data import Dataset
 
 
 class ExemplarDataset(Dataset):
     """Dataset wrapper around exemplars stored as tensors (C,H,W) and labels."""
 
-    def __init__(self, items: List[Tuple[torch.Tensor, int]]):
+    def __init__(self, items: list[tuple[torch.Tensor, int]]):
         self.items = items
 
     def __len__(self):
@@ -26,13 +27,13 @@ class ExemplarBuffer:
 
     def __init__(self, mem_size: int = 2000):
         self.mem_size = int(mem_size)
-        self.storage: Dict[int, List[torch.Tensor]] = {}
-        self.class_means: Dict[int, torch.Tensor] = {}
+        self.storage: dict[int, list[torch.Tensor]] = {}
+        self.class_means: dict[int, torch.Tensor] = {}
 
     def __len__(self) -> int:
         return sum(len(v) for v in self.storage.values())
 
-    def classes(self) -> List[int]:
+    def classes(self) -> list[int]:
         return sorted(list(self.storage.keys()))
 
     def exemplars_per_class(self, num_classes_seen: int) -> int:
@@ -60,7 +61,7 @@ class ExemplarBuffer:
                 continue
             x = x[mask].to(device, non_blocking=True)
             f = feature_extractor(x).detach()  # (n,d)
-            f = torch.nn.functional.normalize(f, dim=1)
+            f = F.normalize(f, dim=1)
             feats.append(f.cpu())
             imgs.append(x.cpu())
         if not feats:
@@ -112,7 +113,7 @@ class ExemplarBuffer:
     @torch.no_grad()
     def compute_nme_classifier(
         self, model, feature_extractor, device: torch.device
-    ) -> Dict[int, torch.Tensor]:
+    ) -> dict[int, torch.Tensor]:
         """Compute mean feature per class from exemplars (for iCaRL NME inference)."""
         nme = {}
         for c, imgs in self.storage.items():
@@ -120,6 +121,6 @@ class ExemplarBuffer:
                 continue
             x = torch.stack(imgs).to(device)
             f = feature_extractor(x)
-            f = torch.nn.functional.normalize(f, dim=1)
+            f = F.normalize(f, dim=1)
             nme[c] = f.mean(dim=0).detach().cpu()
         return nme
