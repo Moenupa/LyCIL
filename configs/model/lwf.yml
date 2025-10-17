@@ -1,0 +1,10 @@
+backbone_name: "resnet18"
+head: "linear"
+pretrained_backbone: true
+lr: 0.1
+weight_decay: 0.0005
+optimizer: "sgd"
+momentum: 0.9
+nesterov: true
+distill_T: 2.0
+lambda_distill: 1.0

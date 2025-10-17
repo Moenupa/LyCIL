@@ -110,7 +110,7 @@ def test_cifar100_training():
             return optimizer
 
     dm = CIFAR100DataModule(
-        root="/public/datasets/cifar",
+        root="data/cifar",
         num_class_per_task=1,
         batch_size=2,
     )

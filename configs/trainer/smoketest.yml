@@ -1,0 +1,7 @@
+max_epochs: 1
+accelerator: "auto"
+devices: 1
+precision: 32
+enable_checkpointing: true
+enable_progress_bar: true
+log_every_n_steps: 50

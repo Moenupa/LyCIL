@@ -11,7 +11,8 @@ class CLI(cli.LightningCLI):
 
     Examples::
 
-        python examples/train_lwf.py -c configs/lwf.yml --data configs/data/cifar100.yml
+        python examples/train_lwf.py fit -c configs/sample_lwf.yml
+        python examples/train_lwf.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
 
     .. _Learning without Forgetting:
         https://arxiv.org/abs/1606.09282

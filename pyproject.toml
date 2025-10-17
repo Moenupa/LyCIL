@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "lightning-cil"
-version = "0.1.0"
+version = "0.1.1"
 description = "A clean, PyTorch Lightning (>2.0) continual/incremental learning (CIL) library with standard iCaRL and LUCIR implementations, exemplar memory, cosine classifier, and ready-to-run CLI examples."
 readme = "README.md"
 requires-python = ">=3.9,<3.12"
