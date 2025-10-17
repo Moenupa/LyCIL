@@ -45,7 +45,7 @@ class CIFAR100DataModule(BaseCILDataModule):
         root (str, optional): root directory of the dataset. Default: "./data".
         download (bool, optional): whether to download data. Default: True.
         num_class_per_task (int, optional): increment per task. Default: 10.
-        batch_size (int, optional): batch size. Default: 128.
+        batch_size (int, optional): batch size. Default: 64.
         num_workers (int, optional): number of workers. Default: 4.
         class_order (list[int] | None, optional): list of orders, see :ref:`BaseCILDataModule`. Default: None.
         seed (int, optional): random seed. Default: 0.
@@ -105,7 +105,6 @@ class CIFAR100DataModule(BaseCILDataModule):
     def train_dataloader(self):
         targets = set(self._index_to_target[i] for i in self.classes_current)
         train_dataset = _filter_dataset_by_target(self.cifar100_train, targets)
-        print(self.classes_current, targets)
         return DataLoader(
             BufferedDataset(
                 train_dataset,
