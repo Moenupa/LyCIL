@@ -28,15 +28,22 @@ def test_cifar100_datamodule_task(task_id: int):
 
     dm.set_task(task_id)
 
+    expected_classes_current = set(range(task_id * 10, (task_id + 1) * 10))
+    expected_classes_seen = set(range(0, (task_id + 1) * 10))
     assert len(dm.classes_current) == 10
-    assert set(dm.classes_current) == set(range(task_id * 10, (task_id + 1) * 10))
+    assert set(dm.classes_current) == expected_classes_current
     assert len(dm.classes_seen) == (task_id + 1) * 10
-    assert set(dm.classes_seen) == set(range(0, (task_id + 1) * 10))
+    assert set(dm.classes_seen) == expected_classes_seen
 
     train_dataset = dm._dataset_train
     test_dataset = dm._dataset_test
     assert len(train_dataset) == 5000
     assert len(test_dataset) == 1000 * (task_id + 1)
+
+    for _, y in train_dataset:
+        assert y in expected_classes_current
+    for _, y in test_dataset:
+        assert y in expected_classes_seen
 
 
 @pytest.mark.cuda
