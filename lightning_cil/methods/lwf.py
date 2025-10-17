@@ -41,7 +41,6 @@ class LWF(BaseIncremental):
         logits: torch.Tensor = self(x)
 
         # Standard CE over all seen classes (labels are within current classes)
-        assert logits.size(0) == y.size(0)
         loss_ce = F.cross_entropy(logits, y)
 
         # Distillation on OLD classes only (seen \ current)

@@ -1,6 +1,6 @@
-from abc import abstractmethod
 import copy
-from typing import Optional, Literal
+from abc import abstractmethod
+from typing import Literal, Optional
 
 import lightning.pytorch as pl
 import torch
@@ -12,7 +12,6 @@ from models.classifier.cosine_classifier import CosineClassifier
 from utils.metrics import accuracy, accuracy_topk
 
 from ..data.buffer import ExemplarBuffer
-
 
 _CLASSIFIER_HEADS = {
     # key: (class, {optional kwargs})
@@ -32,12 +31,12 @@ class BaseIncremental(pl.LightningModule):
 
     def __init__(
         self,
-        backbone_name: str = "resnet18",
+        backbone_name: Literal["resnet18", "resnet34", "resnet50"] = "resnet18",
         head: Literal["linear", "cosine"] = "linear",
         pretrained_backbone: bool = False,
         lr: float = 0.1,
         weight_decay: float = 1e-4,
-        optimizer: str = "sgd",
+        optimizer: Literal["sgd", "adamw"] = "sgd",
         momentum: float = 0.9,
         nesterov: bool = True,
         mem_size: int = 2000,
@@ -46,7 +45,6 @@ class BaseIncremental(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=["buffer"])
         self.backbone = ResNetBackbone(backbone_name, pretrained_backbone)
-        self.feature_dim = self.backbone.feature_dim
         self.head_type = head
 
         # Delay classifier creation until first task
@@ -57,6 +55,10 @@ class BaseIncremental(pl.LightningModule):
         self.current_classes: list[int] = []
         self.seen_classes: list[int] = []
         self.use_nme_eval = bool(use_nme_eval)
+
+    @property
+    def feature_dim(self) -> int:
+        return self.backbone.feature_dim
 
     # ----- task orchestration ------
     def set_task_info(self, current_classes: list[int], seen_classes: list[int]):
@@ -124,7 +126,9 @@ class BaseIncremental(pl.LightningModule):
             )
         elif self.hparams.optimizer.lower() == "adamw":
             opt = torch.optim.AdamW(
-                params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay
+                params,
+                lr=self.hparams.lr,
+                weight_decay=self.hparams.weight_decay,
             )
         else:
             raise ValueError("Unsupported optimizer")
