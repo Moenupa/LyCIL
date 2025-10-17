@@ -85,14 +85,14 @@ class CIFAR100DataModule(BaseCILDataModule):
 
     def setup(self, stage: Optional[str] = None):
         # target transformed to fake index
-        self.cifar100_train = CIFAR100(
+        self._train_dataset = CIFAR100(
             self.root,
             train=True,
             transform=self.train_tf,
             target_transform=self.target_transform,
             download=False,
         )
-        self.cifar100_test = CIFAR100(
+        self._test_dataset = CIFAR100(
             self.root,
             train=False,
             transform=self.test_tf,
@@ -104,7 +104,7 @@ class CIFAR100DataModule(BaseCILDataModule):
         return self.build_loader(
             CILDataset(
                 BaseCILDataModule.dataset_by_target(
-                    self.cifar100_train, self.classes_current
+                    self._train_dataset, self.classes_current
                 ),
                 buffer=self.buffer,
             ),
@@ -113,11 +113,11 @@ class CIFAR100DataModule(BaseCILDataModule):
         )
 
     def val_dataloader(self):
+        return self.test_dataloader()
+
+    def test_dataloader(self):
         return self.build_loader(
-            BaseCILDataModule.dataset_by_target(self.cifar100_test, self.classes_seen),
+            BaseCILDataModule.dataset_by_target(self._test_dataset, self.classes_seen),
             shuffle=False,
             pin_memory=True,
         )
-
-    def test_dataloader(self):
-        return self.val_dataloader()

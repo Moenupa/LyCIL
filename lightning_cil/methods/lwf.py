@@ -61,6 +61,7 @@ class LWF(BaseIncremental):
         loss = loss_ce + self.lambda_distill * loss_distill
         self.log_dict(
             {
+                "train/seen_classes": len(self.seen_classes),
                 "train/loss": loss,
                 "train/ce": loss_ce,
                 "train/distill": loss_distill,

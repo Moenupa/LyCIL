@@ -78,6 +78,11 @@ class BaseCILDataModule(pl.LightningDataModule):
     # indices in class_order seen so far, set by `set_task`
     classes_seen: list[int]
 
+    # subsets
+    _train_dataset: Dataset
+    _val_dataset: Dataset
+    _test_dataset: Dataset
+
     def __init__(
         self,
         root: str,

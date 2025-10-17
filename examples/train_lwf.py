@@ -21,13 +21,7 @@ class CLI(cli.LightningCLI):
     model: LWF
     datamodule: BaseCILDataModule
 
-    def instantiate_classes(self):
-        super().instantiate_classes()
-
-        # init first task to pass sanity checks
-        self.model.expand_head(self.datamodule.num_class_per_task)
-
-    def run(self):
+    def fit(self, **kwargs):
         pl.seed_everything(self.config.get("seed_everything", None))
         dm = self.datamodule
         model: LWF = self.model
@@ -39,7 +33,7 @@ class CLI(cli.LightningCLI):
             seen = dm.classes_seen
             model.set_task_info(cur, seen)
             # first task already expanded in instantiate_classes()
-            model.expand_head(0 if len(cur) == 0 else len(cur))
+            model.expand_head(len(cur))
 
             trainer.fit(model=model, datamodule=dm)
             trainer.validate(model=model, datamodule=dm)
