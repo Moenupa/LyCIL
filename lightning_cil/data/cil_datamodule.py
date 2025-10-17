@@ -1,8 +1,54 @@
 from math import ceil
 
 import lightning.pytorch as pl
+from torch.utils.data import ConcatDataset, Dataset
 
 from .buffer import ExemplarBuffer
+
+
+class BufferedDataset(Dataset):
+    """
+    Dataset with Continual/Incremental Learning (CIL) features.
+
+    Args:
+        dataset (Dataset): Base dataset.
+        target_transform (callable, optional): Typically classid-to-index mapping. Default: None.
+        buffer (ExemplarBuffer, optional): Buffer for replaying, etc. Default: None.
+    """
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        target_transform: callable = None,
+        buffer: ExemplarBuffer = None,
+    ) -> None:
+        super().__init__()
+        # dataset must be a subclass of Dataset
+        assert isinstance(dataset, Dataset), (
+            f"{self.__class__.__name__}: dataset must be a subclass of Dataset, got {type(dataset)}"
+        )
+
+        if buffer is not None and len(buffer) > 0:
+            self.dataset = ConcatDataset([dataset, buffer.make_dataset()])
+        else:
+            self.dataset = dataset
+
+        assert len(self.dataset) > 0, f"{self.__class__.__name__}: dataset is empty"
+
+        if target_transform is None:
+            # warning?
+            # print(f"{self.__class__.__name__}: target_transform is None")
+            pass
+        self.target_transform = target_transform
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int) -> tuple:
+        x, y = self.dataset[index]
+        if self.target_transform is not None:
+            y = self.target_transform(y)
+        return x, y
 
 
 class BaseCILDataModule(pl.LightningDataModule):
@@ -30,7 +76,7 @@ class BaseCILDataModule(pl.LightningDataModule):
         ...     pass
     """
 
-    # class-ids in the order they will appear
+    # class-ids in the order they will appear, i.e. order-index -> actual classid
     class_order: list[int | str] | None
     # buffer
     buffer: ExemplarBuffer | None

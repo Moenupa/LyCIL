@@ -2,10 +2,10 @@ from typing import Optional
 
 import numpy as np
 import torchvision.transforms as T
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR100
 
-from ..cil_datamodule import BaseCILDataModule
+from ..cil_datamodule import BaseCILDataModule, BufferedDataset
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
@@ -29,10 +29,10 @@ def _make_transforms(image_size: int = 32):
     return train_tf, test_tf
 
 
-def _filter_dataset_by_classid(
-    dataset: CIFAR100, class_idx: list[int], class_order: list[int | str]
+def _filter_dataset_by_target(
+    dataset: CIFAR100,
+    selected_targets: set,
 ) -> Dataset:
-    selected_targets = set(class_order[i] for i in class_idx)
     idx = [i for i, (_, t) in enumerate(dataset) if t in selected_targets]
     return Subset(dataset, idx)
 
@@ -70,9 +70,20 @@ class CIFAR100DataModule(BaseCILDataModule):
         )
         self.download = download
 
-        self.class_order = class_order or list(range(self.num_class_total))
-        if class_order is None:
-            np.random.RandomState(seed).shuffle(self.class_order)
+        # no dup in class_order
+        if class_order is not None:
+            assert len(class_order) == len(set(class_order)), (
+                f"{self.__class__.__name__}: class_order has duplicate entries {class_order}"
+            )
+
+        self._index_to_target = class_order or np.random.RandomState(seed).permutation(
+            self.num_class_total
+        )
+        self._target_to_index = {
+            target: order_index
+            for order_index, target in enumerate(self._index_to_target)
+        }
+        self.target_transform = lambda x: self._target_to_index[x]
 
         self.set_task(0)
 
@@ -91,29 +102,16 @@ class CIFAR100DataModule(BaseCILDataModule):
             self.root, train=False, transform=self.test_tf, download=False
         )
 
-    @property
-    def _dataset_train(self) -> Dataset:
-        return _filter_dataset_by_classid(
-            self.cifar100_train, self.classes_current, self.class_order
-        )
-
-    @property
-    def _dataset_test(self) -> Dataset:
-        return _filter_dataset_by_classid(
-            self.cifar100_test, self.classes_seen, self.class_order
-        )
-
     def train_dataloader(self):
-        if self.buffer is not None and len(self.buffer) > 0:
-            mix = ConcatDataset([self._dataset_train, self.buffer.make_dataset()])
-        else:
-            mix = self._dataset_train
-        assert len(mix) > 0, (
-            f"{self.__class__.__name__}: no training data for task {self.task_id} with classes {self.classes_current}"
-        )
-
+        targets = set(self._index_to_target[i] for i in self.classes_current)
+        train_dataset = _filter_dataset_by_target(self.cifar100_train, targets)
+        print(self.classes_current, targets)
         return DataLoader(
-            mix,
+            BufferedDataset(
+                train_dataset,
+                target_transform=self.target_transform,
+                buffer=self.buffer,
+            ),
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
@@ -121,8 +119,14 @@ class CIFAR100DataModule(BaseCILDataModule):
         )
 
     def val_dataloader(self):
+        targets = set(self._index_to_target[i] for i in self.classes_seen)
+        test_dataset = _filter_dataset_by_target(self.cifar100_test, targets)
+
         return DataLoader(
-            self._dataset_test,
+            BufferedDataset(
+                test_dataset,
+                target_transform=self.target_transform,
+            ),
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
