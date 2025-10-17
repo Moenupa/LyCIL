@@ -29,10 +29,11 @@ def _make_transforms(image_size: int = 32):
     return train_tf, test_tf
 
 
-def _filter_dataset_by_classid(dataset: CIFAR100, class_ids: list[int]) -> Dataset:
-    # Optimized: use numpy for fast indexing
-    targets = np.array(dataset.targets)
-    idx = np.where(np.isin(targets, set(class_ids)))[0].tolist()
+def _filter_dataset_by_classid(
+    dataset: CIFAR100, class_idx: list[int], class_order: list[int | str]
+) -> Dataset:
+    selected_targets = set(class_order[i] for i in class_idx)
+    idx = [i for i, (_, t) in enumerate(dataset) if t in selected_targets]
     return Subset(dataset, idx)
 
 
@@ -92,11 +93,15 @@ class CIFAR100DataModule(BaseCILDataModule):
 
     @property
     def _dataset_train(self) -> Dataset:
-        return _filter_dataset_by_classid(self.cifar100_train, self.classes_current)
+        return _filter_dataset_by_classid(
+            self.cifar100_train, self.classes_current, self.class_order
+        )
 
     @property
     def _dataset_test(self) -> Dataset:
-        return _filter_dataset_by_classid(self.cifar100_test, self.classes_seen)
+        return _filter_dataset_by_classid(
+            self.cifar100_test, self.classes_seen, self.class_order
+        )
 
     def train_dataloader(self):
         if self.buffer is not None and len(self.buffer) > 0:
