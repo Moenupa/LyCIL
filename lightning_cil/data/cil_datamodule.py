@@ -1,12 +1,52 @@
 from math import ceil
 
 import lightning.pytorch as pl
-from torch.utils.data import ConcatDataset, Dataset
+from torch.utils.data import ConcatDataset, Dataset, Subset, DataLoader
 
 from .buffer import ExemplarBuffer
 
 
-class BufferedDataset(Dataset):
+def dataset_by_target(
+    dataset: Dataset,
+    selected_targets: set,
+) -> Dataset:
+    """
+    Returns a filtered dataset
+
+    Args:
+        dataset (Dataset): dataset to be filtered
+        selected_targets (set): real targets to keep
+
+    Returns:
+        Dataset: filtered dataset
+    """
+    idx = [i for i, (_, t) in enumerate(dataset) if t in selected_targets]
+    return Subset(dataset, idx)
+
+
+def dataset_by_class_index(
+    dataset: Dataset,
+    selected_class_indices: set,
+    mapper_index2target: list | dict,
+) -> Dataset:
+    """
+    Returns a filtered dataset
+
+    Args:
+        dataset (Dataset): dataset to be filtered
+        selected_class_indices (set): fake class indices to keep
+        mapper_index2target (list | dict): mapping from index to target
+
+    Returns:
+        Dataset: filtered dataset
+    """
+    return dataset_by_target(
+        dataset,
+        set(mapper_index2target[i] for i in selected_class_indices),
+    )
+
+
+class CILDataset(Dataset):
     """
     Dataset with Continual/Incremental Learning (CIL) features.
 
@@ -130,3 +170,21 @@ class BaseCILDataModule(pl.LightningDataModule):
 
         self.classes_current = list(range(_index_l, _index_r))
         self.classes_seen = list(range(0, _index_r))
+
+    def build_loader(self, dataset: Dataset, **kwargs) -> None:
+        """
+        Build a data loader for the given dataset.
+
+        Args:
+            dataset (Dataset): The dataset to load.
+            kwargs: additional args for :ref:`DataLoader <torch.utils.data.DataLoader>`
+
+        Returns:
+            DataLoader: The data loader for the dataset.
+        """
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            **kwargs,
+        )

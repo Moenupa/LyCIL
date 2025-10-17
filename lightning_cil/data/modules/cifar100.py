@@ -2,10 +2,9 @@ from typing import Optional
 
 import numpy as np
 import torchvision.transforms as T
-from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision.datasets import CIFAR100
 
-from ..cil_datamodule import BaseCILDataModule, BufferedDataset
+from ..cil_datamodule import BaseCILDataModule, CILDataset, dataset_by_class_index
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
@@ -27,14 +26,6 @@ def _make_transforms(image_size: int = 32):
         ]
     )
     return train_tf, test_tf
-
-
-def _filter_dataset_by_target(
-    dataset: CIFAR100,
-    selected_targets: set,
-) -> Dataset:
-    idx = [i for i, (_, t) in enumerate(dataset) if t in selected_targets]
-    return Subset(dataset, idx)
 
 
 class CIFAR100DataModule(BaseCILDataModule):
@@ -103,32 +94,30 @@ class CIFAR100DataModule(BaseCILDataModule):
         )
 
     def train_dataloader(self):
-        targets = set(self._index_to_target[i] for i in self.classes_current)
-        train_dataset = _filter_dataset_by_target(self.cifar100_train, targets)
-        return DataLoader(
-            BufferedDataset(
+        train_dataset = dataset_by_class_index(
+            self.cifar100_train, self.classes_current, self._index_to_target
+        )
+        return self.build_loader(
+            CILDataset(
                 train_dataset,
                 target_transform=self.target_transform,
                 buffer=self.buffer,
             ),
-            batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers,
             pin_memory=True,
         )
 
     def val_dataloader(self):
-        targets = set(self._index_to_target[i] for i in self.classes_seen)
-        test_dataset = _filter_dataset_by_target(self.cifar100_test, targets)
+        test_dataset = dataset_by_class_index(
+            self.cifar100_test, self.classes_seen, self._index_to_target
+        )
 
-        return DataLoader(
-            BufferedDataset(
+        return self.build_loader(
+            CILDataset(
                 test_dataset,
                 target_transform=self.target_transform,
             ),
-            batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
             pin_memory=True,
         )
 
