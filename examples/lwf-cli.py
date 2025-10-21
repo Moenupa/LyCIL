@@ -46,7 +46,7 @@ class CLI(cli.LightningCLI):
 if __name__ == "__main__":
     CLI(
         LWF,
-        pl.LightningDataModule,
+        BaseCILDataModule,
         save_config_callback=None,
         run=True,
         subclass_mode_data=True,
