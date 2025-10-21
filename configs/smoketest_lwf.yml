@@ -1,5 +1,5 @@
 data:
-  class_path: lightning_cil.data.modules.cifar100.CIFAR100DataModule
+  class_path: lycil.data.modules.cifar100.CIFAR100DataModule
   init_args:
     root: 'data/cifar'
 

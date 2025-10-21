@@ -1,8 +1,8 @@
 import lightning.pytorch as pl
 from lightning.pytorch import cli
 
-from lightning_cil.data.cil_datamodule import BaseCILDataModule
-from lightning_cil.methods.icarl import ICaRL
+from lycil.data.cil_datamodule import BaseCILDataModule
+from lycil.methods.icarl import ICaRL
 
 
 class CLI(cli.LightningCLI):

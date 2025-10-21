@@ -1,4 +1,4 @@
-# lightning_cil
+# LyCIL
 
 A clean, [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) (2.x) continual/incremental learning (CIL) library inspired by [PyCIL](https://github.com/LAMDA-CL/PyCIL), with up-to-date methods, NPU support, modern interface, and ready-to-run CLI examples. 
 

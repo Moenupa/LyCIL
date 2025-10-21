@@ -2,15 +2,15 @@ version = 1
 revision = 3
 requires-python = ">=3.10, <3.12"
 resolution-markers = [
-    "python_full_version >= '3.11' and extra != 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu'",
-    "python_full_version < '3.11' and extra != 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu'",
-    "python_full_version >= '3.11' and extra == 'extra-13-lightning-cil-lightning' and extra != 'extra-13-lightning-cil-lightning-npu'",
-    "python_full_version < '3.11' and extra == 'extra-13-lightning-cil-lightning' and extra != 'extra-13-lightning-cil-lightning-npu'",
-    "extra != 'extra-13-lightning-cil-lightning' and extra != 'extra-13-lightning-cil-lightning-npu'",
+    "python_full_version >= '3.11' and extra != 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu'",
+    "python_full_version < '3.11' and extra != 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu'",
+    "python_full_version >= '3.11' and extra == 'extra-5-lycil-lightning' and extra != 'extra-5-lycil-lightning-npu'",
+    "python_full_version < '3.11' and extra == 'extra-5-lycil-lightning' and extra != 'extra-5-lycil-lightning-npu'",
+    "extra != 'extra-5-lycil-lightning' and extra != 'extra-5-lycil-lightning-npu'",
 ]
 conflicts = [[
-    { package = "lightning-cil", extra = "lightning" },
-    { package = "lightning-cil", extra = "lightning-npu" },
+    { package = "lycil", extra = "lightning" },
+    { package = "lycil", extra = "lightning-npu" },
 ]]
 
 [[package]]
@@ -155,7 +155,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (extra != 'extra-13-lightning-cil-lightning' and extra != 'extra-13-lightning-cil-lightning-npu')" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -331,7 +331,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-5-lycil-lightning-npu'" },
     { name = "lightning-utilities" },
     { name = "numpy" },
     { name = "packaging" },
@@ -352,7 +352,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-5-lycil-lightning'" },
     { name = "lightning-utilities" },
     { name = "numpy" },
     { name = "packaging" },
@@ -369,7 +369,21 @@ wheels = [
 ]
 
 [[package]]
-name = "lightning-cil"
+name = "lightning-utilities"
+version = "0.15.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "setuptools" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b8/39/6fc58ca81492db047149b4b8fd385aa1bfb8c28cd7cacb0c7eb0c44d842f/lightning_utilities-0.15.2.tar.gz", hash = "sha256:cdf12f530214a63dacefd713f180d1ecf5d165338101617b4742e8f22c032e24", size = 31090, upload-time = "2025-08-06T13:57:39.242Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/73/3d757cb3fc16f0f9794dd289bcd0c4a031d9cf54d8137d6b984b2d02edf3/lightning_utilities-0.15.2-py3-none-any.whl", hash = "sha256:ad3ab1703775044bbf880dbf7ddaaac899396c96315f3aa1779cec9d618a9841", size = 29431, upload-time = "2025-08-06T13:57:38.046Z" },
+]
+
+[[package]]
+name = "lycil"
 version = "0.1.2"
 source = { editable = "." }
 dependencies = [
@@ -428,20 +442,6 @@ dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.14.0" },
-]
-
-[[package]]
-name = "lightning-utilities"
-version = "0.15.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "setuptools" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/39/6fc58ca81492db047149b4b8fd385aa1bfb8c28cd7cacb0c7eb0c44d842f/lightning_utilities-0.15.2.tar.gz", hash = "sha256:cdf12f530214a63dacefd713f180d1ecf5d165338101617b4742e8f22c032e24", size = 31090, upload-time = "2025-08-06T13:57:39.242Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/73/3d757cb3fc16f0f9794dd289bcd0c4a031d9cf54d8137d6b984b2d02edf3/lightning_utilities-0.15.2-py3-none-any.whl", hash = "sha256:ad3ab1703775044bbf880dbf7ddaaac899396c96315f3aa1779cec9d618a9841", size = 29431, upload-time = "2025-08-06T13:57:38.046Z" },
 ]
 
 [[package]]
@@ -705,7 +705,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9f/fd/713452cd72343f682b1c7b9321e23829f00b842ceaedcda96e742ea0b0b3/nvidia_cudnn_cu12-9.1.0.70-py3-none-manylinux2014_x86_64.whl", hash = "sha256:165764f44ef8c61fcdfdfdbe769d687e06374059fbb388b6c89ecb0e28793a6f", size = 664752741, upload-time = "2024-04-22T15:24:15.253Z" },
@@ -721,7 +721,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/41/e79269ce215c857c935fd86bcfe91a451a584dfc27f1e068f568b9ad1ab7/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c9132cc3f8958447b4910a1720036d9eff5928cc3179b0a51fb6d167c6cc87d8", size = 705026878, upload-time = "2025-06-06T21:52:51.348Z" },
@@ -738,7 +738,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/8a/0e728f749baca3fbeffad762738276e5df60851958be7783af121a7221e7/nvidia_cufft_cu12-11.2.1.3-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5dad8008fc7f92f5ddfa2101430917ce2ffacd86824914c82e28990ad7f00399", size = 211422548, upload-time = "2024-06-18T19:33:39.396Z" },
@@ -755,7 +755,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/bc/7771846d3a0272026c416fbb7e5f4c1f146d6d80704534d0b187dd6f4800/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:848ef7224d6305cdb2a4df928759dca7b1201874787083b6e7550dd6765ce69a", size = 193109211, upload-time = "2025-03-07T01:44:56.873Z" },
@@ -809,9 +809,9 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "nvidia-cusparse-cu12", version = "12.3.1.170", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "nvidia-cusparse-cu12", version = "12.3.1.170", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/6b/a5c33cf16af09166845345275c34ad2190944bcc6026797a39f8e0a282e0/nvidia_cusolver_cu12-11.6.1.9-py3-none-manylinux2014_aarch64.whl", hash = "sha256:d338f155f174f90724bbde3758b7ac375a70ce8e706d70b018dd3375545fc84e", size = 127634111, upload-time = "2024-06-18T19:35:01.793Z" },
@@ -828,9 +828,9 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/32/f7cd6ce8a7690544d084ea21c26e910a97e077c9b7f07bf5de623ee19981/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:db9ed69dbef9715071232caa9b69c52ac7de3a95773c2db65bdba85916e4e5c0", size = 267229841, upload-time = "2025-03-07T01:46:54.356Z" },
@@ -847,7 +847,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/96/a9/c0d2f83a53d40a4a41be14cea6a0bf9e668ffcf8b004bd65633f433050c0/nvidia_cusparse_cu12-12.3.1.170-py3-none-manylinux2014_aarch64.whl", hash = "sha256:9d32f62896231ebe0480efd8a7f702e143c98cfaa0e8a76df3386c1ba2b54df3", size = 207381987, upload-time = "2024-06-18T19:35:32.989Z" },
@@ -864,7 +864,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/f7/cd777c4109681367721b00a106f491e0d0d15cfa1fd59672ce580ce42a97/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b6c161cb130be1a07a27ea6923df8141f3c295852f4b260c65f18f3e0a091dc", size = 288117129, upload-time = "2025-03-07T01:47:40.407Z" },
@@ -1118,13 +1118,13 @@ name = "pytest"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "exceptiongroup", marker = "python_full_version < '3.11' or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
     { name = "pygments" },
-    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618, upload-time = "2025-09-04T14:34:22.711Z" }
 wheels = [
@@ -1149,12 +1149,12 @@ name = "pytorch-lightning"
 version = "2.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-13-lightning-cil-lightning' or extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "fsspec", extra = ["http"], marker = "extra == 'extra-5-lycil-lightning' or extra == 'extra-5-lycil-lightning-npu'" },
     { name = "lightning-utilities" },
     { name = "packaging" },
     { name = "pyyaml" },
-    { name = "torch", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "torch", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "torch", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "torch", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
     { name = "torchmetrics" },
     { name = "tqdm" },
     { name = "typing-extensions" },
@@ -1296,7 +1296,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "mpmath", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "mpmath", marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ca/99/5a5b6f19ff9f083671ddf7b9632028436167cd3d33e11015754e41b249a4/sympy-1.13.1.tar.gz", hash = "sha256:9cebf7e04ff162015ce31c9c6c9144daa34a93bd082f54fd8f12deca4f47515f", size = 7533040, upload-time = "2024-07-19T09:26:51.238Z" }
 wheels = [
@@ -1312,7 +1312,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "mpmath", marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "mpmath", marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
@@ -1354,26 +1354,26 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "fsspec", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "jinja2", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-13-lightning-cil-lightning-npu') or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-13-lightning-cil-lightning-npu') or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-cupti-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-nvrtc-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-runtime-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cudnn-cu12", version = "9.1.0.70", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cufft-cu12", version = "11.2.1.3", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-curand-cu12", version = "10.3.5.147", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cusolver-cu12", version = "11.6.1.9", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cusparse-cu12", version = "12.3.1.170", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nccl-cu12", version = "2.21.5", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nvtx-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "sympy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "triton", version = "3.1.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "typing-extensions", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "filelock", marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "fsspec", marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "jinja2", marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-5-lycil-lightning-npu') or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-5-lycil-lightning-npu') or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cublas-cu12", version = "12.4.5.8", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-cupti-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-nvrtc-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-runtime-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cudnn-cu12", version = "9.1.0.70", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cufft-cu12", version = "11.2.1.3", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-curand-cu12", version = "10.3.5.147", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cusolver-cu12", version = "11.6.1.9", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cusparse-cu12", version = "12.3.1.170", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nccl-cu12", version = "2.21.5", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nvtx-cu12", version = "12.4.127", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "sympy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "triton", version = "3.1.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning-npu') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "typing-extensions", marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/ef/834af4a885b31a0b32fff2d80e1e40f771e1566ea8ded55347502440786a/torch-2.5.1-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:71328e1bbe39d213b8721678f9dcac30dfc452a46d586f1d514a6aa0a99d4744", size = 906446312, upload-time = "2024-10-29T17:33:38.045Z" },
@@ -1395,29 +1395,29 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "fsspec", marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "jinja2", marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-13-lightning-cil-lightning') or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-13-lightning-cil-lightning') or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-cupti-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-nvrtc-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cudnn-cu12", version = "9.10.2.21", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cufft-cu12", version = "11.3.3.83", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-curand-cu12", version = "10.3.9.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cusolver-cu12", version = "11.7.3.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nccl-cu12", version = "2.27.5", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nvshmem-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "nvidia-nvtx-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "sympy", version = "1.14.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
-    { name = "triton", version = "3.5.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-13-lightning-cil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
-    { name = "typing-extensions", marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "filelock", marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "fsspec", marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "jinja2", marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-5-lycil-lightning') or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-5-lycil-lightning') or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-cupti-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-nvrtc-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cudnn-cu12", version = "9.10.2.21", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cufft-cu12", version = "11.3.3.83", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-curand-cu12", version = "10.3.9.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cusolver-cu12", version = "11.7.3.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cusparse-cu12", version = "12.5.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nccl-cu12", version = "2.27.5", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nvjitlink-cu12", version = "12.8.93", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nvshmem-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "nvidia-nvtx-cu12", version = "12.8.90", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "sympy", version = "1.14.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
+    { name = "triton", version = "3.5.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-5-lycil-lightning') or (platform_machine != 'x86_64' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu') or (sys_platform != 'linux' and extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
+    { name = "typing-extensions", marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bb/86/245c240d2138c17ed572c943c289056c2721abab70810d772c6bf5495b28/torch-2.9.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:030bbfe367379ae6a4ae4042b6c44da25383343b8b3c68abaa9c7231efbaf2dd", size = 104213554, upload-time = "2025-10-15T15:45:59.798Z" },
@@ -1452,8 +1452,8 @@ dependencies = [
     { name = "lightning-utilities" },
     { name = "numpy" },
     { name = "packaging" },
-    { name = "torch", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
-    { name = "torch", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-13-lightning-cil-lightning'" },
+    { name = "torch", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning-npu'" },
+    { name = "torch", version = "2.9.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-5-lycil-lightning'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/85/2e/48a887a59ecc4a10ce9e8b35b3e3c5cef29d902c4eac143378526e7485cb/torchmetrics-1.8.2.tar.gz", hash = "sha256:cf64a901036bf107f17a524009eea7781c9c5315d130713aeca5747a686fe7a5", size = 580679, upload-time = "2025-09-03T14:00:54.077Z" }
 wheels = [
@@ -1513,7 +1513,7 @@ name = "tqdm"
 version = "4.65.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/78/81191f56abb7d3d56963337dbdff6aa4f55805c8afd8bad64b0a34199e9b/tqdm-4.65.0.tar.gz", hash = "sha256:1871fb68a86b8fb3b59ca4cdd3dcccbc7e6d613eeed31f4c332531977b89beb5", size = 167542, upload-time = "2023-03-03T21:17:29.945Z" }
 wheels = [
@@ -1529,7 +1529,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'extra-13-lightning-cil-lightning-npu'" },
+    { name = "filelock", marker = "extra == 'extra-5-lycil-lightning-npu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/29/69aa56dc0b2eb2602b553881e34243475ea2afd9699be042316842788ff5/triton-3.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6b0dd10a925263abbe9fa37dcde67a5e9b2383fc269fdf59f5657cac38c5d1d8", size = 209460013, upload-time = "2024-10-14T16:05:32.106Z" },
@@ -1581,7 +1581,7 @@ dependencies = [
     { name = "distlib" },
     { name = "filelock" },
     { name = "platformdirs" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-13-lightning-cil-lightning' and extra == 'extra-13-lightning-cil-lightning-npu')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-5-lycil-lightning' and extra == 'extra-5-lycil-lightning-npu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a4/d5/b0ccd381d55c8f45d46f77df6ae59fbc23d19e901e2d523395598e5f4c93/virtualenv-20.35.3.tar.gz", hash = "sha256:4f1a845d131133bdff10590489610c98c168ff99dc75d6c96853801f7f67af44", size = 6002907, upload-time = "2025-10-10T21:23:33.178Z" }
 wheels = [

@@ -1,6 +1,6 @@
 import pytest
 
-from lightning_cil.data.modules.cifar100 import CIFAR100DataModule
+from lycil.data.modules.cifar100 import CIFAR100DataModule
 
 
 @pytest.mark.parametrize("num_class_per_task", [1, 2, 10])

@@ -9,7 +9,7 @@ from torch.optim import Adam
 from torchmetrics.classification.accuracy import Accuracy
 from torchvision.models import resnet18
 
-from lightning_cil.data.modules.cifar100 import CIFAR100DataModule
+from lycil.data.modules.cifar100 import CIFAR100DataModule
 
 
 def _is_cuda_available() -> bool:
