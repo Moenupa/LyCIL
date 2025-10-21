@@ -34,6 +34,8 @@ lightning = [
 lightning-npu = [
     "torch-npu>=2.1.0",
     "torchvision",
+    "decorator",
+    "psutil",
     "importlib_metadata",
     "lightning @ git+https://github.com/SmallPigPeppa/pytorch-lightning.git@npu_support_fp16_mixed",
 ]

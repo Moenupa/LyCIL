@@ -6,7 +6,7 @@ from lightning_cil.data.modules.cifar100 import CIFAR100DataModule
 @pytest.mark.parametrize("num_class_per_task", [1, 2, 10])
 def test_cifar100_datamodule(num_class_per_task: int):
     dm = CIFAR100DataModule(
-        root="/public/datasets/cifar",
+        root="data/cifar",
         num_class_per_task=num_class_per_task,
     )
     dm.prepare_data()
@@ -28,7 +28,7 @@ def test_cifar100_datamodule(num_class_per_task: int):
 )
 def test_cifar100_datamodule_task(task_id: int, train: bool):
     dm = CIFAR100DataModule(
-        root="/public/datasets/cifar",
+        root="data/cifar",
         num_class_per_task=10,
     )
     dm.prepare_data()
