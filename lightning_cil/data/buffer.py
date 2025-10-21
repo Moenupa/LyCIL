@@ -91,6 +91,7 @@ class ExemplarBuffer:
 
         self.storage[class_id] = [img.clone() for img in selected]
         self.class_means[class_id] = mu.squeeze(0)
+        model.train()
 
     def reduce_exemplars(self, per_class_quota: int):
         """Downsize exemplar lists after new classes arrive."""

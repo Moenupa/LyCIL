@@ -11,8 +11,8 @@ class CLI(cli.LightningCLI):
 
     Examples::
 
-        python examples/train_lwf.py fit -c configs/sample_lwf.yml
-        python examples/train_lwf.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
+        python examples/lwf-cli.py fit -c configs/smoketest_lwf.yml
+        python examples/lwf-cli.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
 
     .. _Learning without Forgetting:
         https://arxiv.org/abs/1606.09282
@@ -32,7 +32,6 @@ class CLI(cli.LightningCLI):
             cur = dm.classes_current
             seen = dm.classes_seen
             model.set_task_info(cur, seen)
-            # first task already expanded in instantiate_classes()
             model.expand_head(len(cur))
 
             trainer.fit(model=model, datamodule=dm)

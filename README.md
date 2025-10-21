@@ -34,7 +34,7 @@ Use [LightningCLI](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorc
 
 ```sh
 # valid commands: {fit,validate,test,predict}
-python examples/train_lwf.py fit -c configs/sample_lwf.yml
+python examples/lwf-cli.py fit -c configs/smoketest_lwf.yml
 # or pass individual config files
-python examples/train_lwf.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
+python examples/lwf-cli.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
 ```
