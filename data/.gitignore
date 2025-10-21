@@ -1,0 +1,6 @@
+# this is where all data is stored
+# you can ln -s your dataset folder here
+*
+
+# keep the gitignore and the data folder
+!.gitignore
