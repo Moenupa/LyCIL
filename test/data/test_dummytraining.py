@@ -77,7 +77,7 @@ def test_cifar100_training(accelerator: str):
     dm = CIFAR100DataModule(
         root="data/cifar",
         num_class_per_task=1,
-        batch_size=2,
+        batch_size=32,
     )
 
     model = DummyClassifier(num_classes=100)
