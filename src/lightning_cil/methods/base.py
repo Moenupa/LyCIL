@@ -7,10 +7,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.backbone.resnet import ResNetBackbone
-from models.classifier.cosine_classifier import CosineClassifier
 from utils.metrics import accuracy, accuracy_topk
 
+from ..backbone.resnet import ResNetBackbone
+from ..classifier.cosine_classifier import CosineClassifier
 from ..data.buffer import ExemplarBuffer
 
 _CLASSIFIER_HEADS = {
