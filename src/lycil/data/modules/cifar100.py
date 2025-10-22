@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 
 import torchvision.transforms as T
 from numpy.random import RandomState
@@ -36,9 +36,11 @@ class CIFAR100DataModule(BaseCILDataModule):
         root (str, optional): root directory of the dataset. Default: "./data".
         download (bool, optional): whether to download data. Default: True.
         num_class_per_task (int, optional): increment per task. Default: 10.
+        num_class_total (int, optional): total number of classes. Default: 100.
         batch_size (int, optional): batch size. Default: 64.
         num_workers (int, optional): number of workers. Default: 4.
-        class_order (list[int] | None, optional): list of orders, see :ref:`BaseCILDataModule`. Default: None.
+        class_order (list[int] | None, optional): list of orders,
+            see :ref:`lycil.data.cil_datamodule.BaseCILDataModule`. Default: None.
         seed (int, optional): random seed. Default: 0.
     """
 
@@ -47,32 +49,39 @@ class CIFAR100DataModule(BaseCILDataModule):
         root: str = "./data",
         download: bool = True,
         num_class_per_task: int = 10,
+        num_class_total: int = 100,
         batch_size: int = 64,
         num_workers: int = 4,
         class_order: list[int] | None = None,
-        seed: int = 0,
+        seed: int = None,
     ):
+        assert num_class_total <= 100, f"{self.__class__.__name__}: <=100 classes"
         super().__init__(
             root=root,
             num_class_per_task=num_class_per_task,
-            num_class_total=100,
+            num_class_total=num_class_total,
             batch_size=batch_size,
             num_workers=num_workers,
         )
         self.download = download
 
-        # no dup in class_order
         if class_order is None:
-            index2target = RandomState(seed).permutation(self.num_class_total)
+            # 1-to-1 mapping, randomly init by seed,
+            index2target = RandomState(seed).permutation(num_class_total)
         else:
-            assert len(class_order) == self.num_class_total, (
-                f"{self.__class__.__name__}: class_order expects {self.num_class_total} entries, got {class_order}"
+            # user-defined, a simple length check
+            assert len(class_order) == num_class_total, (
+                f"{self.__class__.__name__}: class_order "
+                f"expects {num_class_total} entries, got {class_order}"
             )
+            # this may be dangerous yet more flexible
             index2target = class_order
+
+        # target transform; assume set(targets) == set(range(num_class_total))
         self._target2index = {
-            target: order_index for order_index, target in enumerate(index2target)
+            target: index for index, target in enumerate(index2target)
         }
-        self.target_transform = lambda x: self._target2index[x]
+        self.target_transform: Callable[[int], int] = lambda x: self._target2index[x]
 
         self.set_task(0)
 

@@ -1,3 +1,5 @@
 class_path: lycil.data.modules.cifar100.CIFAR100DataModule
 init_args:
   root: 'data/cifar'
+  num_class_per_task: 10
+  num_class_total: 100
