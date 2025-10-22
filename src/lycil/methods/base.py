@@ -39,7 +39,6 @@ class BaseIncremental(L.LightningModule):
         momentum: float = 0.9,
         nesterov: bool = True,
         mem_size: int = 2000,
-        use_nme_eval: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["buffer"])
@@ -51,30 +50,50 @@ class BaseIncremental(L.LightningModule):
 
         self.buffer = ExemplarBuffer(mem_size=mem_size)
         self.prev_model: Optional[nn.Module] = None  # frozen copy for distillation
-        self.current_classes: list[int] = []
-        self.seen_classes: list[int] = []
-        self.use_nme_eval = bool(use_nme_eval)
+        self.current_classes: set[int] = set()
+        self.seen_classes: set[int] = set()
+        self.old_classes: list[int] = []
 
     @property
     def feature_dim(self) -> int:
         return self.backbone.feature_dim
 
-    # ----- task orchestration ------
-    def set_task_info(self, current_classes: list[int], seen_classes: list[int]):
-        self.current_classes = list(current_classes)
-        self.seen_classes = list(seen_classes)
+    def set_task_info(
+        self, current_classes: list[int], seen_classes: list[int], task_id: int = None
+    ):
+        self.current_classes = set(current_classes)
+        self.seen_classes = set(seen_classes)
+        self.old_classes = sorted(self.seen_classes - self.current_classes)
 
     def _make_head(self, out_features: int) -> nn.Module:
-        """Create a new classification head."""
+        """
+        Create a new classification head.
+
+        Args:
+            out_features (int): Number of output features (classes).
+
+        Returns:
+            nn.Module: The classification head.
+        """
         assert self.head_type in _CLASSIFIER_HEADS, (
-            f"Unknown head type: {self.head_type} not in {_CLASSIFIER_HEADS.keys()}"
+            f"{self.head_type}: unknown head type, "
+            f"candidates: {_CLASSIFIER_HEADS.keys()}"
         )
 
         cls, kwargs = _CLASSIFIER_HEADS[self.head_type]
         return cls(self.feature_dim, out_features, **kwargs)
 
+    @torch.no_grad()
     def expand_head(self, num_new: int):
-        """Expand classifier to accommodate `num_new` new classes."""
+        r"""
+        Expand classifier to accommodate for more classes. :math:`\texttt{num\_new}=n_\text{after} - n_\text{before}\geq0`.
+
+        Args:
+            num_new (int): A non-negative value for number of newly added classes. 0 means do nothing.
+
+        Raises:
+            NotImplementedError: If the classifier does not support expansion.
+        """
         assert num_new >= 0, f"num_new {num_new} not >= 0"
         if num_new == 0:
             return
@@ -85,9 +104,8 @@ class BaseIncremental(L.LightningModule):
         if isinstance(self.classifier, nn.Linear):
             old_out = self.classifier.out_features
             new_linear = nn.Linear(self.feature_dim, old_out + num_new, bias=True)
-            with torch.no_grad():
-                new_linear.weight[:old_out] = self.classifier.weight.data
-                new_linear.bias[:old_out] = self.classifier.bias.data
+            new_linear.weight[:old_out] = self.classifier.weight.data
+            new_linear.bias[:old_out] = self.classifier.bias.data
             self.classifier = new_linear
             return
 
@@ -95,7 +113,7 @@ class BaseIncremental(L.LightningModule):
             self.classifier.expand(num_new)
             return
 
-        raise RuntimeError("Unknown head type")
+        raise NotImplementedError(f"{type(self.classifier)}: classifier not expandable")
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(x)
@@ -112,7 +130,6 @@ class BaseIncremental(L.LightningModule):
     @abstractmethod
     def update_memory(self, *args, **kwargs): ...
 
-    # ----- Lightning hooks -----
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
         if self.hparams.optimizer.lower() == "sgd":
@@ -145,6 +162,10 @@ class BaseIncremental(L.LightningModule):
         """
         Keep a frozen copy for distillation across the next task.
         """
+        # prevent recursive copies
+        self.prev_model = None
+
+        # snapshot and freeze
         self.prev_model = copy.deepcopy(self).eval()
         for p in self.prev_model.parameters():
             p.requires_grad_(False)
@@ -170,8 +191,14 @@ class BaseIncremental(L.LightningModule):
         acc1 = accuracy(logits, y)
         k = min(5, logits.size(1))
         acc5 = accuracy_topk(logits, y, k=k)
-        self.log("val/acc1", acc1, prog_bar=True, on_epoch=True, sync_dist=True)
-        self.log(f"val/acc{k}", acc5, prog_bar=False, on_epoch=True, sync_dist=True)
+        self.log_dict(
+            {
+                "val/acc1": acc1,
+                f"val/acc{k}": acc5,
+            },
+            prog_bar=False,
+            sync_dist=True,
+        )
 
     # ----- NME evaluation for iCaRL -----
     @torch.no_grad()

@@ -31,7 +31,7 @@ class CLI(LightningCLI):
             dm.set_task(task_id)
             cur = dm.classes_current
             seen = dm.classes_seen
-            model.set_task_info(cur, seen)
+            model.set_task_info(cur, seen, task_id=task_id)
             model.expand_head(len(cur))
 
             trainer.fit(model=model, datamodule=dm)
