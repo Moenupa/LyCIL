@@ -45,23 +45,18 @@ class LWF(BaseIncremental):
 
         # Distillation on OLD classes only (seen \ current)
         loss_distill = torch.tensor(0.0, device=x.device)
-        if self.prev_model is not None and len(self.seen_classes) > 0:
-            old_classes = list(set(self.seen_classes) - set(self.current_classes))
-            if len(old_classes) > 0:
-                idx = torch.tensor(
-                    sorted(old_classes), device=x.device, dtype=torch.long
-                )
-                prev_logits = self.calc_logits_prev(x)
-                T = self.distill_T
-                p = F.log_softmax(logits.index_select(1, idx) / T, dim=1)
-                q = F.softmax(prev_logits.index_select(1, idx) / T, dim=1)
-                loss_distill = F.kl_div(p, q, reduction="batchmean") * (T * T)
+        if self.prev_model is not None and len(self.old_classes) > 0:
+            idx = torch.tensor(self.old_classes, device=x.device, dtype=torch.long)
+            prev_logits = self.calc_logits_prev(x)
+            T = self.distill_T
+            p = F.log_softmax(logits.index_select(1, idx) / T, dim=1)
+            q = F.softmax(prev_logits.index_select(1, idx) / T, dim=1)
+            loss_distill = F.kl_div(p, q, reduction="batchmean") * (T * T)
 
         # combined loss
         loss = loss_ce + self.lambda_distill * loss_distill
         self.log_dict(
             {
-                "train/seen_classes": len(self.seen_classes),
                 "train/loss": loss,
                 "train/ce": loss_ce,
                 "train/distill": loss_distill,
