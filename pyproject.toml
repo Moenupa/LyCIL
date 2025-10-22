@@ -27,8 +27,8 @@ dev = [
 # conflict lightning and lightning-npu
 [project.optional-dependencies]
 lightning = [
-    "torch>=2.7.1",
-    "torchvision>=0.22.1",
+    "torch>=2.7.1,<2.9.0",
+    "torchvision>=0.22.1,<0.24.0",
     "lightning>=2.2.0,<2.6.0",
 ]
 lightning-npu = [
@@ -38,6 +38,9 @@ lightning-npu = [
     "psutil",
     "importlib_metadata",
     "lightning @ git+https://github.com/SmallPigPeppa/pytorch-lightning.git@npu_support_fp16_mixed",
+]
+wandb = [
+    "wandb>=0.12.10,<0.23.0"
 ]
 
 [tool.uv]

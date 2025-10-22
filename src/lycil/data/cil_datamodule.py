@@ -132,7 +132,7 @@ class BaseCILDataModule(L.LightningDataModule):
             dataset, [i for i, (_, y) in enumerate(dataset) if y in selected_targets]
         )
 
-    def set_task(self, task_id: int | str) -> None:
+    def set_task(self, task_id: int) -> None:
         """Set the current task ID. This will also update `classes_current` and `classes_seen`."""
         assert isinstance(task_id, int), (
             f"{self.__class__.__name__}: task_id must be int, got {type(task_id)}"
