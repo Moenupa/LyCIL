@@ -1,0 +1,7 @@
+max_epochs: 200
+accelerator: "auto"
+devices: 1
+precision: 32
+enable_checkpointing: false
+enable_progress_bar: false
+logger: WandbLogger

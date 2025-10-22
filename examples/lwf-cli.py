@@ -13,6 +13,7 @@ class CLI(LightningCLI):
 
         python examples/lwf-cli.py fit -c configs/smoketest_lwf.yml
         python examples/lwf-cli.py fit --trainer configs/trainer/smoketest.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
+        python examples/lwf-cli.py fit --trainer configs/trainer/lwf.yml --model configs/model/lwf.yml --data configs/data/cifar100.yml
 
     .. _Learning without Forgetting:
         https://arxiv.org/abs/1606.09282
@@ -24,7 +25,7 @@ class CLI(LightningCLI):
     def fit(self, **kwargs):
         L.seed_everything(self.config.get("seed_everything", None))
         dm = self.datamodule
-        model: LWF = self.model
+        model = self.model
         trainer = self.trainer
 
         for task_id in range(dm.num_tasks):
