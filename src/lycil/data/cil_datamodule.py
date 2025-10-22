@@ -1,6 +1,6 @@
 from math import ceil
 
-import lightning.pytorch as pl
+import lightning as L
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
 
 from .buffer import ExemplarBuffer
@@ -41,7 +41,7 @@ class CILDataset(Dataset):
         return x, y
 
 
-class BaseCILDataModule(pl.LightningDataModule):
+class BaseCILDataModule(L.LightningDataModule):
     """
     API class for data modules with Continual/Incremental Learning (CIL) features.
 

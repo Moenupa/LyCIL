@@ -2,7 +2,7 @@ import copy
 from abc import abstractmethod
 from typing import Literal, Optional
 
-import lightning.pytorch as pl
+import lightning as L
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -19,7 +19,7 @@ _CLASSIFIER_HEADS = {
 }
 
 
-class BaseIncremental(pl.LightningModule):
+class BaseIncremental(L.LightningModule):
     """Base class providing backbone, head expansion, optimizer, and memory plumbing.
 
     Subclasses must implement:

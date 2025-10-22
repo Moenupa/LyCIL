@@ -1,11 +1,11 @@
-import lightning.pytorch as pl
-from lightning.pytorch import cli
+import lightning as L
+from lightning.pytorch.cli import LightningCLI
 
 from lycil.data.cil_datamodule import BaseCILDataModule
 from lycil.methods.icarl import ICaRL
 
 
-class CLI(cli.LightningCLI):
+class CLI(LightningCLI):
     """
     Train a model using the iCaRL (`Incremental Classifier and Representation Learning`_) method.
 
@@ -21,7 +21,7 @@ class CLI(cli.LightningCLI):
     datamodule: BaseCILDataModule
 
     def fit(self, **kwargs):
-        pl.seed_everything(self.config.get("seed_everything", None))
+        L.seed_everything(self.config.get("seed_everything", None))
         dm = self.datamodule
         model = self.model
         trainer = self.trainer

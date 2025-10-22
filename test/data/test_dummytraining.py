@@ -1,8 +1,7 @@
 # a minimal test to check cifar100 datamodule works with a training loop
 
-import lightning.pytorch as pl
+import lightning as L
 import pytest
-from lightning import Trainer
 from torch import cuda, nn
 from torch.nn import functional as F
 from torch.optim import Adam
@@ -31,7 +30,7 @@ CHECKER = {
 }
 
 
-class DummyClassifier(pl.LightningModule):
+class DummyClassifier(L.LightningModule):
     def __init__(self, num_classes=100):
         super().__init__()
         self.model = resnet18(weights=None)
@@ -81,6 +80,6 @@ def test_cifar100_training(accelerator: str):
     )
 
     model = DummyClassifier(num_classes=100)
-    trainer = Trainer(accelerator=accelerator, max_epochs=1)
+    trainer = L.Trainer(accelerator=accelerator, max_epochs=1)
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
