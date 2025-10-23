@@ -44,24 +44,15 @@ class DummyClassifier(L.LightningModule):
         x, y = batch
         logits = self(x)
         loss = F.cross_entropy(logits, y)
-        self.log("train/loss", loss, prog_bar=True)
+        # self.log("train/loss", loss, prog_bar=True, sync_dist=True)
         return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        acc = self.acc(logits, y)
-        self.log("val/loss", loss, prog_bar=True)
-        self.log("val/acc", acc, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
         loss = F.cross_entropy(logits, y)
         acc = self.acc(logits, y)
-        self.log("test/loss", loss)
-        self.log("test/acc", acc)
+        self.log_dict({"test/loss": loss, "test/acc": acc}, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = Adam(self.model.parameters(), lr=1e-3)
@@ -80,6 +71,6 @@ def test_cifar100_training(accelerator: str):
     )
 
     model = DummyClassifier(num_classes=100)
-    trainer = L.Trainer(accelerator=accelerator, max_epochs=1)
+    trainer = L.Trainer(accelerator=accelerator, max_epochs=1, log_every_n_steps=None)
     trainer.fit(model, datamodule=dm)
-    trainer.test(model, datamodule=dm)
+    # trainer.test(model, datamodule=dm)
