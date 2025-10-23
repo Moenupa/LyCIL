@@ -125,8 +125,18 @@ class CIFAR100DataModule(BaseCILDataModule):
         return self.test_dataloader()
 
     def test_dataloader(self):
-        return self.build_loader(
-            BaseCILDataModule.dataset_by_target(self._test_dataset, self.classes_seen),
-            shuffle=False,
-            pin_memory=True,
-        )
+        return [
+            self.build_loader(
+                BaseCILDataModule.dataset_by_target(
+                    # safe because slicing's end-overflow is allowed,
+                    # e.g. arr = [0,1,2]; arr[2:5] == [2]
+                    self._test_dataset,
+                    self.classes_seen[i : i + self.num_class_per_task],
+                ),
+                shuffle=False,
+                pin_memory=True,
+            )
+            # a list of dataloaders, one for each task,
+            # each task has self.num_class_per_task classes
+            for i in range(0, len(self.classes_seen), self.num_class_per_task)
+        ]
