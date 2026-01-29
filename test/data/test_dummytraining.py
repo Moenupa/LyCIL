@@ -8,7 +8,7 @@ from torch.optim import Adam
 from torchmetrics.classification.accuracy import Accuracy
 from torchvision.models import resnet18
 
-from lycil.data.modules.cifar100 import CIFAR100DataModule
+from lycil.data.hfmodule import HFDataModule
 
 
 def _is_cuda_available() -> bool:
@@ -31,7 +31,7 @@ CHECKER = {
 
 
 class DummyClassifier(L.LightningModule):
-    def __init__(self, num_classes=100):
+    def __init__(self, num_classes=10):
         super().__init__()
         self.model = resnet18(weights=None)
         self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
@@ -41,7 +41,8 @@ class DummyClassifier(L.LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        x, y = batch
+        x = batch["img"]
+        y = batch["label"]
         logits = self(x)
         loss = F.cross_entropy(logits, y)
         self.log("train/loss", loss, prog_bar=True, sync_dist=True)
@@ -51,7 +52,8 @@ class DummyClassifier(L.LightningModule):
         pass
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
+        x = batch["img"]
+        y = batch["label"]
         logits = self(x)
         loss = F.cross_entropy(logits, y)
         acc = self.acc(logits, y)
@@ -63,17 +65,25 @@ class DummyClassifier(L.LightningModule):
 
 
 @pytest.mark.parametrize("accelerator", ["cuda", "npu"])
-def test_cifar100_training(accelerator: str):
+def test_cifar10_training(accelerator: str):
     if not CHECKER[accelerator]():
         pytest.skip(f"{accelerator} is not available")
 
-    dm = CIFAR100DataModule(
-        root="data/cifar",
-        num_class_per_task=1,
-        batch_size=32,
+    dm = HFDataModule(
+        "data/cifar10",
+        split_map={"val": "test"},
+        transform_name="cifar10",
+        train_loader_kwargs={
+            "batch_size": 32,
+            "num_workers": 8,
+            "pin_memory": True,
+        },
+        test_loader_kwargs={
+            "num_workers": 8,
+        },
     )
 
-    model = DummyClassifier(num_classes=100)
+    model = DummyClassifier(num_classes=10)
     trainer = L.Trainer(
         accelerator=accelerator,
         max_epochs=1,
@@ -82,3 +92,7 @@ def test_cifar100_training(accelerator: str):
     )
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
+
+
+if __name__ == "__main__":
+    test_cifar10_training("cuda")
