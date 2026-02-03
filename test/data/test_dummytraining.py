@@ -1,4 +1,4 @@
-# a minimal test to check cifar100 datamodule works with a training loop
+# a minimal test to check cifar10 datamodule works with a training loop
 
 import lightning as L
 import pytest
@@ -17,7 +17,7 @@ def _is_cuda_available() -> bool:
 
 def _is_npu_available() -> bool:
     try:
-        import torch_npu
+        import torch_npu  # type: ignore
 
         return torch_npu.npu.is_available()
     except Exception:

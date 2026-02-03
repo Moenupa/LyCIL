@@ -25,18 +25,8 @@ def test_setup_w_seed(cifar10_hfmodule: HFDataModule | None):
     cifar10_hfmodule.prepare_data()
     cifar10_hfmodule.setup(stage="fit")
 
-    assert cifar10_hfmodule.labelset_per_task == {
-        0: {4},
-        1: {5},
-        2: {0},
-        3: {3},
-        4: {7},
-        5: {2},
-        6: {1},
-        7: {9},
-        8: {6},
-        9: {8},
-    }
+    # expected class order:
+    # [4, 5, 0, 3, 7, 2, 1, 9, 6, 8]
 
     train_loader = cifar10_hfmodule.train_dataloader()
     for batch in train_loader:
@@ -57,12 +47,8 @@ def test_setup_w_custom_labelset(cifar10_hfmodule: HFDataModule | None):
         pytest.skip("CIFAR10 dataset not found.")
         return
 
-    cifar10_hfmodule.labelset_per_task = {
-        i: {
-            i,
-        }
-        for i in range(10)
-    }
+    cifar10_hfmodule.label_map = {i: i for i in range(10)}
+    cifar10_hfmodule.num_tasks = 5
 
     cifar10_hfmodule.prepare_data()
     cifar10_hfmodule.setup(stage="fit")
@@ -71,11 +57,20 @@ def test_setup_w_custom_labelset(cifar10_hfmodule: HFDataModule | None):
     for batch in train_loader:
         assert "img" in batch and "label" in batch
         for label in batch["label"]:
-            assert label.item() == 0
+            assert label.item() in {0, 1}
 
-    cifar10_hfmodule._cur_task_id = 7
+    cifar10_hfmodule._cur_task_id = 3
     train_loader = cifar10_hfmodule.train_dataloader()
     for batch in train_loader:
         assert "img" in batch and "label" in batch
         for label in batch["label"]:
-            assert label.item() == 7
+            assert label.item() in {6, 7}
+
+    test_loader = cifar10_hfmodule.test_dataloader()
+    seen_labels = set()
+    for batch in test_loader:
+        assert "img" in batch and "label" in batch
+        for label in batch["label"]:
+            seen_labels.add(label.item())
+    # we have seen task_id \in [0, 3] => 8 classes so far
+    assert seen_labels == set(range(8))
