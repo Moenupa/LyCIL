@@ -59,9 +59,9 @@ class LWF(BaseLearner):
 
         self.log_dict(
             {
-                "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/distill": loss_distill or 0.0,
+                f"train/task{self.task_id}/loss": loss,
+                f"train/task{self.task_id}/ce": loss_ce,
+                f"train/task{self.task_id}/distill": loss_distill or 0.0,
             },
             prog_bar=True,
             on_epoch=True,

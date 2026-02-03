@@ -206,8 +206,8 @@ class BaseLearner(L.LightningModule):
         acc5 = accuracy_topk(logits, y, k=5)
         self.log_dict(
             {
-                "val/acc1": acc1,
-                "val/acc5": acc5,
+                f"val/task{self.task_id}/acc1": acc1,
+                f"val/task{self.task_id}/acc5": acc5,
             },
             prog_bar=False,
             sync_dist=True,
@@ -224,8 +224,8 @@ class BaseLearner(L.LightningModule):
         acc5 = accuracy_topk(logits, y, k=5)
         self.log_dict(
             {
-                "test/acc1": acc1,
-                "test/acc5": acc5,
+                f"test/task{self.task_id}/acc1": acc1,
+                f"test/task{self.task_id}/acc5": acc5,
             },
             prog_bar=False,
             sync_dist=True,
