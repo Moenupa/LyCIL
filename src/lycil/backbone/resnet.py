@@ -10,7 +10,9 @@ class ResNetBackbone(nn.Module):
     - forward_feats(x): returns dict of feature maps from layers { 'l2','l3','l4' }
     """
 
-    def __init__(self, name: str = "resnet18", pretrained: bool = False):
+    def __init__(
+        self, name: str = "resnet18", pretrained: bool = False, cifar: bool = False
+    ):
         super().__init__()
         match name:
             case "resnet18":
@@ -28,6 +30,13 @@ class ResNetBackbone(nn.Module):
                     weights=tvm.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
                 )
                 feat_dim = 2048
+                if cifar:
+                    net.conv1 = nn.Conv2d(
+                        3, 64, kernel_size=3, stride=1, padding=2, bias=False
+                    )
+                    net.maxpool = nn.Identity()
+                    net.fc = nn.Identity()
+                # net.load_state_dict(state, strict=False)
             case _:
                 raise ValueError(f"Unknown ResNet variant: {name}")
 
