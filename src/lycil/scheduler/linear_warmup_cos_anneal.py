@@ -3,14 +3,8 @@ from typing import TYPE_CHECKING
 
 from torch.optim.lr_scheduler import _LRScheduler
 
-
 if TYPE_CHECKING:
     from torch.optim import Optimizer
-
-
-__all__ = [
-    "LinearWarmupCosineAnnealingLR",
-]
 
 
 class LinearWarmupCosineAnnealingLR(_LRScheduler):
