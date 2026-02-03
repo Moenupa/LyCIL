@@ -1,9 +1,12 @@
+from typing import Any
+
 import lightning as L
 from datasets import Dataset, DatasetDict, load_dataset
 from torch.utils.data import DataLoader
 
+from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
 from .transform import register_tf_as_formatter
-from .util import SplitMapping, chunk, deterministic_shuffle, get_or_identity
+from .util import SplitMapping, deterministic_shuffle, get_or_identity
 
 
 class HFDataModule(L.LightningDataModule):
@@ -14,9 +17,9 @@ class HFDataModule(L.LightningDataModule):
         path: str,
         dataset_kwargs: dict | None = None,
         num_tasks: int = 1,
+        num_classes_per_task: int | None = None,
         label_column_name: str = "label",
-        labelset_per_task: dict[int, set] | None = None,
-        # transforms
+        label_map: dict[int, Any] | list[Any] | None = None,
         transform_name: str | None = None,
         # DataLoader kwargs
         train_loader_kwargs: dict | None = None,
@@ -35,21 +38,9 @@ class HFDataModule(L.LightningDataModule):
         # key mapping for customization, e.g.,
         # {"train": "your_custom_split_for_train", ...}
         self.split_map: dict = split_map or SplitMapping()
-        if labelset_per_task is not None and num_tasks > 1:
-            print(
-                "Warning: both `labelset_per_task` and `num_tasks` are provided. Using `labelset_per_task`."
-            )
-            self.num_tasks = len(labelset_per_task)
-            # verify that keys are 0..num_tasks-1
-            expected_keys = set(range(self.num_tasks))
-            if set(labelset_per_task.keys()) != expected_keys:
-                raise ValueError(
-                    f"`labelset_per_task` keys must be 0..{self.num_tasks}, but got {set(labelset_per_task.keys())}."
-                )
-            self.labelset_per_task = labelset_per_task
-        else:
-            self.num_tasks = num_tasks
-            self.labelset_per_task: dict[int, set] = {}
+        self.label_map = label_map
+        self.num_tasks = num_tasks
+        self.num_classes_per_task: int = num_classes_per_task
         self.label_column_name = label_column_name
         # custom stage; fallback to lazy init in self.setup()
 
@@ -71,24 +62,54 @@ class HFDataModule(L.LightningDataModule):
 
     def setup(self, stage: str | None = None):
         self.dataset: DatasetDict = load_dataset(self.path, **self.load_kwargs)
-        assert isinstance(self.dataset, DatasetDict)
 
         # lazy init, this requires all of:
         # 1. train split exists
         # 2. label_column_name exists
         # 3. deterministic uniform sampling of labels
-        # class-balance is not considered here
-        if not self.labelset_per_task:
-            train_set: Dataset = self.dataset[self._split_train]
-            unique_labels = train_set.unique(self.label_column_name)
-            unique_labels = deterministic_shuffle(unique_labels, self.seed)
-            self.labelset_per_task = {
-                task_id: set(labelset)
-                for task_id, labelset in enumerate(chunk(unique_labels, self.num_tasks))
+        train_set: Dataset = self.dataset[self._split_train]
+        unique_labels: list = train_set.unique(self.label_column_name)
+        self.num_classes_per_task: int = self.num_classes_per_task or (
+            len(unique_labels) // self.num_tasks
+        )
+
+        # a bijection that 0-indexed cl_class_idx -> label
+        if self.label_map is not None:
+            import warnings
+
+            if len(self.label_map) != len(unique_labels):
+                warnings.warn(
+                    "`label_map` does not cover all unique labels. "
+                    + f"DataModule(label_map={self.label_map}). Actual Data has {unique_labels}."
+                )
+
+            # TODO: check for duplicates
+
+        # idx, v -> v, idx for faster remapping
+        idx2label = self.label_map or deterministic_shuffle(unique_labels, self.seed)
+        reverse_lookup: dict[Any, int] = {}
+        if isinstance(idx2label, (list, tuple)):
+            reverse_lookup = {v: idx for idx, v in enumerate(idx2label)}
+        elif isinstance(idx2label, dict):
+            reverse_lookup = {v: idx for idx, v in idx2label.items()}
+        else:
+            raise TypeError("label_map must be a tuple, list or dict.")
+
+        def _map_fn(e: dict) -> dict:
+            mapped_class_idx = reverse_lookup[e[self.label_column_name]]
+            task_id_belonged = mapped_class_idx // self.num_classes_per_task
+            return {
+                _Y_COLUMN_NAME: mapped_class_idx,
+                _CLTASK_COLUMN_NAME: task_id_belonged,
             }
 
+        self.dataset = self.dataset.map(_map_fn)
+
     def is_label_in_cur_task(self, e: dict) -> bool:
-        return e[self.label_column_name] in self.labelset_per_task[self._cur_task_id]
+        return e[_CLTASK_COLUMN_NAME] == self._cur_task_id
+
+    def is_label_in_seen_task(self, e: dict) -> bool:
+        return e[_CLTASK_COLUMN_NAME] <= self._cur_task_id
 
     def set_current_task(self, task_id: int):
         self._cur_task_id = task_id
@@ -120,7 +141,7 @@ class HFDataModule(L.LightningDataModule):
 
     def val_dataloader(self):
         subset = self.dataset[self._split_val].filter(
-            self.is_label_in_cur_task,
+            self.is_label_in_seen_task,
         )
         if self.transform_name is not None:
             subset.set_format(f"{self.transform_name}_test")
@@ -129,9 +150,11 @@ class HFDataModule(L.LightningDataModule):
         return DataLoader(subset, **self.val_loader_kwargs)
 
     def test_dataloader(self):
-        subset = self.dataset[self._split_test]
+        subset = self.dataset[self._split_test].filter(
+            self.is_label_in_seen_task,
+        )
         if self.transform_name is not None:
             subset.set_format(f"{self.transform_name}_test")
         elif self._FORMAT_FALLBACK is not None:
             subset.set_format(self._FORMAT_FALLBACK)
-        return DataLoader(subset, **self.test_loader_kwargs)  # type: ignore
+        return DataLoader(subset, **self.test_loader_kwargs)
