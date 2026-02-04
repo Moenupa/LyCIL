@@ -1,10 +1,12 @@
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Literal
 
 import lightning as L
 from datasets import Dataset, DatasetDict, load_dataset
 from torch.utils.data import DataLoader
 
 from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
+from .buffer import BaseExemplarBuffer
 from .transform import register_tf_as_formatter
 from .util import SplitMapping, deterministic_shuffle, get_or_identity
 
@@ -27,6 +29,7 @@ class HFDataModule(L.LightningDataModule):
         test_loader_kwargs: dict | None = None,
         # train/val/test map in case some dataset uses different split names
         split_map: SplitMapping | None = None,
+        buffer_kwargs: dict | None = None,
         seed: int | None = 42,
     ):
         super().__init__()
@@ -46,13 +49,16 @@ class HFDataModule(L.LightningDataModule):
 
         self.transform_name = transform_name
         if transform_name is not None:
-            # dry run attempt
             register_tf_as_formatter(transform_name)
 
         self.train_loader_kwargs = train_loader_kwargs or {}
         self.val_loader_kwargs = val_loader_kwargs or {}
         self.test_loader_kwargs = test_loader_kwargs or {}
         self.seed = seed
+
+        self.buffer: BaseExemplarBuffer | None = (
+            BaseExemplarBuffer(**buffer_kwargs) if buffer_kwargs is not None else None
+        )
 
         self._cur_task_id: int = 0
         self.dataset: DatasetDict
@@ -129,32 +135,82 @@ class HFDataModule(L.LightningDataModule):
     def _split_test(self) -> str:
         return get_or_identity(self.split_map, "test")
 
-    def train_dataloader(self):
-        subset = self.dataset[self._split_train].filter(
-            self.is_label_in_cur_task,
-        )
+    def get_effective_transform_name(
+        self, mode: Literal["train", "test"] = "train"
+    ) -> str | None:
+        """Get transform settings's name in effect, under the given ``mode``.
+
+        A fallback is ``self._FORMAT_FALLBACK`` which defaults to 'torch',
+        which enables :class:``dataset.Dataset`` to return PyTorch tensors.
+
+        Args:
+            mode (Literal["train", "test"], optional):
+                Use transform train or test. (default: "train")
+
+        Raises:
+            ValueError: If mode is not "train" or "test".
+
+        Returns:
+            str | None: The format name to be used, or None if not set.
+        """
+
+        if mode not in {"train", "test"}:
+            raise ValueError(
+                f"Format/Transform: expect mode in 'train' or 'test', got {mode}."
+            )
+
         if self.transform_name is not None:
-            subset.set_format(f"{self.transform_name}_train")
+            return f"{self.transform_name}_{mode}"
         elif self._FORMAT_FALLBACK is not None:
-            subset.set_format(self._FORMAT_FALLBACK)
-        return DataLoader(subset, **self.train_loader_kwargs)
+            return self._FORMAT_FALLBACK
+
+        return None
+
+    def get_filtered_dataset(
+        self,
+        split: str,
+        filter_fn: Callable[[dict], bool],
+        transform_name: str | None = None,
+    ) -> Dataset:
+        subset = self.dataset[split].filter(filter_fn)
+        if transform_name is not None:
+            subset.set_format(format_name=transform_name)
+        return subset
+
+    def get_dataloader(
+        self,
+        split: str,
+        filter_fn: Callable[[dict], bool],
+        transform_name: str | None,
+        loader_kwargs: dict,
+    ) -> DataLoader:
+        subset = self.get_filtered_dataset(
+            split=split,
+            filter_fn=filter_fn,
+            transform_name=transform_name,
+        )
+        return DataLoader(subset, **loader_kwargs)  # type: ignore
+
+    def train_dataloader(self):
+        return self.get_dataloader(
+            split=self._split_train,
+            filter_fn=self.is_label_in_cur_task,
+            transform_name=self.get_effective_transform_name("train"),
+            loader_kwargs=self.train_loader_kwargs,
+        )
 
     def val_dataloader(self):
-        subset = self.dataset[self._split_val].filter(
-            self.is_label_in_seen_task,
+        return self.get_dataloader(
+            split=self._split_val,
+            filter_fn=self.is_label_in_seen_task,
+            transform_name=self.get_effective_transform_name("test"),
+            loader_kwargs=self.val_loader_kwargs,
         )
-        if self.transform_name is not None:
-            subset.set_format(f"{self.transform_name}_test")
-        elif self._FORMAT_FALLBACK is not None:
-            subset.set_format(self._FORMAT_FALLBACK)
-        return DataLoader(subset, **self.val_loader_kwargs)
 
     def test_dataloader(self):
-        subset = self.dataset[self._split_test].filter(
-            self.is_label_in_seen_task,
+        return self.get_dataloader(
+            split=self._split_test,
+            filter_fn=self.is_label_in_seen_task,
+            transform_name=self.get_effective_transform_name("test"),
+            loader_kwargs=self.test_loader_kwargs,
         )
-        if self.transform_name is not None:
-            subset.set_format(f"{self.transform_name}_test")
-        elif self._FORMAT_FALLBACK is not None:
-            subset.set_format(self._FORMAT_FALLBACK)
-        return DataLoader(subset, **self.test_loader_kwargs)
