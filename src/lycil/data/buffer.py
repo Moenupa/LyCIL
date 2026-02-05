@@ -2,8 +2,8 @@ import copy
 from typing import TYPE_CHECKING, Optional
 
 import torch
-from torch.utils.data import DataLoader
 from datasets import Dataset, DatasetDict, concatenate_datasets
+from torch.utils.data import DataLoader
 
 from ..constants import _X_COLUMN_NAME
 
