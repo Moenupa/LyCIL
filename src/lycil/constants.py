@@ -4,3 +4,7 @@ import os
 _X_COLUMN_NAME = os.getenv("X_COLUMN_NAME", "_x")
 _Y_COLUMN_NAME = os.getenv("Y_COLUMN_NAME", "_y")
 _CLTASK_COLUMN_NAME = os.getenv("CLTASK_COLUMN_NAME", "_cl_task_id")
+
+if os.getenv("HF_DATASETS_DISABLE_PROGRESS_BARS") == "":
+    # disable datasets progress bars if not explicitly set
+    os.environ["HF_DATASETS_DISABLE_PROGRESS_BARS"] = "1"

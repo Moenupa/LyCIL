@@ -3,9 +3,9 @@ import os
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 
+import wandb
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.lwf import LWF
-import wandb
 
 
 def main():
@@ -64,7 +64,7 @@ def main():
             sync_batchnorm=True,
             enable_checkpointing=False,
             enable_progress_bar=False,
-            precision=16,
+            precision="16-mixed",
             logger=WandbLogger(
                 name=f"lwf_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
                 project="lycil",

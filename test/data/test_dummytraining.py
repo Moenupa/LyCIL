@@ -17,7 +17,7 @@ def _is_cuda_available() -> bool:
 
 def _is_npu_available() -> bool:
     try:
-        import torch_npu  # type: ignore
+        import torch_npu  # ty: ignore[unresolved-import]
 
         return torch_npu.npu.is_available()
     except Exception:
@@ -76,7 +76,10 @@ def test_cifar10_training(accelerator: str):
         train_loader_kwargs={
             "batch_size": 32,
             "num_workers": 8,
-            "pin_memory": True,
+            "shuffle": True,
+        },
+        val_loader_kwargs={
+            "num_workers": 8,
         },
         test_loader_kwargs={
             "num_workers": 8,
@@ -88,6 +91,7 @@ def test_cifar10_training(accelerator: str):
         accelerator=accelerator,
         max_epochs=1,
         enable_checkpointing=False,
+        enable_progress_bar=False,
         log_every_n_steps=None,
     )
     trainer.fit(model, datamodule=dm)
