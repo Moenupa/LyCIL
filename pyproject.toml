@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "LyCIL"
 version = "0.1.2"
-description = "A clean, PyTorch Lightning (2.x) continual/incremental learning (CIL) library inspired by PyCIL, with up-to-date methods, NPU support, modern interface, and ready-to-run CLI examples."
+description = "A clean, PyTorch Lightning (2.x) continual/incremental learning (CIL) library, with up-to-date methods, NPU support, modern interface, and ready-to-run CLI examples."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
