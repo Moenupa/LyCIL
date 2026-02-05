@@ -125,38 +125,37 @@ class BaseLearner(L.LightningModule):
     def update_memory(self, *args, **kwargs): ...
 
     def configure_optimizers(self):
-        # force override, reading "all" entry and ignore task_id
-        task_id = -1 if -1 in self.per_task_optim_args else self.task_id
-
         params = [p for p in self.parameters() if p.requires_grad]
-        task_optim_kwargs = self.per_task_optim_args.get(task_id, {})
-        print(self.task_id, "using optimizer configs", task_optim_kwargs)
-        opt_type = task_optim_kwargs.pop("type", "sgd")
+
+        optim_kwargs = (
+            self.per_task_optim_args.get(self.task_id)
+            or self.per_task_optim_args.get(-1)
+            or {}
+        )
+        opt_type = optim_kwargs.pop("type", "sgd")
         match opt_type:
             case "sgd":
-                optim = torch.optim.SGD(params, **task_optim_kwargs)
+                optim = torch.optim.SGD(params, **optim_kwargs)
             case "adamw":
-                optim = torch.optim.AdamW(params, **task_optim_kwargs)
+                optim = torch.optim.AdamW(params, **optim_kwargs)
             case _:
                 raise NotImplementedError(f"Unsupported optimizer: `{opt_type}`")
 
-        task_sched_kwargs = self.per_task_sched_args.get(task_id, {})
-        print(self.task_id, "using scheduler configs", task_sched_kwargs)
-        sched_type = task_sched_kwargs.pop("type", "linear_warmup_cosine_annealing")
+        sched_kwargs = (
+            self.per_task_sched_args.get(self.task_id)
+            or self.per_task_sched_args.get(-1)
+            or {}
+        )
+        sched_type = sched_kwargs.pop("type", "linear_warmup_cosine_annealing")
         match sched_type:
             case "linear_warmup_cosine_annealing":
-                sched = LinearWarmupCosineAnnealingLR(optim, **task_sched_kwargs)
+                sched = LinearWarmupCosineAnnealingLR(optim, **sched_kwargs)
             case "cosine_annealing":
-                sched = lr_scheduler.CosineAnnealingLR(optim, **task_sched_kwargs)
-
-            # WARN: CIL training is a sequence of multiple tasks, each has max_epochs
-            # so the total epochs is num_tasks * max_epochs
-            # you may need to consider per-task scheduler, or
-            # use `_configure_optimizer_per_task` to re-init optimizer&scheduler per task
+                sched = lr_scheduler.CosineAnnealingLR(optim, **sched_kwargs)
             case "step_lr":
-                sched = lr_scheduler.StepLR(optim, **task_sched_kwargs)
+                sched = lr_scheduler.StepLR(optim, **sched_kwargs)
             case "multi_step_lr":
-                sched = lr_scheduler.MultiStepLR(optim, **task_sched_kwargs)
+                sched = lr_scheduler.MultiStepLR(optim, **sched_kwargs)
             case _:
                 raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
 
