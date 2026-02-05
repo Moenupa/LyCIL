@@ -2,7 +2,7 @@ from collections.abc import Callable
 from typing import Any, Literal
 
 import lightning as L
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from torch.utils.data import DataLoader
 
 from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
@@ -171,10 +171,14 @@ class HFDataModule(L.LightningDataModule):
         split: str,
         filter_fn: Callable[[dict], bool],
         transform_name: str | None = None,
+        use_buffer: bool = False,
     ) -> Dataset:
         subset = self.dataset[split].filter(filter_fn)
         if transform_name is not None:
-            subset.set_format(format_name=transform_name)
+            subset.set_format(transform_name)
+        if use_buffer and self.buffer is not None and len(self.buffer) > 0:
+            buffer_dset = self.buffer.make_dataset(transform_name=transform_name)
+            subset = concatenate_datasets([subset, buffer_dset])
         return subset
 
     def get_dataloader(
@@ -183,13 +187,15 @@ class HFDataModule(L.LightningDataModule):
         filter_fn: Callable[[dict], bool],
         transform_name: str | None,
         loader_kwargs: dict,
+        use_buffer: bool = False,
     ) -> DataLoader:
         subset = self.get_filtered_dataset(
             split=split,
             filter_fn=filter_fn,
             transform_name=transform_name,
+            use_buffer=use_buffer,
         )
-        return DataLoader(subset, **loader_kwargs)  # type: ignore
+        return DataLoader(subset, **loader_kwargs)  # ty: ignore[invalid-argument-type]
 
     def train_dataloader(self):
         return self.get_dataloader(
@@ -197,6 +203,7 @@ class HFDataModule(L.LightningDataModule):
             filter_fn=self.is_label_in_cur_task,
             transform_name=self.get_effective_transform_name("train"),
             loader_kwargs=self.train_loader_kwargs,
+            use_buffer=True,
         )
 
     def val_dataloader(self):
