@@ -36,14 +36,14 @@ class LWF(BaseLearner):
         y = batch[_Y_COLUMN_NAME]
         logits: torch.Tensor = self(x)
 
-        if self.prev_model is not None and self.task_id > 0:
+        if self.old_self is not None and self.task_id > 0:
             # distill on old classes ($trainset \setminus cur$)
-            prev_logits = self.forward_prev(x)
+            old_logits = self.forward_old(x)
             T = self.distill_T
 
             # mask to only allow old classes in
             p = F.log_softmax(logits[:, : self.num_old_classes] / T, dim=1)
-            q = F.softmax(prev_logits[:, : self.num_old_classes] / T, dim=1)
+            q = F.softmax(old_logits[:, : self.num_old_classes] / T, dim=1)
             loss_distill = F.kl_div(p, q, reduction="batchmean") * (T * T)
 
             # ce on current classes

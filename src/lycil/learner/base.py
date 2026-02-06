@@ -46,7 +46,7 @@ class BaseLearner(L.LightningModule):
         self.classifier: Optional["nn.Module"] = None
 
         self.buffer: Optional["BaseExemplarBuffer"] = None
-        self.prev_model: Optional["nn.Module"] = None
+        self.old_self: Optional["BaseLearner"] = None
 
         # lazy init by `set_task_id()` to sync with data module
         self.task_id: int = None
@@ -156,31 +156,31 @@ class BaseLearner(L.LightningModule):
         }
 
     @torch.no_grad()
-    def snapshot_prev(self):
+    def snapshot_old(self):
         """Keep a frozen copy of the current model."""
         # prevent recursive copies
-        self.prev_model = None
+        self.old_self = None
 
         # snapshot and freeze
-        self.prev_model = copy.deepcopy(self).eval()
-        for p in self.prev_model.parameters():
+        self.old_self = copy.deepcopy(self).eval()
+        for p in self.old_self.parameters():
             p.requires_grad_(False)
 
     @torch.no_grad()
-    def forward_prev(self, x: torch.Tensor) -> torch.Tensor:
-        """Runs the forward pass on `x` with previous snapshot of the model.
+    def forward_old(self, x: torch.Tensor) -> torch.Tensor:
+        """Runs the forward pass on `x` with an older snapshot of the model.
 
         Raises:
-            RuntimeError: If previous snapshot is not available.
+            RuntimeError: If old snapshot is not available.
 
         Returns:
-            torch.Tensor: ``prev_model(x)``
+            torch.Tensor: ``self.old_self.forward(x)``
         """
-        if self.prev_model is None:
+        if self.old_self is None:
             raise RuntimeError(
-                "No previous model stored. Call `snapshot_prev()` first."
+                "No old model snapshot stored. Call `snapshot_old()` first."
             )
-        return self.prev_model(x)
+        return self.old_self(x)
 
     def setup(self, stage) -> None:
         super().setup(stage)
@@ -190,7 +190,7 @@ class BaseLearner(L.LightningModule):
             self.expand_head(self.num_seen_classes - self.num_old_classes)
 
     def on_fit_end(self):
-        self.snapshot_prev()
+        self.snapshot_old()
 
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
