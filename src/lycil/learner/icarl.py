@@ -76,9 +76,6 @@ class ICaRL(BaseLearner):
     def on_train_end(self):
         self.update_memory(self.trainer.datamodule)  # ty: ignore[unresolved-attribute]
 
-    def on_fit_end(self):
-        self.snapshot_prev()
-
     @torch.no_grad()
     def update_memory(self, dm: HFDataModule, **kwargs) -> None:
         if dm.buffer is None:

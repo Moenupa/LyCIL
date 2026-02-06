@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import torch.nn as nn
 
     from ..data.buffer import BaseExemplarBuffer
+    from ..data.hfmodule import HFDataModule
 
 
 class BaseLearner(L.LightningModule):
@@ -30,7 +31,6 @@ class BaseLearner(L.LightningModule):
 
     def __init__(
         self,
-        num_classes_per_task: int,
         *,
         backbone_args: dict | None = None,
         head: Literal["linear", "cosine"] = "linear",
@@ -46,11 +46,12 @@ class BaseLearner(L.LightningModule):
         self.classifier: Optional["nn.Module"] = None
 
         self.buffer: Optional["BaseExemplarBuffer"] = None
-        self.prev_model: Optional["nn.Module"] = None  # frozen copy for distillation
+        self.prev_model: Optional["nn.Module"] = None
 
         # lazy init by `set_task_id()` to sync with data module
         self.task_id: int = None
-        self.num_classes_per_task: int = num_classes_per_task
+        self.num_old_classes: int = None
+        self.num_seen_classes: int = None
 
         self.data_column_translate: dict[str, str] = data_column_translate or {}
         # kwargs for optimizer/scheduler per task_id
@@ -66,36 +67,26 @@ class BaseLearner(L.LightningModule):
     def set_task_id(self, task_id: int):
         self.task_id = task_id
 
-    @property
-    def num_old_classes(self) -> int:
-        """Total number of classes :math:`all \setminus current`,
-        equal to the 0-index offset for current class.
-        - :math:`\le` this offset means old classes;
-        - :math:`\geq` this offset means current new classes.
+    def sync_with_datamodule(self, dm: "HFDataModule"):
+        """Synchronizes task states with datamodule, including current task ID
+        and seen classes.
 
-        Raises:
-            RuntimeError: If task_id is not set.
-
-        Returns:
-            int: Current class ID offset.
+        Args:
+            dm (HFDataModule): Data module to sync with.
         """
-        if self.task_id is None:
-            raise RuntimeError("task_id is not set. Call `set_task_id()` first.")
-        return self.task_id * self.num_classes_per_task
+        self.task_id = dm.get_current_task()
 
-    @property
-    def num_seen_classes(self) -> int:
-        """Total number of classes seen so far.
+        incoming_expansion = dm.num_seen_classes - (self.num_seen_classes or 0)
+        if incoming_expansion <= 0:
+            raise RuntimeError(
+                f"Expect an incoming expansion, got {incoming_expansion} new classes. "
+                + f"Data has {dm.num_seen_classes} seen classes, "
+                + f"but Model has {self.num_seen_classes} seen classes. "
+                + "Ensure that `sync_with_datamodule()` is called after datamodule updates."
+            )
 
-        Raises:
-            RuntimeError: If task_id is not set.
-
-        Returns:
-            int: Number of seen classes.
-        """
-        if self.task_id is None:
-            raise RuntimeError("task_id is not set. Call `set_task_id()` first.")
-        return (self.task_id + 1) * self.num_classes_per_task
+        self.num_old_classes = self.num_seen_classes or 0
+        self.num_seen_classes = dm.num_seen_classes
 
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
@@ -190,6 +181,16 @@ class BaseLearner(L.LightningModule):
                 "No previous model stored. Call `snapshot_prev()` first."
             )
         return self.prev_model(x)
+
+    def setup(self, stage) -> None:
+        super().setup(stage)
+        if stage == "fit":
+            dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+            self.sync_with_datamodule(dm)
+            self.expand_head(self.num_seen_classes - self.num_old_classes)
+
+    def on_fit_end(self):
+        self.snapshot_prev()
 
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...

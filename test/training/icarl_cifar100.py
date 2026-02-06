@@ -9,9 +9,8 @@ from lycil.learner.icarl import ICaRL
 
 
 def main():
-    N_TASKS = 5
     BUFFER_SIZE_PER_CLASS = 20
-    NUM_CLASSES_PER_TASK = 20
+    NUM_CLASSES_PER_TASK = [50, 10, 10, 10, 10]
     EPOCHS_PER_TASK = 80
     USE_PRETRAIN_WEIGHTS = os.environ.get("PRETRAIN", "1") == "1"
 
@@ -19,7 +18,6 @@ def main():
     dm = HFDataModule(
         "data/cifar100",
         transform_name="cifar100",
-        num_tasks=N_TASKS,
         num_classes_per_task=NUM_CLASSES_PER_TASK,
         label_column_name="fine_label",  # 100 classes
         train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 10},
@@ -29,7 +27,6 @@ def main():
         buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
     model = ICaRL(
-        num_classes_per_task=NUM_CLASSES_PER_TASK,
         backbone_args={
             "name": "resnet50",
             "pretrained": USE_PRETRAIN_WEIGHTS,
@@ -56,10 +53,8 @@ def main():
         distill_lambda=0.1,
     )
 
-    for task_idx in range(0, N_TASKS):
+    for task_idx, _ in enumerate(NUM_CLASSES_PER_TASK):
         dm.set_current_task(task_idx)
-        model.set_task_id(task_idx)
-        model.expand_head(model.num_classes_per_task)
 
         trainer = L.Trainer(
             max_epochs=EPOCHS_PER_TASK,
