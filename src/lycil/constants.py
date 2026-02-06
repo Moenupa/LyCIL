@@ -8,3 +8,10 @@ _CLTASK_COLUMN_NAME = os.getenv("CLTASK_COLUMN_NAME", "_cl_task_id")
 if os.getenv("HF_DATASETS_DISABLE_PROGRESS_BARS") == "":
     # disable datasets progress bars if not explicitly set
     os.environ["HF_DATASETS_DISABLE_PROGRESS_BARS"] = "1"
+
+
+def get_seed() -> int | None:
+    if seed := os.getenv("PL_GLOBAL_SEED"):
+        return int(seed)
+
+    return None
