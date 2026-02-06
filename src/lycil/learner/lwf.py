@@ -28,6 +28,7 @@ class LWF(BaseLearner):
         self.distill_T = float(distill_T)
         self.distill_lambda = float(distill_lambda)
 
+
     def training_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
