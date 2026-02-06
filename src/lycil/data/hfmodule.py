@@ -8,7 +8,14 @@ from torch.utils.data import DataLoader
 from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
 from .buffer import BaseExemplarBuffer
 from .transform import register_tf_as_formatter
-from .util import SplitMapping, deterministic_shuffle, get_or_identity
+from .util import (
+    SplitMapping,
+    check_bijection,
+    deterministic_shuffle,
+    get_num_classes_per_task,
+    get_or_identity,
+    reverse_mapping,
+)
 
 
 class HFDataModule(L.LightningDataModule):
@@ -18,8 +25,8 @@ class HFDataModule(L.LightningDataModule):
         self,
         path: str,
         dataset_kwargs: dict | None = None,
-        num_tasks: int = 1,
-        num_classes_per_task: int | None = None,
+        num_tasks: int | None = None,
+        num_classes_per_task: int | list[int] | None = None,
         label_column_name: str = "label",
         label_map: dict[int, Any] | list[Any] | None = None,
         transform_name: str | None = None,
@@ -30,7 +37,6 @@ class HFDataModule(L.LightningDataModule):
         # train/val/test map in case some dataset uses different split names
         split_map: SplitMapping | None = None,
         buffer_kwargs: dict | None = None,
-        seed: int | None = 42,
     ):
         super().__init__()
 
@@ -41,9 +47,13 @@ class HFDataModule(L.LightningDataModule):
         # key mapping for customization, e.g.,
         # {"train": "your_custom_split_for_train", ...}
         self.split_map: dict = split_map or SplitMapping()
-        self.label_map = label_map
-        self.num_tasks = num_tasks
-        self.num_classes_per_task: int = num_classes_per_task
+        self.label_map: dict[int, Any] | list[Any] | None = label_map
+
+        # task config, lazy init
+        self.num_classes_per_task: list[int]
+        self._num_tasks = num_tasks
+        self._num_classes_per_task = num_classes_per_task
+
         self.label_column_name = label_column_name
         # custom stage; fallback to lazy init in self.setup()
 
@@ -54,7 +64,6 @@ class HFDataModule(L.LightningDataModule):
         self.train_loader_kwargs = train_loader_kwargs or {}
         self.val_loader_kwargs = val_loader_kwargs or {}
         self.test_loader_kwargs = test_loader_kwargs or {}
-        self.seed = seed
 
         self.buffer: BaseExemplarBuffer | None = (
             BaseExemplarBuffer(**buffer_kwargs) if buffer_kwargs is not None else None
@@ -62,6 +71,20 @@ class HFDataModule(L.LightningDataModule):
 
         self._cur_task_id: int = 0
         self.dataset: DatasetDict
+
+    @property
+    def num_tasks(self) -> int:
+        return len(self.num_classes_per_task)
+
+    @property
+    def num_old_classes(self) -> int:
+        # cumulative sum of classes, < current task ID
+        return sum(self.num_classes_per_task[: self._cur_task_id])
+
+    @property
+    def num_seen_classes(self) -> int:
+        # cumulative sum of classes, <= current task ID
+        return sum(self.num_classes_per_task[: self._cur_task_id + 1])
 
     def prepare_data(self):
         load_dataset(self.path)
@@ -75,37 +98,41 @@ class HFDataModule(L.LightningDataModule):
         # 3. deterministic uniform sampling of labels
         train_set: Dataset = self.dataset[self._split_train]
         unique_labels: list = train_set.unique(self.label_column_name)
-        self.num_classes_per_task: int = self.num_classes_per_task or (
-            len(unique_labels) // self.num_tasks
+
+        self.num_classes_per_task = get_num_classes_per_task(
+            num_classes_per_task=self._num_classes_per_task,
+            num_tasks=self._num_tasks,
+            num_classes=len(unique_labels),
         )
 
         # a bijection that 0-indexed cl_class_idx -> label
         if self.label_map is not None:
-            import warnings
-
-            if len(self.label_map) != len(unique_labels):
-                warnings.warn(
-                    "`label_map` does not cover all unique labels. "
-                    + f"DataModule(label_map={self.label_map}). Actual Data has {unique_labels}."
-                )
-
-            # TODO: check for duplicates
+            check_bijection(self.label_map, unique_labels)
 
         # idx, v -> v, idx for faster remapping
-        idx2label = self.label_map or deterministic_shuffle(unique_labels, self.seed)
-        reverse_lookup: dict[Any, int] = {}
-        if isinstance(idx2label, (list, tuple)):
-            reverse_lookup = {v: idx for idx, v in enumerate(idx2label)}
-        elif isinstance(idx2label, dict):
-            reverse_lookup = {v: idx for idx, v in idx2label.items()}
-        else:
-            raise TypeError("label_map must be a tuple, list or dict.")
+        idx2label = self.label_map or deterministic_shuffle(unique_labels)
+        label2idx = reverse_mapping(idx2label)
+
+        # construct mapping y -> cl_task_id
+        idx2taskid: list[int] = []
+        for i, num_classes in enumerate(self.num_classes_per_task):
+            idx2taskid.extend([i] * num_classes)
+
+        y_not_used = len(unique_labels) - len(idx2taskid)
+        if y_not_used > 0:
+            # pad with -1 for unused labels
+            idx2taskid.extend([-1] * y_not_used)
+        elif y_not_used < 0:
+            raise ValueError(
+                "The provided num_classes_per_task results in more classes than "
+                "the actual number of unique labels in the dataset."
+            )
 
         def _map_fn(e: dict) -> dict:
-            mapped_class_idx = reverse_lookup[e[self.label_column_name]]
-            task_id_belonged = mapped_class_idx // self.num_classes_per_task
+            class_idx = label2idx[e[self.label_column_name]]
+            task_id_belonged = idx2taskid[class_idx]
             return {
-                _Y_COLUMN_NAME: mapped_class_idx,
+                _Y_COLUMN_NAME: class_idx,
                 _CLTASK_COLUMN_NAME: task_id_belonged,
             }
 
