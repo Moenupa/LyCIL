@@ -1,0 +1,53 @@
+name: "Code QL"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "**/*.py"
+      - "pyproject.toml"
+      - "Makefile"
+      - ".github/workflows/*.yml"
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "**/*.py"
+      - "pyproject.toml"
+      - "Makefile"
+      - ".github/workflows/*.yml"
+
+jobs:
+  tests:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.12
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra lightning
+
+      - name: Check style
+        run: |
+          make style && make style-check
+
+      - name: Check quality
+        run: |
+          make quality
+
+      - name: Test with pytest
+        run: |
+          make test
+
+        
