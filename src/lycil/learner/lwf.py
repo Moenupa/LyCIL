@@ -1,7 +1,6 @@
 import torch
 import torch.nn.functional as F
 
-from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 from .base import BaseLearner
 
 
@@ -31,14 +30,12 @@ class LWF(BaseLearner):
     def training_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        # labels belong to current classes only
-        x = batch[_X_COLUMN_NAME]
-        y = batch[_Y_COLUMN_NAME]
+        x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
 
-        if self.old_self is not None and self.task_id > 0:
+        if self.task_id > 0:
             # distill on old classes ($trainset \setminus cur$)
-            old_logits = self.forward_old(x)
+            old_logits = self.old_self.forward_no_grad(x)
             T = self.distill_T
 
             # mask to only allow old classes in
@@ -59,9 +56,9 @@ class LWF(BaseLearner):
 
         self.log_dict(
             {
-                f"train/task{self.task_id}/loss": loss,
-                f"train/task{self.task_id}/ce": loss_ce,
-                f"train/task{self.task_id}/distill": loss_distill or 0.0,
+                "train/loss": loss,
+                "train/ce": loss_ce,
+                "train/distill": loss_distill or 0.0,
             },
             prog_bar=True,
             on_epoch=True,

@@ -46,7 +46,7 @@ class BaseLearner(L.LightningModule):
         self.classifier: Optional["nn.Module"] = None
 
         self.buffer: Optional["BaseExemplarBuffer"] = None
-        self.old_self: Optional["BaseLearner"] = None
+        self._old_self: Optional["BaseLearner"] = None
 
         # lazy init by `set_task_id()` to sync with data module
         self.task_id: int = None
@@ -88,6 +88,12 @@ class BaseLearner(L.LightningModule):
         self.num_old_classes = self.num_seen_classes or 0
         self.num_seen_classes = dm.num_seen_classes
 
+    @staticmethod
+    def unpack_batch(
+        batch: dict[str, torch.Tensor],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        return batch[_X_COLUMN_NAME], batch[_Y_COLUMN_NAME]
+
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
         if self.classifier is None:
@@ -100,17 +106,27 @@ class BaseLearner(L.LightningModule):
         return
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
-        return self.backbone(x)
+        return self.forward_layerwise(x)["features"]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.forward_layerwise(x)["logits"]
+
+    @torch.no_grad()
+    def forward_no_grad(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass without tracking gradients. Useful for memory updates."""
+        return self.forward(x)
+
+    def forward_layerwise(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         if self.classifier is None:
             raise RuntimeError(
                 "Classifier head is not initialized. Call expand_head before training."
             )
 
-        f = self.feature_extractor(x)
-        logits = self.classifier(f)
-        return logits
+        fmap = self.backbone.forward_layerwise(x)
+        logits = self.classifier(fmap["features"])
+        fmap["logits"] = logits
+        # with keys 'l1', 'l2', 'l3', 'l4', 'features', 'logits'
+        return fmap
 
     @abstractmethod
     def update_memory(self, *args, **kwargs): ...
@@ -159,28 +175,21 @@ class BaseLearner(L.LightningModule):
     def snapshot_old(self):
         """Keep a frozen copy of the current model."""
         # prevent recursive copies
-        self.old_self = None
+        self._old_self = None
 
         # snapshot and freeze
-        self.old_self = copy.deepcopy(self).eval()
-        for p in self.old_self.parameters():
+        self._old_self = copy.deepcopy(self).eval()
+        for p in self._old_self.parameters():
             p.requires_grad_(False)
 
-    @torch.no_grad()
-    def forward_old(self, x: torch.Tensor) -> torch.Tensor:
-        """Runs the forward pass on `x` with an older snapshot of the model.
-
-        Raises:
-            RuntimeError: If old snapshot is not available.
-
-        Returns:
-            torch.Tensor: ``self.old_self.forward(x)``
-        """
-        if self.old_self is None:
+    @property
+    def old_self(self) -> "BaseLearner":
+        """Returns a frozen copy of the old model. Call `snapshot_old()` to update the snapshot."""
+        if self._old_self is None:
             raise RuntimeError(
                 "No old model snapshot stored. Call `snapshot_old()` first."
             )
-        return self.old_self(x)
+        return self._old_self
 
     def setup(self, stage) -> None:
         super().setup(stage)
@@ -203,11 +212,11 @@ class BaseLearner(L.LightningModule):
             y = batch[_Y_COLUMN_NAME]
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=5)
+        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
         self.log_dict(
             {
-                f"val/task{self.task_id}/acc1": acc1,
-                f"val/task{self.task_id}/acc5": acc5,
+                f"val/acc1/task{self.task_id}": acc1,
+                f"val/acc5/task{self.task_id}": acc5,
             },
             prog_bar=False,
             sync_dist=True,
@@ -221,11 +230,11 @@ class BaseLearner(L.LightningModule):
             y = batch[_Y_COLUMN_NAME]
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=5)
+        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
         self.log_dict(
             {
-                f"test/task{self.task_id}/acc1": acc1,
-                f"test/task{self.task_id}/acc5": acc5,
+                f"test/acc1/task{self.task_id}": acc1,
+                f"test/acc5/task{self.task_id}": acc5,
             },
             prog_bar=False,
             sync_dist=True,

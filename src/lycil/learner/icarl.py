@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
+from ..constants import _Y_COLUMN_NAME
 from ..data.buffer import compute_nme
 from ..data.hfmodule import HFDataModule
 from .base import BaseLearner
@@ -37,17 +37,15 @@ class ICaRL(BaseLearner):
     def training_step(
         self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
-        # labels belong to current classes only
-        x = batch[_X_COLUMN_NAME]
-        y = batch[_Y_COLUMN_NAME]
+        x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
 
         # ce on all classes
         loss_ce = F.cross_entropy(logits, y)
 
-        if self.old_self is not None and self.task_id > 0:
+        if self.task_id > 0:
             # distill on old classes ($trainset \setminus cur$)
-            old_logits = self.forward_old(x)
+            old_logits = self.old_self.forward_no_grad(x)
             T = self.distill_T
 
             # mask to only allow old classes in
