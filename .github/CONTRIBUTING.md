@@ -63,7 +63,7 @@ LyCIL follows the [Google Python Style Guide][google-python-styleguide] and
 
 4. Set up a development environment by running the following command in a virtual environment:
     ```bash
-    uv sync --extra lightning --extra wandb --dev
+    uv sync --extra cuda --dev  # or --extra npu for NPU environment
     ```
 
 5. Check code before commit:
@@ -83,4 +83,4 @@ LyCIL follows the [Google Python Style Guide][google-python-styleguide] and
     git push -u origin feat/describe_your_changes
     ```
 
-7. Create a pull request from your branch `feat/describe_your_changes` at [origin repo](https://github.com/Moenupa/LyCIL).
+7. Create a pull request from your branch `feat/describe_your_changes` at [origin repo][lycil].
