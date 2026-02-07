@@ -49,18 +49,18 @@ class ResNetBackbone(nn.Module):
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.out_dim = feat_dim
 
-    def forward_feats(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+    def forward_layerwise(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         x = self.stem(x)
         x1 = self.layer1(x)
         x2 = self.layer2(x1)
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
-        return {"l2": x2, "l3": x3, "l4": x4}
+        features = self.pool(x4).flatten(1)
+        return {"l1": x1, "l2": x2, "l3": x3, "l4": x4, "features": features}
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        feats = self.forward_feats(x)["l4"]
-        x = self.pool(feats).flatten(1)
-        return x
+        feats = self.forward_layerwise(x)["features"]
+        return feats
 
     @property
     def feature_dim(self) -> int:
