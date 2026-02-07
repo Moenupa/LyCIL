@@ -1,6 +1,6 @@
 .PHONY: build install style-check style quality test
 
-check_dirs := src test
+check_dirs := src tests
 
 # uvx with fallback, e.g.: 1. `uvx ruff check` 2. `ruff check`
 TOOL := $(shell command -v uv >/dev/null 2>&1 && echo "uvx" || echo "")

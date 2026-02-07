@@ -8,7 +8,7 @@ from .base import BaseLearner
 
 
 class ICaRL(BaseLearner):
-    """`iCaRL`_: Incremental Classifier and Representation Learning. (Rebuffi et al., CVPR 2017).
+    r"""`iCaRL`_: Incremental Classifier and Representation Learning. (Rebuffi et al., CVPR 2017).
     - Exemplar memory: herding + NME-based evaluation
     - Loss :math:`L = L_\text{CE} + \lambda * L_\text{distill}`.
 
