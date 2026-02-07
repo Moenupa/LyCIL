@@ -1,20 +1,20 @@
 import os
 import os.path as osp
 
-import pytest
-
 os.environ["X_COLUMN_NAME"] = "img"
 
 import lightning as L
+import pytest
 from lightning.pytorch.loggers import WandbLogger
 
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
-from lycil.learner.lwf import LWF
+from lycil.learner.icarl import ICaRL
 
 DUMMY_TRAINING = os.environ.get("DUMMY", "1") == "1"
 CUDA_AVAILABLE = len(os.environ.get("CUDA_VISIBLE_DEVICES", "")) > 0
+BUFFER_SIZE_PER_CLASS = 20
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def cifar_args() -> list | None:
     return None
 
 
-def test_lwf_cifar100(cifar_args: list | None):
+def test_icarl_cifar100(cifar_args: list | None):
     if not CUDA_AVAILABLE:
         pytest.skip("CUDA not available.")
         return
@@ -54,8 +54,9 @@ def test_lwf_cifar100(cifar_args: list | None):
         split_map={"train": "test", "val": "test"}
         if EPOCHS_PER_TASK == 1
         else {"val": "test"},
+        buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
-    model = LWF(
+    model = ICaRL(
         backbone_args={
             "name": "resnet50",
             "pretrained": USE_PRETRAIN_WEIGHTS,
@@ -92,10 +93,10 @@ def test_lwf_cifar100(cifar_args: list | None):
             enable_progress_bar=False,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"lwf_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+                name=f"icarl_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
                 project="lycil",
                 log_model=False,
-                tags=["lwf", "cifar100"]
+                tags=["icarl", "cifar100"]
                 + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
                 group=_EXP_NAME,
             ),
@@ -109,4 +110,4 @@ def test_lwf_cifar100(cifar_args: list | None):
 
 
 if __name__ == "__main__":
-    test_lwf_cifar100(cifar_args())
+    pytest.main()
