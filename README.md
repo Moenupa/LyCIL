@@ -17,15 +17,15 @@ We highly recommend using `uv` to manage the environment.
 
 ```sh
 # uv venv                           # create virtual env
-uv sync --extra lightning           # for cuda lightning
-uv sync --extra lightning-npu       # for npu lightning
+uv sync --extra cuda                # for cuda lightning
+uv sync --extra npu                 # for npu lightning
 ```
 
 <details><summary>Alternatively, install via pip or conda:</summary>
 
 ```sh
 # conda or pip, with optional dependencies for lightning
-pip install -e ".[lightning]"       # 'lightning', or 'lightning-npu'
+pip install -e ".[cuda]"            # 'cuda', or 'npu'
 ```
 
 </details>
