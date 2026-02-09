@@ -63,6 +63,7 @@ def test_make_dataset(buffer100: BaseExemplarBuffer):
     assert len(combined_dataset) == 100
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("dataset_name", ["cifar10", "cifar100"])
 def test_with_cifar_datasets(dataset_name):
     dataset_path = f"data/{dataset_name}/"
