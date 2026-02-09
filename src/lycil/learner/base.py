@@ -123,8 +123,8 @@ class BaseLearner(L.LightningModule):
             )
 
         fmap = self.backbone.forward_layerwise(x)
-        logits = self.classifier(fmap["features"])
-        fmap["logits"] = logits
+        logits: dict[str, torch.Tensor] = self.classifier(fmap["features"])
+        fmap.update(logits)
         # with keys 'l1', 'l2', 'l3', 'l4', 'features', 'logits'
         return fmap
 
@@ -205,11 +205,7 @@ class BaseLearner(L.LightningModule):
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
     def validation_step(self, batch, batch_idx: int) -> None:
-        if isinstance(batch, (tuple, list)):
-            x, y = batch
-        else:
-            x = batch[_X_COLUMN_NAME]
-            y = batch[_Y_COLUMN_NAME]
+        x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
         acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
@@ -223,11 +219,7 @@ class BaseLearner(L.LightningModule):
         )
 
     def test_step(self, batch, batch_idx: int) -> None:
-        if isinstance(batch, (tuple, list)):
-            x, y = batch
-        else:
-            x = batch[_X_COLUMN_NAME]
-            y = batch[_Y_COLUMN_NAME]
+        x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
         acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
