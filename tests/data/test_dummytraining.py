@@ -69,10 +69,11 @@ class DummyClassifier(L.LightningModule):
 def test_cifar10_training(device: str):
     dm = HFDataModule(
         "data/cifar10",
-        split_map={"val": "test"},
+        split_map={"train": "test", "val": "test"},
         transform_name="cifar10",
+        num_classes_per_task=[1, 1],
         train_loader_kwargs={
-            "batch_size": 32,
+            "batch_size": 64,
             "num_workers": 8,
             "shuffle": True,
         },
@@ -91,6 +92,7 @@ def test_cifar10_training(device: str):
         enable_checkpointing=False,
         enable_progress_bar=False,
         log_every_n_steps=None,
+        logger=False,
     )
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
