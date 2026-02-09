@@ -2,9 +2,9 @@ import os.path as osp
 
 import lightning as L
 import pytest
-import wandb
 from lightning.pytorch.loggers import WandbLogger
 
+import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.lwf import LWF
