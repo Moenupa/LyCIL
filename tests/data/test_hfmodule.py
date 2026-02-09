@@ -14,6 +14,7 @@ def cifar10_path() -> str | None:
     return path
 
 
+@pytest.mark.slow
 def test_setup_w_seed(cifar10_path: str | None):
     if cifar10_path is None:
         pytest.skip("CIFAR10 dataset not found.")
@@ -47,6 +48,7 @@ def test_setup_w_seed(cifar10_path: str | None):
             assert label.item() == 7
 
 
+@pytest.mark.slow
 def test_setup_w_custom_labelset(cifar10_path: str | None):
     if cifar10_path is None:
         pytest.skip("CIFAR10 dataset not found.")
@@ -83,6 +85,7 @@ def test_setup_w_custom_labelset(cifar10_path: str | None):
     assert seen_labels == set(range(8))
 
 
+@pytest.mark.slow
 def test_buffer(cifar10_path: str | None):
     if cifar10_path is None:
         pytest.skip("CIFAR10 dataset not found.")
@@ -116,6 +119,7 @@ def test_buffer(cifar10_path: str | None):
     assert seen_labels == {0, 2}
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "task_id, expected_label_set, expected_num_old_classes, expected_num_seen_classes",
     [

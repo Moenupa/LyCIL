@@ -19,3 +19,8 @@ def get_seed() -> int | None:
         return int(seed)
 
     return None
+
+
+def is_env_enabled(env_var: str, default: str = "0") -> bool:
+    """Check if the environment variable is enabled."""
+    return os.getenv(env_var, default).lower() in ["true", "yes", "on", "t", "y", "1"]
