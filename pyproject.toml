@@ -53,7 +53,7 @@ lightning = [
     "lightning>=2.2.0,<2.6.0",
 ]
 wandb = [
-    "wandb>=0.12.10,<0.23.0"
+    "wandb>=0.20.0,<0.25.0,!=0.24.0"
 ]
 
 [project.urls]

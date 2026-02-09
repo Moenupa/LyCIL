@@ -1,7 +1,4 @@
-import os
 import os.path as osp
-
-os.environ["X_COLUMN_NAME"] = "img"
 
 import lightning as L
 import pytest
@@ -10,37 +7,30 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
-from lycil.learner.icarl import ICaRL
+from lycil.learner.podnet import PODNet
 
-DUMMY_TRAINING = os.environ.get("DUMMY", "1") == "1"
-CUDA_AVAILABLE = len(os.environ.get("CUDA_VISIBLE_DEVICES", "")) > 0
 BUFFER_SIZE_PER_CLASS = 20
 
 
-@pytest.fixture
-def cifar_args() -> list | None:
-    args = (
-        ["data/cifar10", [1, 1], "label", 1, False]
-        if DUMMY_TRAINING
-        else ["data/cifar100", [20, 20, 20, 20, 20], "fine_label", 80, True]
-    )
-    if osp.exists(args[0]):  # ty: ignore[invalid-argument-type]
-        return args
-
-    return None
-
-
-def test_podnet_cifar100(cifar_args: list | None):
-    if not CUDA_AVAILABLE:
-        pytest.skip("CUDA not available.")
-        return
-    if cifar_args is None:
+@pytest.mark.runs_on(["cuda"])
+def test_podnet_cifar100(is_dummy_training: bool):
+    if is_dummy_training:
+        DATAPATH = "data/cifar10"
+        N_CLASS_PER_TASK = [1, 1]
+        LABEL_COL = "label"
+        EPOCHS_PER_TASK = 1
+        EPOCHS_PER_TASK_MEMORY = 1
+        USE_PRETRAIN_WEIGHTS = False
+    else:
+        DATAPATH = "data/cifar100"
+        N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
+        LABEL_COL = "fine_label"
+        EPOCHS_PER_TASK = 80
+        EPOCHS_PER_TASK_MEMORY = 20
+        USE_PRETRAIN_WEIGHTS = True
+    if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
-
-    DATAPATH, N_CLASS_PER_TASK, LABEL_COL, EPOCHS_PER_TASK, USE_PRETRAIN_WEIGHTS = (
-        cifar_args
-    )
 
     L.seed_everything(42)
     dm = HFDataModule(
@@ -56,13 +46,13 @@ def test_podnet_cifar100(cifar_args: list | None):
         else {"val": "test"},
         buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
-    model = ICaRL(
+    model = PODNet(
         backbone_args={
             "name": "resnet50",
             "pretrained": USE_PRETRAIN_WEIGHTS,
             "cifar": True,
         },
-        head="linear",
+        head="cosine",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             -1: {
@@ -85,6 +75,9 @@ def test_podnet_cifar100(cifar_args: list | None):
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
 
+        # use training data, without buffer
+        dm.use_buffer = False
+        dm.train_filter_fn = None
         trainer = L.Trainer(
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
@@ -103,10 +96,32 @@ def test_podnet_cifar100(cifar_args: list | None):
             log_every_n_steps=1000,
         )
         trainer.fit(model, datamodule=dm)
+
+        # use data from buffer only, do not use training data
+        dm.use_buffer = True
+        dm.train_filter_fn = lambda e: False
+        trainer = L.Trainer(
+            max_epochs=EPOCHS_PER_TASK_MEMORY,
+            sync_batchnorm=True,
+            enable_checkpointing=False,
+            enable_progress_bar=False,
+            precision="16-mixed",
+            logger=WandbLogger(
+                name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}_memory",
+                project="lycil",
+                log_model=False,
+                tags=["podnet", "cifar100"]
+                + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
+                group=_EXP_NAME,
+            ),
+            check_val_every_n_epoch=10,
+            log_every_n_steps=1000,
+        )
+        trainer.fit(model, datamodule=dm)
         trainer.validate(model, datamodule=dm)
 
         wandb.finish()
 
 
 if __name__ == "__main__":
-    pytest.main()
+    test_podnet_cifar100(is_dummy_training=False)

@@ -74,7 +74,12 @@ class BaseLearner(L.LightningModule):
         Args:
             dm (HFDataModule): Data module to sync with.
         """
-        self.task_id = dm.get_current_task()
+        dm_task_id = dm.get_current_task()
+        if self.task_id is not None and dm_task_id == self.task_id:
+            # in sync, no update
+            return
+
+        self.task_id = dm_task_id
 
         incoming_expansion = dm.num_seen_classes - (self.num_seen_classes or 0)
         if incoming_expansion <= 0:
@@ -84,6 +89,8 @@ class BaseLearner(L.LightningModule):
                 + f"but Model has {self.num_seen_classes} seen classes. "
                 + "Ensure that `sync_with_datamodule()` is called after datamodule updates."
             )
+
+        self.expand_head(incoming_expansion)
 
         self.num_old_classes = self.num_seen_classes or 0
         self.num_seen_classes = dm.num_seen_classes
@@ -196,7 +203,6 @@ class BaseLearner(L.LightningModule):
         if stage == "fit":
             dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
             self.sync_with_datamodule(dm)
-            self.expand_head(self.num_seen_classes - self.num_old_classes)
 
     def on_fit_end(self):
         self.snapshot_old()

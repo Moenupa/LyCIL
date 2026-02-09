@@ -68,6 +68,8 @@ class HFDataModule(L.LightningDataModule):
         self.buffer: BaseExemplarBuffer | None = (
             BaseExemplarBuffer(**buffer_kwargs) if buffer_kwargs is not None else None
         )
+        self.train_filter_fn: Callable[[dict], bool] | None = None
+        self.use_buffer: bool = True
 
         self._cur_task_id: int = 0
         self.dataset: DatasetDict
@@ -227,10 +229,10 @@ class HFDataModule(L.LightningDataModule):
     def train_dataloader(self):
         return self.get_dataloader(
             split=self._split_train,
-            filter_fn=self.is_label_in_cur_task,
+            filter_fn=self.train_filter_fn or self.is_label_in_cur_task,
             transform_name=self.get_effective_transform_name("train"),
             loader_kwargs=self.train_loader_kwargs,
-            use_buffer=True,
+            use_buffer=self.use_buffer,
         )
 
     def val_dataloader(self):
