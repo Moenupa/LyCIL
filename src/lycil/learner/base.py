@@ -78,6 +78,12 @@ class BaseLearner(L.LightningModule):
         if self.task_id is not None and dm_task_id == self.task_id:
             # in sync, no update
             return
+        if self.task_id is not None and self.task_id < 0:
+            # a special bypass rule for buffer-only training
+            # this will disable head expansion, to do this, you should:
+            # set by `learner.task_id=-2` and
+            # reset by `learner.task_id=cur_task_id`.
+            return
 
         self.task_id = dm_task_id
 
@@ -138,40 +144,49 @@ class BaseLearner(L.LightningModule):
     @abstractmethod
     def update_memory(self, *args, **kwargs): ...
 
+    @staticmethod
+    def _get_optimizer(*args, **kwargs):
+        opt_type = kwargs.pop("type", "sgd")
+        match opt_type:
+            case "sgd":
+                return torch.optim.SGD(*args, **kwargs)
+            case "adamw":
+                return torch.optim.AdamW(*args, **kwargs)
+            case _:
+                raise NotImplementedError(f"Unsupported optimizer: `{opt_type}`")
+
+    @staticmethod
+    def _get_scheduler(*args, **kwargs):
+        sched_type = kwargs.pop("type", "linear_warmup_cosine_annealing")
+        match sched_type:
+            case "linear_warmup_cosine_annealing":
+                return LinearWarmupCosineAnnealingLR(*args, **kwargs)
+            case "cosine_annealing":
+                return lr_scheduler.CosineAnnealingLR(*args, **kwargs)
+            case "step_lr":
+                return lr_scheduler.StepLR(*args, **kwargs)
+            case "multi_step_lr":
+                return lr_scheduler.MultiStepLR(*args, **kwargs)
+            case _:
+                raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
+
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
 
+        # a waterfall lookup for optimizer/scheduler kwargs:
+        # per-task specific > default (-1) > empty dict
         optim_kwargs = (
             self.per_task_optim_args.get(self.task_id)
             or self.per_task_optim_args.get(-1)
             or {}
         )
-        opt_type = optim_kwargs.pop("type", "sgd")
-        match opt_type:
-            case "sgd":
-                optim = torch.optim.SGD(params, **optim_kwargs)
-            case "adamw":
-                optim = torch.optim.AdamW(params, **optim_kwargs)
-            case _:
-                raise NotImplementedError(f"Unsupported optimizer: `{opt_type}`")
-
         sched_kwargs = (
             self.per_task_sched_args.get(self.task_id)
             or self.per_task_sched_args.get(-1)
             or {}
         )
-        sched_type = sched_kwargs.pop("type", "linear_warmup_cosine_annealing")
-        match sched_type:
-            case "linear_warmup_cosine_annealing":
-                sched = LinearWarmupCosineAnnealingLR(optim, **sched_kwargs)
-            case "cosine_annealing":
-                sched = lr_scheduler.CosineAnnealingLR(optim, **sched_kwargs)
-            case "step_lr":
-                sched = lr_scheduler.StepLR(optim, **sched_kwargs)
-            case "multi_step_lr":
-                sched = lr_scheduler.MultiStepLR(optim, **sched_kwargs)
-            case _:
-                raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
+        optim = self._get_optimizer(params, **optim_kwargs)
+        sched = self._get_scheduler(optim, **sched_kwargs)
 
         return {
             "optimizer": optim,

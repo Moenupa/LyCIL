@@ -26,7 +26,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 80
-        EPOCHS_PER_TASK_MEMORY = 20
+        EPOCHS_PER_TASK_MEMORY = 10
         USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
@@ -38,7 +38,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 10},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
         val_loader_kwargs={"shuffle": False, "num_workers": 10},
         test_loader_kwargs={"shuffle": False, "num_workers": 10},
         split_map={"train": "test", "val": "test"}
@@ -54,6 +54,12 @@ def test_podnet_cifar100(is_dummy_training: bool):
         },
         head="cosine",
         per_task_optim_args={
+            # for buffer training, small learning rate
+            -2: {
+                "type": "sgd",
+                "lr": 0.01,
+                "weight_decay": 5e-4,
+            },
             # for all tasks, use the same optimizer kwargs
             -1: {
                 "type": "sgd",
@@ -69,7 +75,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "max_epochs": EPOCHS_PER_TASK,
             }
         },
-        distill_lambda=0.1,
+        lambda_spatial=5.0,
+        lambda_flat=1.0,
     )
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
@@ -100,6 +107,9 @@ def test_podnet_cifar100(is_dummy_training: bool):
         # use data from buffer only, do not use training data
         dm.use_buffer = True
         dm.train_filter_fn = lambda e: False
+        # to bypass head expansion, see `BaseLearner.sync_with_datamodule()`
+        # and get special training optimizer kwargs with key -2
+        model.set_task_id(-2)
         trainer = L.Trainer(
             max_epochs=EPOCHS_PER_TASK_MEMORY,
             sync_batchnorm=True,
@@ -118,6 +128,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             log_every_n_steps=1000,
         )
         trainer.fit(model, datamodule=dm)
+        # reset after memory training
+        model.set_task_id(task_idx)
         trainer.validate(model, datamodule=dm)
 
         wandb.finish()

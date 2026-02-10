@@ -15,7 +15,7 @@ __all__ = [
 _CLASSIFIER_HEADS: dict[str, tuple[type[nn.Module], dict]] = {
     # key: (class, {optional kwargs})
     "linear": (SimpleLinear, {}),
-    "cosine": (CosineLinear, {"learn_scale": True}),
+    "cosine": (CosineLinear, {"num_proxy": 10, "to_reduce": True, "learn_scale": True}),
 }
 
 
@@ -70,11 +70,13 @@ def expand_head(module: nn.Module, num_new: int) -> nn.Module:
     if isinstance(module, CosineLinear):
         new_linear = SplitCosineLinear.from_cosine_linear(module, num_new)
         new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
         return new_linear
 
     if isinstance(module, SplitCosineLinear):
         new_linear = SplitCosineLinear.from_split_cosine_linear(module, num_new)
         new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
         return new_linear
 
     raise NotImplementedError(f"Classifier not expandable: {type(module)}.")

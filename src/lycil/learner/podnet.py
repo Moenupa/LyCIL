@@ -88,7 +88,8 @@ class PODNet(ICaRL):
     - Loss :math:`L = L_\text{NCA} + \lambda * \alpha_\text{task} * (L_\text{flat} + L_\text{spatial})`.
 
     Args:
-        lambda_distill (float, optional): Weight for distillation loss. Default: 1.0.
+        lambda_spatial (float, optional): Weight for spatial distillation loss. (default: 5.0)
+        lambda_flat (float, optional): Weight for flat distillation loss. (default: 1.0)
         args: See :class:`BaseLearner` for other args.
         kwargs: See :class:`BaseLearner` for other args.
 
@@ -99,12 +100,14 @@ class PODNet(ICaRL):
     def __init__(
         self,
         *args,
-        distill_lambda: float = 1.0,
+        lambda_spatial: float = 5.0,
+        lambda_flat: float = 1.0,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
-        self.distill_lambda = float(distill_lambda)
+        self.lambda_spatial = float(lambda_spatial)
+        self.lambda_flat = float(lambda_flat)
 
     @property
     def task_factor(self) -> float:
@@ -135,8 +138,8 @@ class PODNet(ICaRL):
             )
             loss_spatial = pod_spatial_loss(new_fmap, old_fmap)
 
-            loss = loss_lsc + self.task_factor * self.distill_lambda * (
-                loss_spatial + loss_flat
+            loss = loss_lsc + self.task_factor * (
+                self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
             )
         else:
             # first task, no distill
@@ -148,8 +151,8 @@ class PODNet(ICaRL):
             {
                 "train/loss": loss,
                 "train/lsc": loss_lsc,
-                "train/flat": loss_spatial or 0.0,
-                "train/spatial": loss_flat or 0.0,
+                "train/flat": loss_flat or 0.0,
+                "train/spatial": loss_spatial or 0.0,
             },
             prog_bar=True,
             on_epoch=True,
