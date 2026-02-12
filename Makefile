@@ -28,4 +28,4 @@ quality:
 	$(TOOL) ty check $(check_dirs)
 
 test:
-	WANDB_DISABLED=true $(RUN) pytest -vv --import-mode=importlib
+	WANDB_MODE=disabled $(RUN) pytest tests -vv --import-mode=importlib
