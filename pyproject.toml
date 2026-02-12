@@ -33,7 +33,7 @@ npu = [
     "decorator",
     "psutil",
     "importlib_metadata",
-    "lightning @ git+https://github.com/SmallPigPeppa/pytorch-lightning.git@npu_support_fp16_mixed",
+    # "lightning @ git+https://github.com/SmallPigPeppa/pytorch-lightning.git@npu_support_fp16_mixed",
     "lycil[wandb]"
 ]
 ghactions = [
