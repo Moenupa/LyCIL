@@ -46,8 +46,8 @@ def test_split_cosine_linear(device):
     x = torch.randn(2, in_features, device=device)
     out = m(x)
     assert out["logits"].shape == (2, old_out + new_out)
-    assert out["old_logits"].shape == (2, old_out)
-    assert out["new_logits"].shape == (2, new_out)
+    assert out["old_scores"].shape == (2, old_out)
+    assert out["new_scores"].shape == (2, new_out)
 
 
 @pytest.mark.runs_on(["cpu", "cuda", "npu"])

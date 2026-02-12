@@ -1,10 +1,14 @@
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn.functional as F
 
 from ..constants import _Y_COLUMN_NAME
 from ..data.buffer import compute_nme
-from ..data.hfmodule import HFDataModule
 from .base import BaseLearner
+
+if TYPE_CHECKING:
+    from ..data.hfmodule import HFDataModule
 
 
 class ICaRL(BaseLearner):
@@ -75,7 +79,7 @@ class ICaRL(BaseLearner):
         self.update_memory(self.trainer.datamodule)  # ty: ignore[unresolved-attribute]
 
     @torch.no_grad()
-    def update_memory(self, dm: HFDataModule, **kwargs) -> None:
+    def update_memory(self, dm: "HFDataModule", **kwargs) -> None:
         if dm.buffer is None:
             raise RuntimeError("Buffer is not initialized.")
 
@@ -90,7 +94,7 @@ class ICaRL(BaseLearner):
         return
 
     @torch.no_grad()
-    def _construct_exemplar(self, dm: HFDataModule, **kwargs) -> None:
+    def _construct_exemplar(self, dm: "HFDataModule", **kwargs) -> None:
         raise NotImplementedError
 
         assert dm.buffer is not None
@@ -99,7 +103,7 @@ class ICaRL(BaseLearner):
             pass
 
     @torch.no_grad()
-    def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
+    def _construct_exemplar_unified(self, dm: "HFDataModule", **kwargs) -> None:
         # for dataloader during exemplar construction,
         # rather conservative because args are hard-coded here
         loader_kwargs = dict(
