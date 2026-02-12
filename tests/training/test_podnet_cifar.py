@@ -12,6 +12,7 @@ from lycil.learner.podnet import PODNet
 BUFFER_SIZE_PER_CLASS = 20
 
 
+@pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 def test_podnet_cifar100(is_dummy_training: bool):
     if is_dummy_training:
@@ -25,8 +26,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "data/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 80
-        EPOCHS_PER_TASK_MEMORY = 10
+        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
@@ -57,13 +58,13 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # for buffer training, small learning rate
             -2: {
                 "type": "sgd",
-                "lr": 0.01,
+                "lr": 0.005,
                 "weight_decay": 5e-4,
             },
             # for all tasks, use the same optimizer kwargs
             -1: {
                 "type": "sgd",
-                "lr": 0.3,
+                "lr": 0.1,
                 "weight_decay": 5e-4,
             },
         },

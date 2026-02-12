@@ -134,9 +134,9 @@ class PODNet(ICaRL):
             loss_flat = F.cosine_embedding_loss(
                 new_fmap["features"],
                 old_fmap["features"].detach(),
-                torch.ones(x.shape[0]).to(self._device),
+                torch.ones(x.shape[0]).to(self.device),
             )
-            loss_spatial = pod_spatial_loss(new_fmap, old_fmap)
+            loss_spatial = pod_spatial_loss(old_fmap, new_fmap)
 
             loss = loss_lsc + self.task_factor * (
                 self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
