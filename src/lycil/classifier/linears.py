@@ -1,10 +1,9 @@
 import math
-from typing import TypedDict, Callable
+from typing import Callable, TypedDict
 
 import torch
 from torch import nn
 from torch.nn import functional as F
-
 
 LinearHead = Callable[[torch.Tensor], dict[str, torch.Tensor]]
 

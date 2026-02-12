@@ -37,12 +37,8 @@ npu = [
     "lycil[wandb]"
 ]
 ghactions = [
-    "torch @ https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.11' and platform_machine == 'x86_64'",
     "torch @ https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.12' and platform_machine == 'x86_64'",
-    "torch @ https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.13' and platform_machine == 'x86_64'",
-    "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.11' and platform_machine == 'x86_64'",
     "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.12' and platform_machine == 'x86_64'",
-    "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.22.1%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl ; platform_system == 'Linux' and python_version == '3.13' and platform_machine == 'x86_64'",
     "lycil[lightning,wandb]",
 ]
 torch-cuda = [
@@ -53,13 +49,22 @@ lightning = [
     "lightning>=2.2.0,<2.6.0",
 ]
 wandb = [
-    "wandb>=0.12.10,<0.23.0"
+    "wandb>=0.20.0,<0.25.0,!=0.24.0"
 ]
 
 [project.urls]
 homepage = "http://moenupa.github.io/LyCIL"
 documentation = "https://github.com/Moenupa/LyCIL"
 repository = "https://github.com/Moenupa/LyCIL"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-vv -n auto"
+markers = [
+    "runs_on: mark tests requiring specific device type, e.g. @pytest.mark.runs_on(['cuda'])",
+    "slow: mark tests as slow (pytest -m 'not slow' or set RUN_SLOW=1 to run)",
+    "distributed: mark tests requireing multi-device execution",
+]
 
 [tool.uv]
 conflicts = [
