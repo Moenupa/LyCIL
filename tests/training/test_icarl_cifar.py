@@ -76,6 +76,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         dm.set_current_task(task_idx)
 
         trainer = L.Trainer(
+            accelerator=device,
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
             enable_checkpointing=False,
@@ -99,4 +100,4 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
 
 
 if __name__ == "__main__":
-    pytest.main()
+    test_icarl_cifar100(device="cuda", is_dummy_training=True)

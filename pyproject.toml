@@ -57,9 +57,9 @@ wandb = [
 ]
 
 [project.urls]
-homepage = "http://moenupa.github.io/LyCIL"
-documentation = "https://github.com/Moenupa/LyCIL"
-repository = "https://github.com/Moenupa/LyCIL"
+source = "https://github.com/Moenupa/LyCIL"
+issues = "https://github.com/Moenupa/LyCIL/issues"
+releasenotes = "https://github.com/Moenupa/LyCIL/releases"
 
 [tool.uv]
 conflicts = [

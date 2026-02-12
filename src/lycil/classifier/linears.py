@@ -33,6 +33,15 @@ class SimpleLinear(nn.Linear):
     @classmethod
     @torch.no_grad()
     def from_linear(cls, old_linear: nn.Linear, num_new: int) -> "SimpleLinear":
+        """Create a SimpleLinear layer by expanding an existing linear layer.
+
+        Args:
+            old_linear (nn.Linear): The existing linear layer.
+            num_new (int): Number of new output features to add.
+
+        Returns:
+            SimpleLinear: The expanded SimpleLinear layer.
+        """
         # head expansion from an existing linear
         new_linear = cls(
             in_features=old_linear.in_features,
@@ -80,7 +89,7 @@ class CosineLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        """Initialize parameters using uniform distribution."""
+        """Initialize parameters using a uniform distribution."""
         stdv = 1.0 / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
 
@@ -148,11 +157,11 @@ class SplitCosineLinear(nn.Module):
         """Head expansion, from an existing CosineLinear head.
 
         Args:
-            old_linear (CosineLinear): Old linear head.
-            num_new (int): Number of new classes to add.
+            old_linear (CosineLinear): The existing CosineLinear layer.
+            num_new (int): Number of new output features to add.
 
         Returns:
-            SplitCosineLinear: New expanded linear head.
+            SplitCosineLinear: The expanded SplitCosineLinear layer.
         """
         new_head = cls(
             in_features=old_linear.in_features,
@@ -177,11 +186,11 @@ class SplitCosineLinear(nn.Module):
         """Head expansion, from an existing SplitCosineLinear head.
 
         Args:
-            old_linear (SplitCosineLinear): Old linear head.
-            num_new (int): Number of new classes to add.
+            old_linear (SplitCosineLinear): The existing SplitCosineLinear layer.
+            num_new (int): Number of new output features to add.
 
         Returns:
-            SplitCosineLinear: New expanded linear head.
+            SplitCosineLinear: The expanded SplitCosineLinear layer.
         """
         new_linear = cls(
             in_features=old_linear.in_features,
@@ -204,25 +213,35 @@ class SplitCosineLinear(nn.Module):
         return new_linear
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
-        # logits for old/new classes
-        old_logits = self.old_head(x)["logits"]
-        new_logits = self.new_head(x)["logits"]
+        old_scores = self.old_head(x)["logits"]
+        new_scores = self.new_head(x)["logits"]
 
-        logits = torch.cat([old_logits, new_logits], dim=1)
+        logits = torch.cat([old_scores, new_scores], dim=1)
         logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
             logits = logits * self.sigma
 
         return {
-            "old_logits": reduce_proxies(old_logits, self.num_proxy),
-            "new_logits": reduce_proxies(new_logits, self.num_proxy),
+            "old_scores": reduce_proxies(old_scores, self.num_proxy),
+            "new_scores": reduce_proxies(new_scores, self.num_proxy),
             "logits": logits,
         }
 
 
 def reduce_proxies(logits: torch.Tensor, num_proxy: int) -> torch.Tensor:
-    """Reduces proxy logits per class using attention-based weighting."""
+    """Reduces proxy logits per class using attention-based weighting.
+
+    Args:
+        logits (torch.Tensor): The logits tensor of shape (batch_size, out_features).
+        num_proxy (int): Number of proxies per class.
+
+    Returns:
+        torch.Tensor: Reduced logits tensor of shape (batch_size, num_classes).
+
+    Raises:
+        ValueError: If the number of output features is not divisible by the number of proxies.
+    """
     if num_proxy == 1:
         return logits
 
