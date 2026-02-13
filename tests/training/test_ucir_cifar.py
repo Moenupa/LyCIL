@@ -14,10 +14,11 @@ BUFFER_SIZE_PER_CLASS = 20
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
+@pytest.mark.xdist_group("training")
 def test_ucir_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH = "data/cifar10"
-        N_CLASS_PER_TASK = [1, 1]
+        N_CLASS_PER_TASK = [2, 2]
         LABEL_COL = "label"
         EPOCHS_PER_TASK = 1
         USE_PRETRAIN_WEIGHTS = False

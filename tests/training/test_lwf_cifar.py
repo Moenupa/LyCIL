@@ -12,6 +12,7 @@ from lycil.learner.lwf import LWF
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
+@pytest.mark.xdist_group("training")
 def test_lwf_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH = "data/cifar10"
