@@ -98,4 +98,4 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
 
 
 if __name__ == "__main__":
-    test_lwf_cifar100(device="cuda", is_dummy_training=True)
+    test_lwf_cifar100(device="cuda", is_dummy_training=False)
