@@ -14,6 +14,7 @@ BUFFER_SIZE_PER_CLASS = 20
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
+@pytest.mark.xdist_group("training")
 def test_icarl_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH = "data/cifar10"
@@ -100,4 +101,4 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
 
 
 if __name__ == "__main__":
-    test_icarl_cifar100(device="cuda", is_dummy_training=True)
+    test_icarl_cifar100(device="cuda", is_dummy_training=False)

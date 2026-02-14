@@ -4,7 +4,7 @@ import pytest
 
 from lycil.constants import is_env_enabled
 
-AVAILABLE_DEVICES: set[str] = {"cpu"}
+SUPPORTED_DEVICES: set[str] = {"cpu"}
 VISIBLE_DEVICE_ENV: str | None = None
 for _env_var, _device_type in [
     ("CUDA_VISIBLE_DEVICES", "cuda"),
@@ -12,17 +12,17 @@ for _env_var, _device_type in [
 ]:
     if os.getenv(_env_var):
         VISIBLE_DEVICE_ENV = _env_var
-        AVAILABLE_DEVICES.add(_device_type)
+        SUPPORTED_DEVICES.add(_device_type)
 
 
 @pytest.fixture(scope="session", autouse=True)
-def available_devices():
-    return AVAILABLE_DEVICES
+def supported_devices():
+    return SUPPORTED_DEVICES
 
 
 @pytest.fixture(scope="session", autouse=True)
 def is_dummy_training():
-    return os.environ.get("DUMMY", "1") == "1"
+    return is_env_enabled("DUMMY", default="1")
 
 
 def pytest_generate_tests(metafunc):
@@ -34,7 +34,7 @@ def pytest_generate_tests(metafunc):
             if not isinstance(requested_devices, (list, tuple)):
                 requested_devices = [requested_devices]
 
-            devices = [d for d in requested_devices if d in AVAILABLE_DEVICES]
+            devices = [d for d in requested_devices if d in SUPPORTED_DEVICES]
             if devices:
                 metafunc.parametrize("device", devices)
 
@@ -58,20 +58,22 @@ def _handle_runs_on(items: list[pytest.Item]):
             requested_devices = [requested_devices]
         requested_devices = set(requested_devices)
         request_not_satisfied_marker = pytest.mark.skip(
-            reason=f"test requires one of {requested_devices} (available: {AVAILABLE_DEVICES})"
+            reason=f"test requires one of {requested_devices} (available: {SUPPORTED_DEVICES})"
         )
 
-        if AVAILABLE_DEVICES.isdisjoint(requested_devices):
+        if SUPPORTED_DEVICES.isdisjoint(requested_devices):
             item.add_marker(request_not_satisfied_marker)
 
 
 def _handle_slow_tests(items: list[pytest.Item]):
     """Skip slow tests unless RUN_SLOW is enabled."""
-    if not is_env_enabled("RUN_SLOW"):
-        skip_slow = pytest.mark.skip(reason="slow test (set RUN_SLOW=1 to run)")
-        for item in items:
-            if "slow" in item.keywords:
-                item.add_marker(skip_slow)
+    if is_env_enabled("RUN_SLOW"):
+        return
+
+    skip_slow = pytest.mark.skip(reason="slow test (set RUN_SLOW=1 to run)")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
 
 
 def _handle_device_visibility(items: list[pytest.Item]):

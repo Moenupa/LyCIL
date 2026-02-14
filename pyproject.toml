@@ -59,7 +59,7 @@ releasenotes = "https://github.com/Moenupa/LyCIL/releases"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-vv -n auto"
+addopts = "-vv -n auto --dist=loadgroup"
 markers = [
     "runs_on: mark tests requiring specific device type, e.g. @pytest.mark.runs_on(['cuda'])",
     "slow: mark tests as slow (pytest -m 'not slow' or set RUN_SLOW=1 to run)",
