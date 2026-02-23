@@ -60,6 +60,10 @@ releasenotes = "https://github.com/Moenupa/LyCIL/releases"
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-vv -n auto --dist=loadgroup"
+filterwarnings = [
+    "ignore::UserWarning:.*Precision 16-mixed is not supported by the model summary.*",
+    "ignore::PossibleUserWarning:.*The number of training batches (\\d*).*",
+]
 markers = [
     "runs_on: mark tests requiring specific device type, e.g. @pytest.mark.runs_on(['cuda'])",
     "slow: mark tests as slow (pytest -m 'not slow' or set RUN_SLOW=1 to run)",

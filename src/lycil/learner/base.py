@@ -49,9 +49,9 @@ class BaseLearner(L.LightningModule):
         self._old_self: Optional["BaseLearner"] = None
 
         # lazy init by `set_task_id()` to sync with data module
-        self.task_id: int = None
-        self.num_old_classes: int = None
-        self.num_seen_classes: int = None
+        self.task_id: int = None  # ty: ignore[invalid-assignment]
+        self.num_old_classes: int = None  # ty: ignore[invalid-assignment]
+        self.num_seen_classes: int = None  # ty: ignore[invalid-assignment]
 
         self.data_column_translate: dict[str, str] = data_column_translate or {}
         # kwargs for optimizer/scheduler per task_id
@@ -91,8 +91,14 @@ class BaseLearner(L.LightningModule):
     @staticmethod
     def unpack_batch(
         batch: dict[str, torch.Tensor],
+        device: torch.device | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        return batch[_X_COLUMN_NAME], batch[_Y_COLUMN_NAME]
+        x = batch[_X_COLUMN_NAME]
+        y = batch[_Y_COLUMN_NAME]
+        if device is not None:
+            x = x.to(device)
+            y = y.to(device)
+        return x, y
 
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
