@@ -28,4 +28,7 @@ quality:
 	$(TOOL) ty check $(check_dirs)
 
 test:
-	WANDB_MODE=disabled $(RUN) pytest tests -vv --import-mode=importlib
+	WANDB_MODE=disabled $(RUN) pytest tests -n auto --import-mode=importlib
+
+test-slow:
+	RUN_SLOW=1 WANDB_MODE=disabled $(RUN) pytest tests --import-mode=importlib
