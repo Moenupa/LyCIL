@@ -77,9 +77,13 @@ class EWC(BaseLearner):
         )
         return loss
 
+    def harmonize_named_parameters(self, *args, **kwargs):
+        for n, p in self.named_parameters(*args, **kwargs):
+            yield harmonize_keyname(n), p
+
     def compute_ewc_loss(self) -> torch.Tensor:
         loss_ewc = torch.tensor(0.0, device=self.device)
-        for n, p in self.named_parameters():
+        for n, p in self.harmonize_named_parameters():
             # Only consider parameters that were present in the previous task
             if n not in self.fisher_dict:
                 continue
@@ -93,39 +97,37 @@ class EWC(BaseLearner):
 
     def on_train_end(self) -> None:
         dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
-        print(self.device)
         self.update_fisher_and_mean(dm)
 
     @torch.no_grad()
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
         new_fisher = {
-            harmonize_keyname(n): nn.Parameter(
+            n: nn.Parameter(
                 torch.zeros_like(p, device=self.device), requires_grad=False
             )
-            for n, p in self.named_parameters()
+            for n, p in self.harmonize_named_parameters()
             if p.requires_grad
         }
 
         self.train()
         torch.set_grad_enabled(True)
-        for batch in dm.train_dataloader():
+        train_loader = dm.train_dataloader()
+        for batch in train_loader:
             self.zero_grad()
             x, y = self.unpack_batch(batch, self.device)
             logits = self(x)
             loss = F.cross_entropy(logits, y)
             loss.backward()
 
-            for n, p in self.named_parameters():
+            for n, p in self.harmonize_named_parameters():
                 if p.grad is not None:
-                    new_fisher[harmonize_keyname(n)] += p.grad.pow(2).detach()
+                    new_fisher[n] += p.grad.pow(2).detach()
         self.zero_grad()
         torch.set_grad_enabled(False)
 
         # inplace normalization + clipping
         for n, f in new_fisher.items():
-            new_fisher[n] = torch.clamp(
-                f / len(dm.train_dataloader()), max=self.fisher_max
-            )
+            new_fisher[n] = torch.clamp(f / len(train_loader), max=self.fisher_max)
 
         # if old fisher, combine using weighted average
         if len(self.fisher_dict) > 0:
@@ -134,17 +136,15 @@ class EWC(BaseLearner):
                 if n not in self.fisher_dict:
                     continue
 
-                old_f = self.fisher_dict[harmonize_keyname(n)]
+                old_f = self.fisher_dict[n]
                 old_f_len = len(old_f)
                 new_fisher[n][:old_f_len] = alpha * old_f + (1 - alpha) * f[:old_f_len]
 
         self.fisher_dict = nn.ParameterDict(new_fisher)
         self.mean_dict = nn.ParameterDict(
             {
-                harmonize_keyname(n): nn.Parameter(
-                    p.clone().detach(), requires_grad=False
-                )
-                for n, p in self.named_parameters()
+                n: nn.Parameter(p.clone().detach(), requires_grad=False)
+                for n, p in self.harmonize_named_parameters()
                 if p.requires_grad
             }
         )
