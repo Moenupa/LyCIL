@@ -32,6 +32,8 @@ class EWC(BaseLearner):
         args: See :class:`BaseLearner` for other args.
         kwargs: See :class:`BaseLearner` for other args.
 
+    .. _Elastic Weight Consolidation:
+        https://doi.org/10.1073/pnas.1611835114
     """
 
     def __init__(
