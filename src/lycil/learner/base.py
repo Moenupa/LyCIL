@@ -1,6 +1,6 @@
 import copy
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal
 
 import lightning as L
 import torch
@@ -43,10 +43,10 @@ class BaseLearner(L.LightningModule):
         self.backbone = ResNetBackbone(**(backbone_args or {}))
         self.head_type = head
         # lazy init by head_type at `expand_head()`
-        self.classifier: Optional["nn.Module"] = None
+        self.classifier: nn.Module | None = None
 
-        self.buffer: Optional["BaseExemplarBuffer"] = None
-        self._old_self: Optional["BaseLearner"] = None
+        self.buffer: BaseExemplarBuffer | None = None
+        self._old_self: BaseLearner | None = None
 
         # lazy init by `set_task_id()` to sync with data module
         self.task_id: int = None  # ty: ignore[invalid-assignment]
@@ -68,8 +68,10 @@ class BaseLearner(L.LightningModule):
         self.task_id = task_id
 
     def sync_with_datamodule(self, dm: "HFDataModule"):
-        """Synchronizes task states with datamodule, including current task ID
-        and seen classes.
+        """Synchronizes task states with datamodule.
+
+        - Updates ``task_id`` from datamodule's current task.
+        - If datamodule is newer, updates ``num_old_classes`` and ``num_seen_classes``.
 
         Args:
             dm (HFDataModule): Data module to sync with.

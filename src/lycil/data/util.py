@@ -77,6 +77,7 @@ def check_bijection(
         mapping (dict[int, Any] | list[Any]): mapping to check
         values (list[Any]): target values
         keys (list[int] | None, optional): If None, 0-index indices for values. (default: None)
+
     """
     import warnings
 
@@ -103,6 +104,7 @@ def reverse_mapping(mapping: dict[int, Any] | list[Any]) -> dict[Any, int]:
 
     Raises:
         TypeError: if mapping is not a dict or list
+
     """
     reverse_lookup: dict[Any, int]
     if isinstance(mapping, (list, tuple)):

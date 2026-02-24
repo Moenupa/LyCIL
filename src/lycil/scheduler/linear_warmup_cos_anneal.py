@@ -8,7 +8,9 @@ if TYPE_CHECKING:
 
 
 class LinearWarmupCosineAnnealingLR(_LRScheduler):
-    r"""Sets the learning rate of each parameter group to follow a linear warmup schedule between warmup_start_lr and
+    r"""Cosine annealing with linear warmup.
+
+    Sets the learning rate of each parameter group to follow a linear warmup schedule between warmup_start_lr and
     base_lr followed by a cosine annealing schedule between base_lr and eta_min. Borrowed from `lightning-bolts`_.
 
     .. warning::
@@ -29,7 +31,9 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
         >>> #
         >>> layer = nn.Linear(10, 1)
         >>> optimizer = Adam(layer.parameters(), lr=0.02)
-        >>> scheduler = LinearWarmupCosineAnnealingLR(optimizer, warmup_epochs=10, max_epochs=40)
+        >>> scheduler = LinearWarmupCosineAnnealingLR(
+        ...     optimizer, warmup_epochs=10, max_epochs=40
+        ... )
         >>> # the default case
         >>> for epoch in range(40):
         ...     # train(...)
@@ -54,15 +58,6 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
         eta_min: float = 0.0,
         last_epoch: int = -1,
     ) -> None:
-        """
-        Args:
-            optimizer (Optimizer): Wrapped optimizer.
-            warmup_epochs (int): Maximum number of iterations for linear warmup
-            max_epochs (int): Maximum number of iterations
-            warmup_start_lr (float): Learning rate to start the linear warmup. Default: 0.
-            eta_min (float): Minimum learning rate. Default: 0.
-            last_epoch (int): The index of last epoch. Default: -1.
-        """
         self.warmup_epochs = warmup_epochs
         self.max_epochs = max_epochs
         self.warmup_start_lr = warmup_start_lr

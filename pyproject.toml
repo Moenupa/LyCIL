@@ -57,19 +57,6 @@ source = "https://github.com/Moenupa/LyCIL"
 issues = "https://github.com/Moenupa/LyCIL/issues"
 releasenotes = "https://github.com/Moenupa/LyCIL/releases"
 
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-vv"
-filterwarnings = [
-    "ignore::UserWarning:Precision 16-mixed is not supported by the model summary*",
-    "ignore::DeprecationWarning:This process * is multi-threaded, use of fork() may lead to deadlocks in the child.",
-]
-markers = [
-    "runs_on: mark tests requiring specific device type, e.g. @pytest.mark.runs_on(['cuda'])",
-    "slow: mark tests as slow (pytest -m 'not slow' or set RUN_SLOW=1 to run)",
-    "distributed: mark tests requireing multi-device execution",
-]
-
 [tool.uv]
 conflicts = [
     [
@@ -101,3 +88,50 @@ explicit = true
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.ruff.lint]
+ignore = [
+    "C408",  # collection
+    "E501",  # line too long
+    "D100",  # no doc public module
+    "D101",  # no doc public class
+    "D102",  # no doc public method
+    "D103",  # no doc public function
+    "D104",  # no doc public package
+    "D105",  # no doc magic method
+    "D107",  # no doc __init__
+]
+extend-select = [
+    "C",      # complexity
+    "E",      # error
+    "F",      # pyflakes
+    "I",      # isort
+    "W",      # warning
+    "UP",     # pyupgrade
+    "D",      # pydocstyle
+    "PT009",  # pytest assert
+    "RUF022", # sort __all__
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lycil"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-vv"
+filterwarnings = [
+    "ignore::UserWarning:Precision 16-mixed is not supported by the model summary*",
+    "ignore::DeprecationWarning:This process * is multi-threaded, use of fork() may lead to deadlocks in the child.",
+]
+markers = [
+    "runs_on: mark tests requiring specific device type, e.g. @pytest.mark.runs_on(['cuda'])",
+    "slow: mark tests as slow (pytest -m 'not slow' or set RUN_SLOW=1 to run)",
+    "distributed: mark tests requireing multi-device execution",
+]

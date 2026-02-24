@@ -4,11 +4,11 @@ import torch.nn as nn
 from .linears import CosineLinear, SimpleLinear, SplitCosineLinear
 
 __all__ = [
-    "make_head",
-    "expand_head",
     "CosineClassifier",
     "SimpleLinear",
     "SplitCosineLinear",
+    "expand_head",
+    "make_head",
 ]
 
 
@@ -28,12 +28,15 @@ def make_head(
     Args:
         in_features (int): Number of input features.
         out_features (int): Number of output features.
+        head_type (str, optional): Type of the classification head. (default: "linear")
+        kwargs: Override kwargs passed to the head constructor.
 
     Raises:
         ValueError: If head_type is not supported.
 
     Returns:
         nn.Module: The classification head.
+
     """
     if head_type not in _CLASSIFIER_HEADS:
         raise ValueError(
@@ -59,6 +62,7 @@ def expand_head(module: nn.Module, num_new: int) -> nn.Module:
 
     Returns:
         nn.Module: The expanded classifier module.
+
     """
     if num_new <= 0:
         raise ValueError(f"Expanding for new heads {num_new} must be >0.")

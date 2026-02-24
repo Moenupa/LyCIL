@@ -33,6 +33,7 @@ def compute_nme(
         tuple: 2 tensors
             - 1d tensor, sample-wise mean of feature vector, shaped (n_features),
             - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features)
+
     """
     from torch.nn import functional as F
 
@@ -55,14 +56,14 @@ def compute_nme(
 
 
 class BaseExemplarBuffer(DatasetDict):
-    r"""
-    Fixed-size buffer with per-class lists.
+    r"""Fixed-size buffer with per-class lists.
 
     Args:
         mem_size (int, optional): Exemplar size in total, each class gets
             :math:`\lfloor(\frac{mem\_size}{n_{classes\_seen}})\rfloor`. (default: 2000)
         args: Additional args passed to ``datasets.DatasetDict``.
         kwargs: Additional kwargs passed to ``datasets.DatasetDict``.
+
     """
 
     @classmethod
@@ -71,8 +72,7 @@ class BaseExemplarBuffer(DatasetDict):
         dataset_dict: DatasetDict,
         mem_size: int = 2000,
     ) -> "BaseExemplarBuffer":
-        r"""
-        Create a BaseExemplarBuffer instance from an existing DatasetDict.
+        r"""Create a BaseExemplarBuffer instance from an existing DatasetDict.
 
         Args:
             dataset_dict (DatasetDict): The source DatasetDict.
@@ -80,6 +80,7 @@ class BaseExemplarBuffer(DatasetDict):
 
         Returns:
             BaseExemplarBuffer: A new instance of BaseExemplarBuffer.
+
         """
         buffer = cls(mem_size=mem_size)
         for key, dataset in dataset_dict.items():
@@ -113,7 +114,7 @@ class BaseExemplarBuffer(DatasetDict):
 
         # two dicts keyed by class_id, manual sync required
         # per_class_data is `self` in DatasetDict format
-        self.per_class_means: dict[int, "torch.Tensor"] = {}
+        self.per_class_means: dict[int, torch.Tensor] = {}
 
     def __getitem__(self, k):
         if isinstance(k, int):
@@ -128,11 +129,13 @@ class BaseExemplarBuffer(DatasetDict):
     @property
     def is_adaptive(self) -> bool:
         """Whether to allow adaptive per-class size.
+
         If adaptive: per-class size is computed as `mem_size // num_classes`.
         E.g., if given total=200, per-class size is 20 at 10 classes, 10 at 20 classes, etc.
 
         Returns:
             bool: True if per-class size is adaptive.
+
         """
         return self.mem_size_per_class is None
 
@@ -154,14 +157,14 @@ class BaseExemplarBuffer(DatasetDict):
         per_class_quota: int,
         trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
     ) -> None:
-        r"""
-        Reduce exemplars, typically called after new classes arrive.
+        r"""Reduce exemplars, typically called after new classes arrive.
 
         Args:
             per_class_quota (int): Maximum number of exemplars to keep per class.
             trim_func (Callable[[Dataset, int], Dataset] | None, optional):
                 Function to trim exemplars: ``trim_func(dataset, quota) -> trimmed_dataset``
                 If None, get first `quota` samples. (default: None)
+
         """
         trim_func = trim_func or (
             # fallback: get first `quota` samples -> data[:quota]
@@ -182,7 +185,7 @@ class BaseExemplarBuffer(DatasetDict):
             keys = [keys]
 
         # collect subsets by filter and concatenate
-        subsets: list["Dataset"] = [
+        subsets: list[Dataset] = [
             v if isinstance(v, Dataset) else Dataset.from_dict(v)
             for k, v in self.items()
             if keys is None or k in keys

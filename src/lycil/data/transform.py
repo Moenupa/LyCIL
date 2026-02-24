@@ -14,15 +14,15 @@ _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
 
 
 def get_transforms(name: str) -> tuple["Callable", "Callable"]:
-    """Get train and test transforms according to common alias ``name``
+    """Get train and test transforms according to common alias ``name``.
 
     Raises:
         ValueError: Unknown ``name``
 
     Returns:
         tuple[T.Compose, T.Compose]: train_transform, test_transform
-    """
 
+    """
     match name:
         case "cifar10":
             train_tf = T.Compose(
@@ -68,6 +68,7 @@ def register_tf_as_formatter(name: str) -> None:
 
     Args:
         name (str): Name of the transform set to register.
+
     """
     train_tf, test_tf = get_transforms(name)
 
@@ -87,15 +88,19 @@ def _register_custom_formatter(
             PIL Image and returns a torch Tensor. E.g.,
             ```py
             import torchvision.transforms as T
-            transform=T.Compose([
-                T.RandomCrop(32, padding=4),
-                T.RandomHorizontalFlip(),
-                T.ToTensor(),
-                T.Normalize(_CIFAR10_MEAN, _CIFAR10_STD),
-            ])
+
+            transform = T.Compose(
+                [
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(_CIFAR10_MEAN, _CIFAR10_STD),
+                ]
+            )
             ```
         name (str): Name of the formatter to register.
         aliases (list[str] | None, optional): Extra aliases for the formatter. (default: None)
+
     """
 
     # injects the transform into the formatter
