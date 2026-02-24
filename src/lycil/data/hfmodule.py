@@ -179,8 +179,8 @@ class HFDataModule(L.LightningDataModule):
 
         Returns:
             str | None: The format name to be used, or None if not set.
-        """
 
+        """
         if mode not in {"train", "test"}:
             raise ValueError(
                 f"Format/Transform: expect mode in 'train' or 'test', got {mode}."

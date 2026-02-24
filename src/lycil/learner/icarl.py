@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 class ICaRL(BaseLearner):
     r"""`iCaRL`_: Incremental Classifier and Representation Learning. (Rebuffi et al., CVPR 2017).
+
     - Exemplar memory: herding + NME-based evaluation
     - Loss :math:`L = L_\text{CE} + \lambda * L_\text{distill}`.
 
@@ -24,6 +25,7 @@ class ICaRL(BaseLearner):
 
     .. _iCaRL:
         https://arxiv.org/abs/1611.07725
+
     """
 
     def __init__(

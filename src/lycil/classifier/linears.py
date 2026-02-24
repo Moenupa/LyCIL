@@ -1,5 +1,6 @@
 import math
-from typing import Callable, TypedDict
+from collections.abc import Callable
+from typing import TypedDict
 
 import torch
 from torch import nn
@@ -40,6 +41,7 @@ class SimpleLinear(nn.Linear):
 
         Returns:
             SimpleLinear: The expanded SimpleLinear layer.
+
         """
         # head expansion from an existing linear
         new_linear = cls(
@@ -161,6 +163,7 @@ class SplitCosineLinear(nn.Module):
 
         Returns:
             SplitCosineLinear: The expanded SplitCosineLinear layer.
+
         """
         new_head = cls(
             in_features=old_linear.in_features,
@@ -190,6 +193,7 @@ class SplitCosineLinear(nn.Module):
 
         Returns:
             SplitCosineLinear: The expanded SplitCosineLinear layer.
+
         """
         new_linear = cls(
             in_features=old_linear.in_features,
@@ -240,6 +244,7 @@ def reduce_proxies(logits: torch.Tensor, num_proxy: int) -> torch.Tensor:
 
     Raises:
         ValueError: If the number of output features is not divisible by the number of proxies.
+
     """
     if num_proxy == 1:
         return logits

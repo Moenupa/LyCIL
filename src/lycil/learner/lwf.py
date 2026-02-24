@@ -6,7 +6,9 @@ from .base import BaseLearner
 
 class LWF(BaseLearner):
     r"""`Learning without Forgetting`_ (Li & Hoiem, ECCV 2016).
-    Loss :math:`L = L_\text{CE} + \lambda * L_\text{distill}`.
+
+    - Distillation on old classes, CE on new classes.
+    - Loss :math:`L = L_\text{CE} + \lambda * L_\text{distill}`.
 
     Args:
         distill_T (float, optional): Temperature for distillation. Default: 2.0.
@@ -16,6 +18,7 @@ class LWF(BaseLearner):
 
     .. _Learning without Forgetting:
         https://arxiv.org/abs/1606.09282
+
     """
 
     def __init__(
