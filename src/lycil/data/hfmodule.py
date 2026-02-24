@@ -46,7 +46,7 @@ class HFDataModule(L.LightningDataModule):
 
         # key mapping for customization, e.g.,
         # {"train": "your_custom_split_for_train", ...}
-        self.split_map: dict = split_map or SplitMapping()
+        self.split_map: SplitMapping = split_map or SplitMapping()
         self.label_map: dict[int, Any] | list[Any] | None = label_map
 
         # task config, lazy init
@@ -152,15 +152,15 @@ class HFDataModule(L.LightningDataModule):
 
     @property
     def _split_train(self) -> str:
-        return get_or_identity(self.split_map, "train")
+        return get_or_identity(self.split_map, "train")  # ty: ignore[invalid-argument-type]
 
     @property
     def _split_val(self) -> str:
-        return get_or_identity(self.split_map, "val")
+        return get_or_identity(self.split_map, "val")  # ty: ignore[invalid-argument-type]
 
     @property
     def _split_test(self) -> str:
-        return get_or_identity(self.split_map, "test")
+        return get_or_identity(self.split_map, "test")  # ty: ignore[invalid-argument-type]
 
     def get_effective_transform_name(
         self, mode: Literal["train", "test"] = "train"
