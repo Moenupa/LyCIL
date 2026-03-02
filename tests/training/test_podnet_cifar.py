@@ -107,35 +107,36 @@ def test_podnet_cifar100(is_dummy_training: bool):
         )
         trainer.fit(model, datamodule=dm)
 
-        # use data from buffer only, do not use training data
-        dm.use_buffer = True
-        dm.train_filter_fn = lambda e: False
-        # to bypass head expansion, see `BaseLearner.sync_with_datamodule()`
-        # and get special training optimizer kwargs with key -2
-        model.set_task_id(-2)
-        trainer = L.Trainer(
-            max_epochs=EPOCHS_PER_TASK_MEMORY,
-            sync_batchnorm=True,
-            enable_checkpointing=False,
-            enable_progress_bar=True,
-            precision="16-mixed",
-            logger=WandbLogger(
-                name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}_memory",
-                project="lycil",
-                log_model=False,
-                tags=["podnet", "cifar100"]
-                + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
-                group=_EXP_NAME,
-            ),
-            check_val_every_n_epoch=10,
-            # log_every_n_steps=10,
-            callbacks=[LearningRateMonitor(logging_interval="epoch")],
-        )
-        trainer.fit(model, datamodule=dm)
-        # reset after memory training
-        model.set_task_id(task_idx)
-        trainer.validate(model, datamodule=dm)
+        if task_idx >0 :
+            # use data from buffer only, do not use training data
+            dm.use_buffer = True
+            dm.train_filter_fn = lambda e: False
+            # to bypass head expansion, see `BaseLearner.sync_with_datamodule()`
+            # and get special training optimizer kwargs with key -2
+            model.set_task_id(-2)
+            trainer = L.Trainer(
+                max_epochs=EPOCHS_PER_TASK_MEMORY,
+                sync_batchnorm=True,
+                enable_checkpointing=False,
+                enable_progress_bar=True,
+                precision="16-mixed",
+                logger=WandbLogger(
+                    name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}_memory",
+                    project="lycil",
+                    log_model=False,
+                    tags=["podnet", "cifar100"]
+                    + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
+                    group=_EXP_NAME,
+                ),
+                check_val_every_n_epoch=10,
+                # log_every_n_steps=10,
+                callbacks=[LearningRateMonitor(logging_interval="epoch")],
+            )
+            trainer.fit(model, datamodule=dm)
+            # reset after memory training
+            model.set_task_id(task_idx)
 
+        trainer.validate(model, datamodule=dm)
         wandb.finish()
 
 
