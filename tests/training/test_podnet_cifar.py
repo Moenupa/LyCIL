@@ -16,14 +16,14 @@ BUFFER_SIZE_PER_CLASS = 20
 @pytest.mark.runs_on(["cuda"])
 def test_podnet_cifar100(is_dummy_training: bool):
     if is_dummy_training:
-        DATAPATH = "data/cifar10"
+        DATAPATH = "/ppio_net0/datasets/cifar10"
         N_CLASS_PER_TASK = [1, 1]
         LABEL_COL = "label"
         EPOCHS_PER_TASK = 1
         EPOCHS_PER_TASK_MEMORY = 1
         USE_PRETRAIN_WEIGHTS = False
     else:
-        DATAPATH = "data/cifar100"
+        DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
