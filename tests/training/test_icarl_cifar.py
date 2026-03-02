@@ -1,7 +1,4 @@
-import os
 import os.path as osp
-
-os.environ["X_COLUMN_NAME"] = "img"
 
 import lightning as L
 import pytest
@@ -12,35 +9,27 @@ from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.icarl import ICaRL
 
-DUMMY_TRAINING = os.environ.get("DUMMY", "1") == "1"
-CUDA_AVAILABLE = len(os.environ.get("CUDA_VISIBLE_DEVICES", "")) > 0
 BUFFER_SIZE_PER_CLASS = 20
 
 
-@pytest.fixture
-def cifar_args() -> list | None:
-    args = (
-        ["data/cifar10", [1, 1], "label", 1, False]
-        if DUMMY_TRAINING
-        else ["data/cifar100", [20, 20, 20, 20, 20], "fine_label", 80, True]
-    )
-    if osp.exists(args[0]):  # ty: ignore[invalid-argument-type]
-        return args
-
-    return None
-
-
-def test_icarl_cifar100(cifar_args: list | None):
-    if not CUDA_AVAILABLE:
-        pytest.skip("CUDA not available.")
-        return
-    if cifar_args is None:
+@pytest.mark.slow
+@pytest.mark.runs_on(["cuda"])
+def test_icarl_cifar100(device: str, is_dummy_training: bool):
+    if is_dummy_training:
+        DATAPATH = "data/cifar10"
+        N_CLASS_PER_TASK = [1, 1]
+        LABEL_COL = "label"
+        EPOCHS_PER_TASK = 1
+        USE_PRETRAIN_WEIGHTS = False
+    else:
+        DATAPATH = "data/cifar100"
+        N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
+        LABEL_COL = "fine_label"
+        EPOCHS_PER_TASK = 80
+        USE_PRETRAIN_WEIGHTS = True
+    if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
-
-    DATAPATH, N_CLASS_PER_TASK, LABEL_COL, EPOCHS_PER_TASK, USE_PRETRAIN_WEIGHTS = (
-        cifar_args
-    )
 
     L.seed_everything(42)
     dm = HFDataModule(

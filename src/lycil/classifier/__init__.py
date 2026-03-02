@@ -1,19 +1,21 @@
 import torch
 import torch.nn as nn
 
-from .cosine_classifier import CosineClassifier
+from .linears import CosineLinear, SimpleLinear, SplitCosineLinear
 
 __all__ = [
     "make_head",
     "expand_head",
     "CosineClassifier",
+    "SimpleLinear",
+    "SplitCosineLinear",
 ]
 
 
 _CLASSIFIER_HEADS: dict[str, tuple[type[nn.Module], dict]] = {
     # key: (class, {optional kwargs})
-    "linear": (nn.Linear, {}),
-    "cosine": (CosineClassifier, {"learn_scale": True}),
+    "linear": (SimpleLinear, {}),
+    "cosine": (CosineLinear, {"num_proxy": 10, "to_reduce": True, "learn_scale": True}),
 }
 
 
@@ -61,15 +63,20 @@ def expand_head(module: nn.Module, num_new: int) -> nn.Module:
     if num_new <= 0:
         raise ValueError(f"Expanding for new heads {num_new} must be >0.")
 
-    if isinstance(module, nn.Linear):
-        old_out = module.out_features
-        new_linear = nn.Linear(module.in_features, old_out + num_new, bias=True)
-        new_linear.weight[:old_out] = module.weight.data
-        new_linear.bias[:old_out] = module.bias.data
+    if isinstance(module, SimpleLinear):
+        new_linear = SimpleLinear.from_linear(module, num_new)
         return new_linear
 
-    if isinstance(module, CosineClassifier):
-        module.expand(num_new)
-        return module
+    if isinstance(module, CosineLinear):
+        new_linear = SplitCosineLinear.from_cosine_linear(module, num_new)
+        new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
+        return new_linear
+
+    if isinstance(module, SplitCosineLinear):
+        new_linear = SplitCosineLinear.from_split_cosine_linear(module, num_new)
+        new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
+        return new_linear
 
     raise NotImplementedError(f"Classifier not expandable: {type(module)}.")

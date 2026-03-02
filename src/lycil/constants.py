@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 
 # static column names in datasets for internal use
-_X_COLUMN_NAME = os.getenv("X_COLUMN_NAME", "_x")
+_X_COLUMN_NAME = os.getenv("X_COLUMN_NAME", "img")
 _Y_COLUMN_NAME = os.getenv("Y_COLUMN_NAME", "_y")
 _CLTASK_COLUMN_NAME = os.getenv("CLTASK_COLUMN_NAME", "_cl_task_id")
 
@@ -19,3 +19,8 @@ def get_seed() -> int | None:
         return int(seed)
 
     return None
+
+
+def is_env_enabled(env_var: str, default: str = "0") -> bool:
+    """Check if the environment variable is enabled."""
+    return os.getenv(env_var, default).lower() in ["true", "yes", "on", "t", "y", "1"]

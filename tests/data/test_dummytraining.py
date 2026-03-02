@@ -64,17 +64,16 @@ class DummyClassifier(L.LightningModule):
         return optimizer
 
 
-@pytest.mark.parametrize("accelerator", ["cuda", "npu"])
-def test_cifar10_training(accelerator: str):
-    if not CHECKER[accelerator]():
-        pytest.skip(f"{accelerator} is not available")
-
+@pytest.mark.slow
+@pytest.mark.runs_on(["cuda", "npu"])
+def test_cifar10_training(device: str):
     dm = HFDataModule(
         "data/cifar10",
-        split_map={"val": "test"},
+        split_map={"train": "test", "val": "test"},
         transform_name="cifar10",
+        num_classes_per_task=[1, 1],
         train_loader_kwargs={
-            "batch_size": 32,
+            "batch_size": 64,
             "num_workers": 8,
             "shuffle": True,
         },
@@ -88,11 +87,12 @@ def test_cifar10_training(accelerator: str):
 
     model = DummyClassifier(num_classes=10)
     trainer = L.Trainer(
-        accelerator=accelerator,
+        accelerator=device,
         max_epochs=1,
         enable_checkpointing=False,
         enable_progress_bar=False,
         log_every_n_steps=None,
+        logger=False,
     )
     trainer.fit(model, datamodule=dm)
     trainer.test(model, datamodule=dm)
