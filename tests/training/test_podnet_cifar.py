@@ -126,7 +126,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=10,
-            log_every_n_steps=1000,
+            log_every_n_steps=10,
         )
         trainer.fit(model, datamodule=dm)
         # reset after memory training
