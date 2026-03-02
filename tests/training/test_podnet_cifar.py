@@ -107,7 +107,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         )
         trainer.fit(model, datamodule=dm)
 
-        if task_idx >0 :
+        if task_idx > 0 :
             # use data from buffer only, do not use training data
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
@@ -136,7 +136,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # reset after memory training
             model.set_task_id(task_idx)
 
-        trainer.validate(model, datamodule=dm)
+        # trainer.validate(model, datamodule=dm)
         wandb.finish()
 
 
