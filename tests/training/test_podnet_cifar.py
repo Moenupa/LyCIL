@@ -3,6 +3,7 @@ import os.path as osp
 import lightning as L
 import pytest
 from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import LearningRateMonitor
 
 import wandb
 from lycil.constants import _EXP_NAME
@@ -127,6 +128,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             ),
             check_val_every_n_epoch=10,
             # log_every_n_steps=10,
+            callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer.fit(model, datamodule=dm)
         # reset after memory training
