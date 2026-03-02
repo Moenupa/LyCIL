@@ -89,7 +89,8 @@ class HFDataModule(L.LightningDataModule):
         return sum(self.num_classes_per_task[: self._cur_task_id + 1])
 
     def prepare_data(self):
-        load_dataset(self.path)
+        # load_dataset(self.path)
+        ds = load_dataset("cifar100", cache_dir=self.path)
 
     def setup(self, stage: str | None = None):
         self.dataset: DatasetDict = load_dataset(self.path, **self.load_kwargs)
