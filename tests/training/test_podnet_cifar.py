@@ -90,7 +90,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
             enable_checkpointing=False,
-            enable_progress_bar=False,
+            enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
                 name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
@@ -101,7 +101,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=10,
-            log_every_n_steps=1000,
+            log_every_n_steps=10,
         )
         trainer.fit(model, datamodule=dm)
 
