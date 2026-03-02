@@ -102,7 +102,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=10,
-            log_every_n_steps=10,
+            # log_every_n_steps=10,
+            callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer.fit(model, datamodule=dm)
 
