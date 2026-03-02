@@ -136,5 +136,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
         wandb.finish()
 
 
+
 if __name__ == "__main__":
     test_podnet_cifar100(is_dummy_training=False)
