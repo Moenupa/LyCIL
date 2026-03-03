@@ -13,14 +13,20 @@ from lycil.learner.podnet import PODNet
 BUFFER_SIZE_PER_CLASS = 20
 
 
+
 class OffsetWandbLogger(WandbLogger):
-    def __init__(self, step_offset: int = 0, **kwargs):
+    def __init__(self, step_offset: int = 0, epoch_offset: int = 0, **kwargs):
         super().__init__(**kwargs)
         self.step_offset = step_offset
+        self.epoch_offset = epoch_offset
 
     def log_metrics(self, metrics, step=None):
         if step is not None:
-            step = step + self.step_offset
+            step += self.step_offset
+
+        if "epoch" in metrics and metrics["epoch"] is not None:
+            metrics["epoch"] += self.epoch_offset
+
         return super().log_metrics(metrics, step=step)
 
 
@@ -54,9 +60,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
         val_loader_kwargs={"batch_size": 128, "shuffle": False, "num_workers": 10},
         test_loader_kwargs={"batch_size": 128, "shuffle": False, "num_workers": 10},
-        split_map={"train": "test", "val": "test"}
-        if EPOCHS_PER_TASK == 1
-        else {"val": "test"},
+        split_map={"train": "test", "val": "test"} if EPOCHS_PER_TASK == 1 else {"val": "test"},
         buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
     model = PODNet(
@@ -130,6 +134,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             logger2 = OffsetWandbLogger(
                 resume="allow",
                 step_offset=trainer1.global_step,  # 关键：把第二段的 step 往后平移
+                epoch_offset=trainer1.current_epoch + 1,  # epoch 从 0 开始；+1 才能连续
                 name=logger1._name,  # 可选：同名
                 project="lycil",
                 log_model=False,
