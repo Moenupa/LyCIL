@@ -121,7 +121,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=logger1,
-            check_val_every_n_epoch=10,
+            check_val_every_n_epoch=1,
             # log_every_n_steps=10,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
@@ -152,7 +152,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 enable_progress_bar=True,
                 precision="16-mixed",
                 logger=logger2,
-                check_val_every_n_epoch=10,
+                check_val_every_n_epoch=1,
                 # log_every_n_steps=10,
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
