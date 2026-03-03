@@ -225,30 +225,62 @@ class BaseLearner(L.LightningModule):
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
-    def validation_step(self, batch, batch_idx: int) -> None:
+    # def validation_step(self, batch, batch_idx: int) -> None:
+    #     x, y = self.unpack_batch(batch)
+    #     logits: torch.Tensor = self(x)
+    #     acc1 = accuracy(logits, y)
+    #     # acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
+    #     self.log_dict(
+    #         {
+    #             f"val/acc1/task{self.task_id}": acc1,
+    #             # f"val/acc5/task{self.task_id}": acc5,
+    #         },
+    #         prog_bar=False,
+    #         sync_dist=True,
+    #     )
+    #
+    # def test_step(self, batch, batch_idx: int) -> None:
+    #     x, y = self.unpack_batch(batch)
+    #     logits: torch.Tensor = self(x)
+    #     acc1 = accuracy(logits, y)
+    #     # acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
+    #     self.log_dict(
+    #         {
+    #             f"test/acc1/task{self.task_id}": acc1,
+    #             # f"test/acc5/task{self.task_id}": acc5,
+    #         },
+    #         prog_bar=False,
+    #         sync_dist=True,
+    #     )
+
+    def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        # acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
-        self.log_dict(
-            {
-                f"val/acc1/task{self.task_id}": acc1,
-                # f"val/acc5/task{self.task_id}": acc5,
-            },
+
+        dm = self.trainer.datamodule  # HFDataModule
+        name = getattr(dm, "_val_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            f"val_{suffix}",
+            acc1,
             prog_bar=False,
             sync_dist=True,
         )
 
-    def test_step(self, batch, batch_idx: int) -> None:
+    def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        # acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
-        self.log_dict(
-            {
-                f"test/acc1/task{self.task_id}": acc1,
-                # f"test/acc5/task{self.task_id}": acc5,
-            },
+
+        dm = self.trainer.datamodule
+        name = getattr(dm, "_test_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            f"test_{suffix}",
+            acc1,
             prog_bar=False,
             sync_dist=True,
         )

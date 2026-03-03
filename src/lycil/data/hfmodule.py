@@ -236,18 +236,111 @@ class HFDataModule(L.LightningDataModule):
             use_buffer=self.use_buffer,
         )
 
+    # def val_dataloader(self):
+    #     return self.get_dataloader(
+    #         split=self._split_val,
+    #         filter_fn=self.is_label_in_seen_task,
+    #         transform_name=self.get_effective_transform_name("test"),
+    #         loader_kwargs=self.val_loader_kwargs,
+    #     )
+    #
+    # def test_dataloader(self):
+    #     return self.get_dataloader(
+    #         split=self._split_test,
+    #         filter_fn=self.is_label_in_seen_task,
+    #         transform_name=self.get_effective_transform_name("test"),
+    #         loader_kwargs=self.test_loader_kwargs,
+    #     )
+# HFDataModule 内新增
+
+    def is_label_in_task(self, task_id: int):
+        def _fn(e: dict) -> bool:
+            return e[_CLTASK_COLUMN_NAME] == task_id
+        return _fn
+
+    def is_label_in_upto_task(self, task_id: int):
+        # 累积：0..task_id
+        def _fn(e: dict) -> bool:
+            return e[_CLTASK_COLUMN_NAME] <= task_id
+        return _fn
+
+    def get_eval_val_loaders(self):
+        """
+        返回：
+          loaders: list[DataLoader]
+          names:   list[str]  与 loaders 一一对应
+        结构：对每个 j<=cur_task
+            - cum/task{j}  (0..end_j)
+            - inc/task{j}  (task j 这段)
+        """
+        loaders = []
+        names = []
+        tfm = self.get_effective_transform_name("test")
+
+        for j in range(self._cur_task_id + 1):
+            # cumulative
+            loaders.append(
+                self.get_dataloader(
+                    split=self._split_val,
+                    filter_fn=self.is_label_in_upto_task(j),
+                    transform_name=tfm,
+                    loader_kwargs=self.val_loader_kwargs,
+                    use_buffer=False,
+                )
+            )
+            names.append(f"cum/task{j}")
+
+            # incremental (non-cumulative)
+            loaders.append(
+                self.get_dataloader(
+                    split=self._split_val,
+                    filter_fn=self.is_label_in_task(j),
+                    transform_name=tfm,
+                    loader_kwargs=self.val_loader_kwargs,
+                    use_buffer=False,
+                )
+            )
+            names.append(f"inc/task{j}")
+
+        return loaders, names
+
+    def get_eval_test_loaders(self):
+        loaders = []
+        names = []
+        tfm = self.get_effective_transform_name("test")
+
+        for j in range(self._cur_task_id + 1):
+            loaders.append(
+                self.get_dataloader(
+                    split=self._split_test,
+                    filter_fn=self.is_label_in_upto_task(j),
+                    transform_name=tfm,
+                    loader_kwargs=self.test_loader_kwargs,
+                    use_buffer=False,
+                )
+            )
+            names.append(f"cum/task{j}")
+
+            loaders.append(
+                self.get_dataloader(
+                    split=self._split_test,
+                    filter_fn=self.is_label_in_task(j),
+                    transform_name=tfm,
+                    loader_kwargs=self.test_loader_kwargs,
+                    use_buffer=False,
+                )
+            )
+            names.append(f"inc/task{j}")
+
+        return loaders, names
+
     def val_dataloader(self):
-        return self.get_dataloader(
-            split=self._split_val,
-            filter_fn=self.is_label_in_seen_task,
-            transform_name=self.get_effective_transform_name("test"),
-            loader_kwargs=self.val_loader_kwargs,
-        )
+        loaders, names = self.get_eval_val_loaders()
+        self._val_loader_names = names   # 保存给 model 用
+        return loaders
 
     def test_dataloader(self):
-        return self.get_dataloader(
-            split=self._split_test,
-            filter_fn=self.is_label_in_seen_task,
-            transform_name=self.get_effective_transform_name("test"),
-            loader_kwargs=self.test_loader_kwargs,
-        )
+        loaders, names = self.get_eval_test_loaders()
+        self._test_loader_names = names
+        return loaders
+
