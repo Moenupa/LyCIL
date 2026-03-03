@@ -135,7 +135,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             dm.train_filter_fn = lambda e: False
             # to bypass head expansion, see `BaseLearner.sync_with_datamodule()`
             # and get special training optimizer kwargs with key -2
-            model.set_task_id(-2)
+            # model.set_task_id(-2)
 
             logger2 = OffsetWandbLogger(
                 resume="allow",
