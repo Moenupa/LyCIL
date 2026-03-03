@@ -37,7 +37,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
         train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
-        val_loader_kwargs={"shuffle": False, "num_workers": 10},
+        val_loader_kwargs={"batch_size": 128, "shuffle": False, "num_workers": 10},
         test_loader_kwargs={"shuffle": False, "num_workers": 10},
         split_map={"train": "test", "val": "test"}
         if EPOCHS_PER_TASK == 1

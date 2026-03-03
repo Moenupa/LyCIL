@@ -79,6 +79,10 @@ class EWC(BaseLearner):
 
     def harmonize_named_parameters(self, *args, **kwargs):
         for n, p in self.named_parameters(*args, **kwargs):
+            # prevent recursive inclusion of fisher_dict and mean_dict
+            if "fisher_dict." in n or "mean_dict." in n:
+                continue
+
             yield harmonize_keyname(n), p
 
     def compute_ewc_loss(self) -> torch.Tensor:
@@ -102,28 +106,25 @@ class EWC(BaseLearner):
     @torch.no_grad()
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
         new_fisher = {
-            n: nn.Parameter(
-                torch.zeros_like(p, device=self.device), requires_grad=False
-            )
+            n: torch.zeros_like(p, device=self.device)
             for n, p in self.harmonize_named_parameters()
             if p.requires_grad
         }
 
         self.train()
-        torch.set_grad_enabled(True)
-        train_loader = dm.train_dataloader()
-        for batch in train_loader:
-            self.zero_grad()
-            x, y = self.unpack_batch(batch, self.device)
-            logits = self(x)
-            loss = F.cross_entropy(logits, y)
-            loss.backward()
+        with torch.enable_grad():
+            train_loader = dm.train_dataloader()
+            for batch in train_loader:
+                self.zero_grad()
+                x, y = self.unpack_batch(batch, self.device)
+                logits = self(x)
+                loss = F.cross_entropy(logits, y)
+                loss.backward()
 
-            for n, p in self.harmonize_named_parameters():
-                if p.grad is not None:
-                    new_fisher[n] += p.grad.pow(2).detach()
+                for n, p in self.harmonize_named_parameters():
+                    if p.grad is not None:
+                        new_fisher[n] += p.grad.pow(2).detach()
         self.zero_grad()
-        torch.set_grad_enabled(False)
 
         # inplace normalization + clipping
         for n, f in new_fisher.items():
@@ -140,7 +141,12 @@ class EWC(BaseLearner):
                 old_f_len = len(old_f)
                 new_fisher[n][:old_f_len] = alpha * old_f + (1 - alpha) * f[:old_f_len]
 
-        self.fisher_dict = nn.ParameterDict(new_fisher)
+        self.fisher_dict = nn.ParameterDict(
+            {
+                n: nn.Parameter(f.detach(), requires_grad=False)
+                for n, f in new_fisher.items()
+            }
+        )
         self.mean_dict = nn.ParameterDict(
             {
                 n: nn.Parameter(p.clone().detach(), requires_grad=False)
