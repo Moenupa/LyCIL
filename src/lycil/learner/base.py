@@ -262,8 +262,6 @@ class BaseLearner(L.LightningModule):
         name = getattr(dm, "_val_loader_names", None)
         suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
 
-        import pdb; pdb.set_trace()
-
         self.log(
             name=f"val_{suffix}",
             value=acc1,
