@@ -35,7 +35,7 @@ class HFDataModule(L.LightningDataModule):
         val_loader_kwargs: dict | None = None,
         test_loader_kwargs: dict | None = None,
         # train/val/test map in case some dataset uses different split names
-        split_map: SplitMapping | None = None,
+        split_map: dict | None = None,
         buffer_kwargs: dict | None = None,
     ):
         super().__init__()

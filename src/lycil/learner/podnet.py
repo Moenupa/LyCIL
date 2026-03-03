@@ -118,7 +118,7 @@ class PODNet(ICaRL):
 
         # Select stage-specific key for optimizer/scheduler configs.
         # If buffer_training is True, prefer "buffer" configs; otherwise use task_id configs.
-        stage_key = "buffer" if getattr(self, "buffer_training", False) else self.task_id
+        stage_key = "buffer" if self.buffer_training else self.task_id
 
         # Waterfall lookup: stage_key -> default -> {}
         optim_kwargs = (
