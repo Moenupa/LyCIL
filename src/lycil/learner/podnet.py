@@ -120,6 +120,7 @@ class PODNet(ICaRL):
         # If buffer_training is True, prefer "buffer" configs; otherwise use task_id configs.
         stage_key = "buffer" if self.buffer_training else self.task_id
 
+
         # Waterfall lookup: stage_key -> default -> {}
         optim_kwargs = (
                 self.per_task_optim_args.get(stage_key)
@@ -191,6 +192,7 @@ class PODNet(ICaRL):
             },
             prog_bar=True,
             on_epoch=True,
+            on_step=False,
             sync_dist=True,
         )
         return loss
