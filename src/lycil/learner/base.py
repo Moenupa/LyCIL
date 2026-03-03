@@ -265,10 +265,11 @@ class BaseLearner(L.LightningModule):
         import pdb; pdb.set_trace()
 
         self.log(
-            f"val_{suffix}",
-            acc1,
+            name=f"val_{suffix}",
+            value=acc1,
             prog_bar=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
 
     def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
@@ -281,8 +282,9 @@ class BaseLearner(L.LightningModule):
         suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
 
         self.log(
-            f"test_{suffix}",
-            acc1,
+            name=f"test_{suffix}",
+            value=acc1,
             prog_bar=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
