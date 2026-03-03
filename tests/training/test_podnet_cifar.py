@@ -30,6 +30,10 @@ class OffsetWandbLogger(WandbLogger):
         return super().log_metrics(metrics, step=step)
 
 
+def should_use_distill(task_idx: int, use_buffer: bool) -> bool:
+    # 典型逻辑：非首任务、且不是 memory/buffer 阶段才 distill
+    return (task_idx > 0) and (not use_buffer)
+
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 def test_podnet_cifar100(is_dummy_training: bool):
@@ -97,8 +101,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
     )
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
+        model.using_distill = should_use_distill(task_idx, use_buffer=False)
         dm.set_current_task(task_idx)
-
         # use training data, without buffer
         dm.use_buffer = False
         dm.train_filter_fn = None
@@ -124,6 +128,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         trainer1.fit(model, datamodule=dm)
 
         if task_idx >= 0 :
+            model.using_distill = should_use_distill(task_idx, use_buffer=False)
             # use data from buffer only, do not use training data
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
@@ -154,8 +159,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
             trainer2.fit(model, datamodule=dm)
-            # reset after memory training
-            model.set_task_id(task_idx)
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()

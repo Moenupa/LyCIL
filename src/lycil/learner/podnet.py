@@ -102,12 +102,14 @@ class PODNet(ICaRL):
         *args,
         lambda_spatial: float = 5.0,
         lambda_flat: float = 1.0,
+        using_distill: bool = True,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
         self.lambda_spatial = float(lambda_spatial)
         self.lambda_flat = float(lambda_flat)
+        self.using_distill = using_distill
 
     @property
     def task_factor(self) -> float:
@@ -127,7 +129,7 @@ class PODNet(ICaRL):
         # ce on all classes
         loss_lsc = nca(new_fmap["logits"], y)
 
-        if self.task_id > 0:
+        if self.using_distill:
             # distill on old classes ($trainset \setminus cur$)
             with torch.no_grad():
                 old_fmap = self.old_self.forward_layerwise(x)
