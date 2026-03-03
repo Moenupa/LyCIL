@@ -1,17 +1,14 @@
 import os.path as osp
-
 import lightning as L
 import pytest
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
-
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.podnet import PODNet
 
 BUFFER_SIZE_PER_CLASS = 20
-
 
 
 class OffsetWandbLogger(WandbLogger):
@@ -33,6 +30,7 @@ class OffsetWandbLogger(WandbLogger):
 def should_use_distill(task_idx: int, use_buffer: bool) -> bool:
     # 典型逻辑：非首任务、且不是 memory/buffer 阶段才 distill
     return (task_idx > 0) and (not use_buffer)
+
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
@@ -76,25 +74,26 @@ def test_podnet_cifar100(is_dummy_training: bool):
         head="cosine",
         per_task_optim_args={
             # for buffer training, small learning rate
-            -2: {
-                "type": "sgd",
-                "lr": 0.005,
-                "weight_decay": 5e-4,
-            },
             # for all tasks, use the same optimizer kwargs
-            -1: {
+            "default": {
                 "type": "sgd",
                 "lr": 0.1,
+                "weight_decay": 5e-4,
+            },
+            "buffer": {
+                "type": "sgd",
+                "lr": 0.005,
                 "weight_decay": 5e-4,
             },
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            -1: {
+            "default": {
                 "type": "linear_warmup_cosine_annealing",
                 "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
                 "max_epochs": EPOCHS_PER_TASK,
-            }
+            },
+            "buffer": None,  # No scheduler during buffer training
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,
@@ -102,6 +101,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.using_distill = should_use_distill(task_idx, use_buffer=False)
+        model.buffer_training = False  # Not buffer stage
         dm.set_current_task(task_idx)
         # use training data, without buffer
         dm.use_buffer = False
@@ -127,8 +127,9 @@ def test_podnet_cifar100(is_dummy_training: bool):
         )
         trainer1.fit(model, datamodule=dm)
 
-        if task_idx >= 0 :
+        if task_idx >= 0:
             model.using_distill = should_use_distill(task_idx, use_buffer=False)
+            model.buffer_training = True  # Not buffer stage
             # use data from buffer only, do not use training data
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
@@ -162,7 +163,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
-
 
 
 if __name__ == "__main__":

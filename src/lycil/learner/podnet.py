@@ -103,6 +103,7 @@ class PODNet(ICaRL):
         lambda_spatial: float = 5.0,
         lambda_flat: float = 1.0,
         using_distill: bool = True,
+        buffer_training: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -110,6 +111,38 @@ class PODNet(ICaRL):
         self.lambda_spatial = float(lambda_spatial)
         self.lambda_flat = float(lambda_flat)
         self.using_distill = using_distill
+        self.buffer_training = buffer_training
+
+    def configure_optimizers(self):
+        params = [p for p in self.parameters() if p.requires_grad]
+
+        # Select stage-specific key for optimizer/scheduler configs.
+        # If buffer_training is True, prefer "buffer" configs; otherwise use task_id configs.
+        stage_key = "buffer" if getattr(self, "buffer_training", False) else self.task_id
+
+        # Waterfall lookup: stage_key -> default -> {}
+        optim_kwargs = (
+                self.per_task_optim_args.get(stage_key)
+                or self.per_task_optim_args.get("default")
+                or {}
+        )
+        sched_kwargs = (
+                self.per_task_sched_args.get(stage_key)
+                or self.per_task_sched_args.get("default")
+                or {}
+        )
+
+        optim = self._get_optimizer(params, **optim_kwargs)
+        # If sched_kwargs is None (or explicitly disabled), return optimizer only
+        if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+            return optim
+
+        sched = self._get_scheduler(optim, **sched_kwargs)
+        return {
+            "optimizer": optim,
+            "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+        }
+
 
     @property
     def task_factor(self) -> float:
@@ -161,6 +194,8 @@ class PODNet(ICaRL):
             sync_dist=True,
         )
         return loss
+
+
 
     def on_train_end(self):
         # already implemented in ICaRL
