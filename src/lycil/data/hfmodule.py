@@ -90,7 +90,7 @@ class HFDataModule(L.LightningDataModule):
 
     def prepare_data(self):
         # load_dataset(self.path)
-        ds = load_dataset("cifar100", cache_dir=self.path)
+        load_dataset("cifar100", cache_dir=self.path)
 
     def setup(self, stage: str | None = None):
         self.dataset: DatasetDict = load_dataset(self.path, **self.load_kwargs)
