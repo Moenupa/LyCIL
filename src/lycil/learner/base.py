@@ -232,7 +232,7 @@ class BaseLearner(L.LightningModule):
         # acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
         self.log_dict(
             {
-                f"acc1/task{self.task_id}": acc1,
+                f"val/acc1/task{self.task_id}": acc1,
                 # f"val/acc5/task{self.task_id}": acc5,
             },
             prog_bar=False,

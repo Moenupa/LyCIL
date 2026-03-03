@@ -149,10 +149,10 @@ class PODNet(ICaRL):
 
         self.log_dict(
             {
-                "loss": loss,
-                "lsc": loss_lsc,
-                "flat": loss_flat or 0.0,
-                "spatial": loss_spatial or 0.0,
+                "train/loss": loss,
+                "train/lsc": loss_lsc,
+                "train/flat": loss_flat or 0.0,
+                "train/spatial": loss_spatial or 0.0,
             },
             prog_bar=True,
             on_epoch=True,
