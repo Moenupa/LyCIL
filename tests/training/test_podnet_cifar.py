@@ -93,7 +93,9 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
                 "max_epochs": EPOCHS_PER_TASK,
             },
-            "buffer": None,  # No scheduler during buffer training
+            "buffer": {
+                "type":None # No scheduler during buffer training
+            },
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,
