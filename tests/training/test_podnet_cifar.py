@@ -135,6 +135,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         if task_idx >= 0:
             model.using_distill = should_use_distill(task_idx, use_buffer=False)
             model.buffer_training = True  # Not buffer stage
+            model.classifier.old_head.requires_grad_(True)
             # use data from buffer only, do not use training data
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
