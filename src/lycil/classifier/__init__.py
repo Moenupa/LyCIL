@@ -69,14 +69,14 @@ def expand_head(module: nn.Module, num_new: int) -> nn.Module:
 
     if isinstance(module, CosineLinear):
         new_linear = SplitCosineLinear.from_cosine_linear(module, num_new)
-        # new_linear.old_head.requires_grad_(False)
-        # new_linear.new_head.requires_grad_(True)
+        new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
         return new_linear
 
     if isinstance(module, SplitCosineLinear):
         new_linear = SplitCosineLinear.from_split_cosine_linear(module, num_new)
-        # new_linear.old_head.requires_grad_(False)
-        # new_linear.new_head.requires_grad_(True)
+        new_linear.old_head.requires_grad_(False)
+        new_linear.new_head.requires_grad_(True)
         return new_linear
 
     raise NotImplementedError(f"Classifier not expandable: {type(module)}.")
