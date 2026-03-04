@@ -132,7 +132,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         )
         trainer1.fit(model, datamodule=dm)
 
-        if task_idx >= 0:
+        if task_idx > 0:
             model.using_distill = should_use_distill(task_idx, use_buffer=True)
             model.buffer_training = True  # Not buffer stage
             # use data from buffer only, do not use training data
