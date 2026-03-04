@@ -106,7 +106,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         model.buffer_training = False  # Not buffer stage
         dm.set_current_task(task_idx)
         # use training data, without buffer
-        dm.use_buffer = False
+        dm.use_buffer = True
         dm.train_filter_fn = None
         logger1 = OffsetWandbLogger(
             resume="allow",
