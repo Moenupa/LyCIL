@@ -123,7 +123,7 @@ class ICaRL(BaseLearner):
 
         # construct exemplar set for current classes
         for class_idx in range(self.num_old_classes, self.num_seen_classes):
-            import pdb;pdb.set_trace()
+            # import pdb;pdb.set_trace()
             # 1. single pass on all data
             train_loader = dm.get_dataloader(
                 split=dm._split_train,
