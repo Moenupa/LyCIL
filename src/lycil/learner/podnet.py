@@ -2,9 +2,10 @@ import math
 
 import torch
 import torch.nn.functional as F
-
+import lightning as L
 from .icarl import ICaRL
 
+from ..data.hfmodule import HFDataModule
 
 def nca(
     similarities: torch.Tensor,
@@ -200,6 +201,15 @@ class PODNet(ICaRL):
         return loss
 
 
+    def setup(self, stage) -> None:
+        # 仍然保留 LightningModule 的 setup 链
+        L.LightningModule.setup(self, stage)
+        if stage == "fit":
+            if self.buffer_training:
+                return
+            else:
+                dm: HFDataModule = self.trainer.datamodule
+                self.sync_with_datamodule(dm)
 
     def on_train_end(self):
         if self.buffer_training:
