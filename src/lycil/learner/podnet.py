@@ -200,12 +200,14 @@ class PODNet(ICaRL):
 
 
     def on_train_end(self):
-        # already implemented in ICaRL
-        dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+        if self.buffer_training:
+            return
+        else: # already implemented in ICaRL
+            dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
 
-        # update memory after training current task data, not after replay memory
-        if dm.train_filter_fn is None:
-            self.update_memory(dm)
+            # update memory after training current task data, not after replay memory
+            if dm.train_filter_fn is None:
+                self.update_memory(dm)
 
     def on_fit_end(self):
         self.snapshot_old()
