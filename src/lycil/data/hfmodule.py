@@ -24,6 +24,7 @@ class HFDataModule(L.LightningDataModule):
     def __init__(
         self,
         path: str,
+        *,
         dataset_kwargs: dict | None = None,
         num_tasks: int | None = None,
         num_classes_per_task: int | list[int] | None = None,
