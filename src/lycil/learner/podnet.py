@@ -159,8 +159,8 @@ class PODNet(ICaRL):
         self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
-        if self.buffer_training:
-            import pdb;pdb.set_trace()
+        # if self.buffer_training:
+        #     import pdb;pdb.set_trace()
 
         new_fmap = self.forward_layerwise(x)
 
