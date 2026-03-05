@@ -3,10 +3,10 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .icarl import ICaRL
+from .base import BaseLearner
 
 
-class UCIR(ICaRL):
+class UCIR(BaseLearner):
     r"""`UCIR`_: Learning a Unified Classifier Incrementally via Rebalancing. (Hou et al., CVPR 2019).
 
     .. _UCIR:
@@ -97,3 +97,6 @@ class UCIR(ICaRL):
             sync_dist=True,
         )
         return loss
+
+    def on_train_end(self):
+        self.update_memory(self.trainer.datamodule)  # ty: ignore[unresolved-attribute]
