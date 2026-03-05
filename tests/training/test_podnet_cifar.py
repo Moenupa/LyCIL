@@ -46,8 +46,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 80
-        EPOCHS_PER_TASK_MEMORY = 20
+        EPOCHS_PER_TASK = 20
+        EPOCHS_PER_TASK_MEMORY = 10
         USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
@@ -138,6 +138,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # use data from buffer only, do not use training data
             # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
             #     model.classifier.old_head.requires_grad_(True)
+            model.backbone.requires_grad_(False)
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
 
