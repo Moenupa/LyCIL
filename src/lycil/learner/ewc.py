@@ -154,8 +154,3 @@ class EWC(BaseLearner):
                 if p.requires_grad
             }
         )
-
-    @torch.no_grad()
-    def update_memory(self, *args, **kwargs):
-        """EWC stores no exemplars."""
-        return

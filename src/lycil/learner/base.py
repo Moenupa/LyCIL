@@ -10,6 +10,7 @@ from torch.optim import lr_scheduler
 from ..backbone.resnet import ResNetBackbone
 from ..classifier import expand_head, make_head
 from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
+from ..data.buffer import compute_nme
 from ..metrics.accuracy import accuracy, accuracy_topk
 from ..scheduler import LinearWarmupCosineAnnealingLR
 
@@ -21,12 +22,25 @@ if TYPE_CHECKING:
 
 
 class BaseLearner(L.LightningModule):
-    r"""Base class providing backbone, head expansion, optimizer, and memory plumbing.
+    r"""Base class providing backbone, optimizer, and memory helpers.
 
     Subclasses must implement:
-      - training_step() with appropriate losses
-      - update_memory() to (re)build exemplars for the new classes
-      - validation logic (optionally override `validation_step` or `on_validation_epoch_end`)
+      - ``training_step()`` with appropriate losses
+      - ``on_train_end()`` for replaying history tasks, or other strategies.
+        By default, memory updates are disabled.
+
+    Args:
+        backbone_args (dict, optional):
+            Args to init backbone. (default: None)
+        head (Literal[linear, cosine], optional):
+            Head type. (default: "linear")
+        data_column_translate (dict[str, str], optional):
+            Data column mapping that translate to Lycil-recogizable column
+            names. (default: None)
+        per_task_optim_args (dict[int, dict], optional):
+            Per-task optimizer arguments. (default: None)
+        per_task_sched_args (dict[int, dict], optional):
+            Per-task scheduler arguments. (default: None)
     """
 
     def __init__(
@@ -136,9 +150,6 @@ class BaseLearner(L.LightningModule):
         # with keys 'l1', 'l2', 'l3', 'l4', 'features', 'logits'
         return fmap
 
-    @abstractmethod
-    def update_memory(self, *args, **kwargs): ...
-
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
 
@@ -239,3 +250,119 @@ class BaseLearner(L.LightningModule):
             prog_bar=False,
             sync_dist=True,
         )
+
+    @torch.no_grad()
+    def update_memory(self, dm: "HFDataModule", **kwargs) -> None:
+        """Update datamodule's exemplar memory (i.e., iCaRL).
+
+        To be opted-in after training of each task, e.g. in ``on_train_end()``.
+
+        Args:
+            dm (HFDataModule): The data module containing the buffer.
+            kwargs: Additional arguments for exemplar construction.
+
+        Raises:
+            RuntimeError: If the buffer is not initialized.
+        """
+        if dm.buffer is None:
+            raise RuntimeError("Buffer is not initialized.")
+
+        self.eval()
+        if dm.buffer.is_adaptive:
+            # vacate exemplars for more classes
+            dm.buffer.reduce_exemplars(dm.buffer.size_per_class(self.num_seen_classes))
+            self._construct_exemplar(dm, **kwargs)
+        else:
+            self._construct_exemplar_unified(dm, **kwargs)
+        self.train()
+        return
+
+    @torch.no_grad()
+    def _construct_exemplar(self, dm: "HFDataModule", **kwargs) -> None:
+        raise NotImplementedError
+
+        assert dm.buffer is not None
+        # construct exemplar set for current classes
+        for class_idx in range(self.num_old_classes, self.num_seen_classes):
+            pass
+
+    @torch.no_grad()
+    def _construct_exemplar_unified(self, dm: "HFDataModule", **kwargs) -> None:
+        # for dataloader during exemplar construction,
+        # rather conservative because args are hard-coded here
+        loader_kwargs = dict(
+            batch_size=1,
+            shuffle=False,
+            num_workers=8,
+        )
+
+        assert dm.buffer is not None
+        per_class_means = {}
+
+        # find means of old classes with newly trained network
+        for class_idx in range(self.num_old_classes):
+            loader = dm.buffer.get_dataloader(
+                keys=[f"{class_idx}"],
+                transform_name=dm.get_effective_transform_name(),
+                loader_kwargs=loader_kwargs,
+            )
+            mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+            per_class_means[class_idx] = mean
+
+        # construct exemplar set for current classes
+        for class_idx in range(self.num_old_classes, self.num_seen_classes):
+            # 1. single pass on all data
+            train_loader = dm.get_dataloader(
+                split=dm._split_train,
+                filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
+                transform_name=dm.get_effective_transform_name(),
+                loader_kwargs=loader_kwargs,
+            )
+            mean, per_sample_features = compute_nme(
+                train_loader, self.feature_extractor, self.device
+            )
+
+            # 2. select exemplars by herding
+            # for now, use first m samples
+            m = dm.buffer.size_per_class(self.num_seen_classes)
+            selected_idx = list(range(0, m))
+            # TODO: implement full herding
+            # herding implementation from another library is below:
+            # selected_exemplars = []
+            # exemplar_vectors = []
+            # for k in range(1, m + 1):
+            #     S = np.sum(
+            #         exemplar_vectors, axis=0
+            #     )  # [feature_dim] sum of selected exemplars vectors
+            #     mu_p = (vectors + S) / k  # [n, feature_dim] sum to all vectors
+            #     i = np.argmin(np.sqrt(np.sum((class_mean - mu_p) ** 2, axis=1)))
+
+            #     selected_exemplars.append(
+            #         np.array(data[i])
+            #     )  # New object to avoid passing by inference
+            #     exemplar_vectors.append(
+            #         np.array(vectors[i])
+            #     )  # New object to avoid passing by inference
+
+            #     vectors = np.delete(
+            #         vectors, i, axis=0
+            #     )  # Remove it to avoid duplicative selection
+            #     data = np.delete(
+            #         data, i, axis=0
+            #     )  # Remove it to avoid duplicative selection
+            selected_dataset = dm.get_filtered_dataset(
+                split=dm._split_train,
+                filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
+            ).select(selected_idx)
+            dm.buffer[f"{class_idx}"] = selected_dataset
+
+            # 3. recompute class mean after selection
+            loader = dm.buffer.get_dataloader(
+                keys=[f"{class_idx}"],
+                transform_name=dm.get_effective_transform_name(),
+                loader_kwargs=loader_kwargs,
+            )
+            mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+            per_class_means[class_idx] = mean
+
+        dm.buffer.per_class_means = per_class_means

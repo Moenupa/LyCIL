@@ -68,8 +68,3 @@ class LWF(BaseLearner):
             sync_dist=True,
         )
         return loss
-
-    @torch.no_grad()
-    def update_memory(self, *args, **kwargs):
-        """LwF stores no exemplars; do nothing."""
-        return
