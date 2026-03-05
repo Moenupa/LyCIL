@@ -125,7 +125,7 @@ docstring-code-format = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-vv"
+addopts = "-vv --import-mode=importlib"
 filterwarnings = [
     "ignore::UserWarning:Precision 16-mixed is not supported by the model summary*",
     "ignore::DeprecationWarning:This process * is multi-threaded, use of fork() may lead to deadlocks in the child.",

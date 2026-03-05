@@ -9,6 +9,15 @@ from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.ucir import UCIR
 
+from .constants import (
+    CIFAR10_LABEL_COL,
+    CIFAR10_PATH,
+    CIFAR100_LABEL_COL,
+    CIFAR100_PATH,
+    TEST_LOADER_KWARGS,
+    VAL_LOADER_KWARGS,
+)
+
 BUFFER_SIZE_PER_CLASS = 20
 
 
@@ -17,15 +26,13 @@ BUFFER_SIZE_PER_CLASS = 20
 @pytest.mark.xdist_group("training")
 def test_ucir_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
-        DATAPATH = "data/cifar10"
+        DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [2, 2]
-        LABEL_COL = "label"
         EPOCHS_PER_TASK = 1
         USE_PRETRAIN_WEIGHTS = False
     else:
-        DATAPATH = "data/cifar100"
+        DATAPATH, LABEL_COL = CIFAR100_PATH, CIFAR100_LABEL_COL
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
-        LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
@@ -39,8 +46,8 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
         train_loader_kwargs={"batch_size": 512, "shuffle": True, "num_workers": 10},
-        val_loader_kwargs={"shuffle": False, "num_workers": 10},
-        test_loader_kwargs={"shuffle": False, "num_workers": 10},
+        val_loader_kwargs=VAL_LOADER_KWARGS,
+        test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "test", "val": "test"}
         if EPOCHS_PER_TASK == 1
         else {"val": "test"},
