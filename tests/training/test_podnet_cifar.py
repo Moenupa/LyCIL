@@ -82,7 +82,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             },
             "buffer": {
                 "type": "sgd",
-                "lr": 0.005,
+                # "lr": 0.005,
+                "lr": 0.,
                 "weight_decay": 5e-4,
             },
         },
