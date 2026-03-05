@@ -158,6 +158,9 @@ class PODNet(ICaRL):
         self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
+        if self.buffer_training:
+            import pdb;pdb.set_trace()
+
         new_fmap = self.forward_layerwise(x)
 
         # ce on all classes
@@ -178,7 +181,6 @@ class PODNet(ICaRL):
                 self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
             )
         else:
-            # first task, no distill
             loss_spatial = None
             loss_flat = None
             loss = loss_lsc
