@@ -139,7 +139,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # use data from buffer only, do not use training data
             # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
             #     model.classifier.old_head.requires_grad_(True)
-            model.backbone.eval()
+            # model.backbone.eval()
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
 
