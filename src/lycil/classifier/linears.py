@@ -93,7 +93,6 @@ class CosineLinear(nn.Module):
             logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
-            print("cosine_linear_sigma",self.sigma)
             logits = logits * self.sigma
 
         return {"logits": logits}
@@ -213,7 +212,6 @@ class SplitCosineLinear(nn.Module):
         logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
-            print("split_cosine_linear_sigma", self.sigma)
             logits = logits * self.sigma
 
         return {
