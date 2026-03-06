@@ -167,6 +167,7 @@ class ICaRL(BaseLearner):
                 split=dm._split_train,
                 filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
             ).select(selected_idx)
+            selected_dataset.reset_format()
             dm.buffer[f"{class_idx}"] = selected_dataset
 
             # 3. recompute class mean after selection
