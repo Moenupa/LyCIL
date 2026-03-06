@@ -18,8 +18,8 @@ def nca(
 ) -> torch.Tensor:
     margins = torch.zeros_like(similarities)
     margins[torch.arange(margins.shape[0]), targets] = margin
-    # similarities = scale * (similarities - margin)
-    similarities = scale * (similarities - margins)
+    similarities = scale * (similarities - margin)
+    # similarities = scale * (similarities - margins)
 
     if exclude_pos_denominator:
         similarities = similarities - similarities.max(1)[0].view(-1, 1)
