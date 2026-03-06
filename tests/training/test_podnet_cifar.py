@@ -82,8 +82,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             },
             "buffer": {
                 "type": "sgd",
-                # "lr": 0.005,
-                "lr": 0.,
+                "lr": 0.005,
+                # "lr": 0.,
                 "weight_decay": 5e-4,
             },
         },
@@ -120,7 +120,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         dm.train_filter_fn = None
         logger1 = OffsetWandbLogger(
             resume="allow",
-            name=f"mask_b_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"unfixed_mask_b_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
