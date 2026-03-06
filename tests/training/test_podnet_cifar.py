@@ -120,7 +120,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         dm.train_filter_fn = None
         logger1 = OffsetWandbLogger(
             resume="allow",
-            name=f"v2_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"b_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -140,7 +140,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         trainer1.fit(model, datamodule=dm)
 
         if task_idx > 0:
-            model.using_distill = should_use_distill(task_idx, use_buffer=True)
+            model.using_distill = should_use_distill(task_idx, use_buffer=False)
             model.buffer_training = True  # Not buffer stage
             # use data from buffer only, do not use training data
             if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
