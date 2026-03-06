@@ -6,8 +6,7 @@ import lightning as L
 import torch
 from torch.optim import lr_scheduler
 
-# from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
-from ..backbone.resnet import ResNetBackbone
+from ..backbone import BaseBackbone, ConvNetArgs, ResNetBackbone
 from ..classifier import expand_head, make_head
 from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 from ..data.buffer import compute_nme
@@ -46,7 +45,8 @@ class BaseLearner(L.LightningModule):
     def __init__(
         self,
         *,
-        backbone_args: dict | None = None,
+        backbone_cls: "type[BaseBackbone]" = ResNetBackbone,
+        backbone_args: ConvNetArgs | None = None,
         head: Literal["linear", "cosine"] = "linear",
         data_column_translate: dict[str, str] | None = None,
         per_task_optim_args: dict[int, dict] | None = None,
@@ -54,7 +54,7 @@ class BaseLearner(L.LightningModule):
     ):
         super().__init__()
 
-        self.backbone = ResNetBackbone(**(backbone_args or {}))
+        self.backbone = backbone_cls(backbone_args or ConvNetArgs())
         self.head_type = head
         # lazy init by head_type at `expand_head()`
         self.classifier: nn.Module | None = None
