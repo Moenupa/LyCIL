@@ -171,13 +171,14 @@ class ICaRL(BaseLearner):
             dm.buffer[f"{class_idx}"] = selected_dataset
 
             # 3. recompute class mean after selection
-            loader = dm.buffer.get_dataloader(
-                keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
-            )
-            mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
+            # TODO: fix bug of  Data Transform
+            # loader = dm.buffer.get_dataloader(
+            #     keys=[f"{class_idx}"],
+            #     transform_name=dm.get_effective_transform_name(),
+            #     loader_kwargs=loader_kwargs,
+            # )
+            # mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+            # per_class_means[class_idx] = mean
 
         dm.buffer.per_class_means = per_class_means
 
