@@ -92,7 +92,7 @@ class CosineLinear(nn.Module):
             logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
-            print(self.sigma)
+            print("cosine_linear_sigma",self.sigma)
             logits = logits * self.sigma
 
         return {"logits": logits}
@@ -163,7 +163,6 @@ class SplitCosineLinear(nn.Module):
             device=old_linear.weight.device,
             dtype=old_linear.weight.dtype,
         )
-        import pdb; pdb.set_trace()
 
         new_head.old_head.weight.copy_(old_linear.weight)
         if old_linear.sigma is not None:
@@ -213,6 +212,7 @@ class SplitCosineLinear(nn.Module):
         logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
+            print("split_cosine_linear_sigma", self.sigma)
             logits = logits * self.sigma
 
         return {
