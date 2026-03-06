@@ -15,8 +15,7 @@ __all__ = [
 _CLASSIFIER_HEADS: dict[str, tuple[type[nn.Module], dict]] = {
     # key: (class, {optional kwargs})
     "linear": (SimpleLinear, {}),
-    # "cosine": (CosineLinear, {"num_proxy": 10, "to_reduce": True, "learn_scale": True}),
-    "cosine": (CosineLinear, {"num_proxy": 10, "to_reduce": True, "learn_scale": False}),
+    "cosine": (CosineLinear, {"num_proxy": 10, "to_reduce": True, "learn_scale": True}),
 }
 
 
