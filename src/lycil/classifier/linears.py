@@ -89,10 +89,10 @@ class CosineLinear(nn.Module):
         )
 
         if self.to_reduce:
-            print("reduce")
             logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
+            print(self.sigma)
             logits = logits * self.sigma
 
         return {"logits": logits}
