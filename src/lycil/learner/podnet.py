@@ -165,8 +165,8 @@ class PODNet(ICaRL):
         new_fmap = self.forward_layerwise(x)
 
         # ce on all classes
-        # loss_lsc = nca(new_fmap["logits"], y)
-        loss_lsc = F.cross_entropy(new_fmap["logits"], y)
+        loss_lsc = nca(new_fmap["logits"], y)
+        # loss_lsc = F.cross_entropy(new_fmap["logits"], y)
 
         if self.using_distill:
             # distill on old classes ($trainset \setminus cur$)
