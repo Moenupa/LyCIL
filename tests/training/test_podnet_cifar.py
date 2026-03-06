@@ -53,8 +53,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         pytest.skip("Data path does not exist.")
         return
 
-    # L.seed_everything(42)
-    L.seed_everything(3)
+    L.seed_everything(42)
+    # L.seed_everything(3)
     dm = HFDataModule(
         DATAPATH,
         transform_name=osp.basename(DATAPATH),
