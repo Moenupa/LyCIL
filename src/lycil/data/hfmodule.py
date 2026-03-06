@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from functools import partial
 from typing import Any, Literal
 
 import lightning as L
@@ -16,6 +17,28 @@ from .util import (
     get_or_identity,
     reverse_mapping,
 )
+
+
+def preprocess_for_cl(
+    sample: dict[str, Any],
+    label_column_name: str,
+    label2idx: dict[Any, int],
+    idx2taskid: dict[int, int],
+) -> dict[str, int]:
+    class_idx = label2idx[sample[label_column_name]]
+    task_id_belonged = idx2taskid[class_idx]
+    return {
+        _Y_COLUMN_NAME: class_idx,
+        _CLTASK_COLUMN_NAME: task_id_belonged,
+    }
+
+
+def filter_by_task(sample: dict[str, Any], task_id: int) -> bool:
+    return sample[_CLTASK_COLUMN_NAME] == task_id
+
+
+def filter_by_classid(sample: dict[str, Any], class_idx: int) -> bool:
+    return sample[_Y_COLUMN_NAME] == class_idx
 
 
 class HFDataModule(L.LightningDataModule):
@@ -129,15 +152,14 @@ class HFDataModule(L.LightningDataModule):
                 "the actual number of unique labels in the dataset."
             )
 
-        def _map_fn(e: dict) -> dict:
-            class_idx = label2idx[e[self.label_column_name]]
-            task_id_belonged = idx2taskid[class_idx]
-            return {
-                _Y_COLUMN_NAME: class_idx,
-                _CLTASK_COLUMN_NAME: task_id_belonged,
-            }
-
-        self.dataset = self.dataset.map(_map_fn)
+        self.dataset = self.dataset.map(
+            partial(
+                preprocess_for_cl,
+                label_column_name=self.label_column_name,
+                label2idx=label2idx,
+                idx2taskid=idx2taskid,
+            )
+        )
 
     def is_label_in_cur_task(self, e: dict) -> bool:
         return e[_CLTASK_COLUMN_NAME] == self._cur_task_id

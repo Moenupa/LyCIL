@@ -1,5 +1,6 @@
 import copy
 from abc import abstractmethod
+from functools import partial
 from typing import TYPE_CHECKING, Literal
 
 import lightning as L
@@ -10,6 +11,7 @@ from ..backbone import BaseBackbone, ConvNetArgs, ResNetBackbone
 from ..classifier import expand_head, make_head
 from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 from ..data.buffer import compute_nme
+from ..data.hfmodule import filter_by_classid
 from ..metrics.accuracy import accuracy, accuracy_topk
 from ..scheduler import LinearWarmupCosineAnnealingLR
 
@@ -336,7 +338,7 @@ class BaseLearner(L.LightningModule):
             # 1. single pass on all data
             train_loader = dm.get_dataloader(
                 split=dm._split_train,
-                filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
+                filter_fn=partial(filter_by_classid, class_idx=class_idx),
                 transform_name=dm.get_effective_transform_name(),
                 loader_kwargs=loader_kwargs,
             )
@@ -374,7 +376,7 @@ class BaseLearner(L.LightningModule):
             #     )  # Remove it to avoid duplicative selection
             selected_dataset = dm.get_filtered_dataset(
                 split=dm._split_train,
-                filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
+                filter_fn=partial(filter_by_classid, class_idx=class_idx),
             ).select(selected_idx)
             dm.buffer[f"{class_idx}"] = selected_dataset
 
