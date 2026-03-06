@@ -99,10 +99,12 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "T_max": EPOCHS_PER_TASK,
             },
             "buffer": {
-                "type":None # No scheduler during buffer training
+                # "type":None # No scheduler during buffer training
                 # "type": "linear_warmup_cosine_annealing",
                 # "warmup_epochs": 5,
                 # "max_epochs": EPOCHS_PER_TASK_MEMORY,
+                "type": "cosine_annealing",
+                "T_max": EPOCHS_PER_TASK_MEMORY,
             },
         },
         lambda_spatial=5.0,
@@ -141,8 +143,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.using_distill = should_use_distill(task_idx, use_buffer=True)
             model.buffer_training = True  # Not buffer stage
             # use data from buffer only, do not use training data
-            # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
-            #     model.classifier.old_head.requires_grad_(True)
+            if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
+                model.classifier.old_head.requires_grad_(False)
             # model.backbone.eval()
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
