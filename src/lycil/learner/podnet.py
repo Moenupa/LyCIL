@@ -194,6 +194,7 @@ class PODNet(ICaRL):
                 "train/lsc": loss_lsc,
                 "train/flat": loss_flat or 0.0,
                 "train/spatial": loss_spatial or 0.0,
+                "train/classifier_sigma": self.classifier.sigma or 0.0,
             },
             prog_bar=True,
             on_epoch=True,
