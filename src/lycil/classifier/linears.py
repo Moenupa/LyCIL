@@ -88,8 +88,9 @@ class CosineLinear(nn.Module):
             F.normalize(x, p=2, dim=1), F.normalize(self.weight, p=2, dim=1)
         )
 
-        # if self.to_reduce:
-        logits = reduce_proxies(logits, self.num_proxy)
+        if self.to_reduce:
+            print("reduce")
+            logits = reduce_proxies(logits, self.num_proxy)
 
         if self.sigma is not None:
             logits = logits * self.sigma
