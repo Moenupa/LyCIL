@@ -89,22 +89,22 @@ def test_podnet_cifar100(is_dummy_training: bool):
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            # "default": {
-            #     "type": "linear_warmup_cosine_annealing",
-            #     "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-            #     "max_epochs": EPOCHS_PER_TASK,
-            # },
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
+            # "default": {
+            #     "type": "cosine_annealing",
+            #     "T_max": EPOCHS_PER_TASK,
+            # },
             "buffer": {
-                # "type":None # No scheduler during buffer training
+                "type":None # No scheduler during buffer training
                 # "type": "linear_warmup_cosine_annealing",
                 # "warmup_epochs": 5,
                 # "max_epochs": EPOCHS_PER_TASK_MEMORY,
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK_MEMORY,
+                # "type": "cosine_annealing",
+                # "T_max": EPOCHS_PER_TASK_MEMORY,
             },
         },
         lambda_spatial=5.0,
@@ -120,7 +120,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         dm.train_filter_fn = None
         logger1 = OffsetWandbLogger(
             resume="allow",
-            name=f"unfixed_b_mask_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
