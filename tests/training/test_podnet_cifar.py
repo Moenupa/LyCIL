@@ -120,7 +120,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"force_reset_unfixed_b_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"force_reset_unfixed_b_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -144,8 +144,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.buffer_training = True  # Not buffer stage
             # use data from buffer only, do not use training data
             if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
-                model.classifier.old_head.requires_grad_(False)
-            # model.backbone.eval()
+                model.classifier.old_head.requires_grad_(True)
+            model.backbone.eval()
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
 
