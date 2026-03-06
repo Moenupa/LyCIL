@@ -163,6 +163,7 @@ class SplitCosineLinear(nn.Module):
             device=old_linear.weight.device,
             dtype=old_linear.weight.dtype,
         )
+        import pdb; pdb.set_trace()
 
         new_head.old_head.weight.copy_(old_linear.weight)
         if old_linear.sigma is not None:
