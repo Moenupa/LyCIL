@@ -72,8 +72,8 @@ class CosineLinear(nn.Module):
         )
 
         if learn_scale:
-            self.sigma = nn.Parameter(torch.tensor(10.0, **factory_kwargs))
-            # self.sigma = nn.Parameter(torch.tensor(1.0, **factory_kwargs))
+            # self.sigma = nn.Parameter(torch.tensor(10.0, **factory_kwargs))
+            self.sigma = nn.Parameter(torch.tensor(1.0, **factory_kwargs))
         else:
             self.register_parameter("sigma", None)
 
