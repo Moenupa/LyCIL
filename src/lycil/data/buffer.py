@@ -182,11 +182,19 @@ class BaseExemplarBuffer(DatasetDict):
             keys = [keys]
 
         # collect subsets by filter and concatenate
-        subsets: list["Dataset"] = [
-            v if isinstance(v, Dataset) else Dataset.from_dict(v)
-            for k, v in self.items()
-            if keys is None or k in keys
-        ]
+        # subsets: list["Dataset"] = [
+        #     v if isinstance(v, Dataset) else Dataset.from_dict(v)
+        #     for k, v in self.items()
+        #     if keys is None or k in keys
+        # ]
+        subsets = []
+        for k, v in self.items():
+            if keys is None or k in keys:
+                if isinstance(v, Dataset):
+                    v.reset_format()
+                    subsets.append(v)
+                else:
+                    subsets.append(Dataset.from_dict(v))
         ret = concatenate_datasets(subsets)
 
         if transform_name is not None:
