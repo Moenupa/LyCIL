@@ -195,8 +195,8 @@ class BaseExemplarBuffer(DatasetDict):
                 subsets.append(ds)
         ret = concatenate_datasets(subsets)
 
-        if transform_name is not None:
-            ret.set_format(transform_name)
+        # if transform_name is not None:
+        #     ret.set_format(transform_name)
         return ret
 
     def get_dataloader(
