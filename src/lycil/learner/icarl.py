@@ -112,28 +112,28 @@ class ICaRL(BaseLearner):
         per_class_means = {}
 
         # find means of old classes with newly trained network
-        for class_idx in range(self.num_old_classes):
-            loader = dm.buffer.get_dataloader(
-                keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
-            )
-            mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
+        # for class_idx in range(self.num_old_classes):
+        #     loader = dm.buffer.get_dataloader(
+        #         keys=[f"{class_idx}"],
+        #         transform_name=dm.get_effective_transform_name(),
+        #         loader_kwargs=loader_kwargs,
+        #     )
+        #     mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+        #     per_class_means[class_idx] = mean
 
         # construct exemplar set for current classes
         for class_idx in range(self.num_old_classes, self.num_seen_classes):
             # import pdb;pdb.set_trace()
             # 1. single pass on all data
-            train_loader = dm.get_dataloader(
-                split=dm._split_train,
-                filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
-            )
-            mean, per_sample_features = compute_nme(
-                train_loader, self.feature_extractor, self.device
-            )
+            # train_loader = dm.get_dataloader(
+            #     split=dm._split_train,
+            #     filter_fn=lambda e: e[_Y_COLUMN_NAME] == class_idx,
+            #     transform_name=dm.get_effective_transform_name(),
+            #     loader_kwargs=loader_kwargs,
+            # )
+            # mean, per_sample_features = compute_nme(
+            #     train_loader, self.feature_extractor, self.device
+            # )
 
             # 2. select exemplars by herding
             # for now, use first m samples
