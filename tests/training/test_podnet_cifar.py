@@ -165,7 +165,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # model.backbone.requires_grad_(False)
             # model.classifier.requires_grad_(True)
             dm.use_buffer = True
-            dm.buffer_only_new = True
+            dm.buffer_only_new = False
             dm.train_filter_fn = lambda e: False
 
             logger2 = OffsetWandbLogger(

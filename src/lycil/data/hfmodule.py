@@ -170,7 +170,6 @@ class HFDataModule(L.LightningDataModule):
         if use_buffer and self.buffer is not None and len(self.buffer) > 0:
             # subset = concatenate_datasets([subset, self.buffer.make_dataset(transform_name=transform_name)])
             # subset = concatenate_datasets([subset, self.buffer.make_dataset()])
-            import pdb; pdb.set_trace()
             if buffer_only_new:
                 buffer_set=self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)])
             else:

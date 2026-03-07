@@ -338,14 +338,17 @@ class PODNet(ICaRL):
                 self.sync_with_datamodule(dm)
 
     def on_train_end(self):
-        if self.buffer_training:
-            return
-        else: # already implemented in ICaRL
-            dm = self.trainer.datamodule
-            # update memory after training current task data, not after replay memory
-            # if dm.train_filter_fn is None:
-            self.update_memory(dm)
+        # if self.buffer_training:
+        #     return
+        # else: # already implemented in ICaRL
+        #     dm = self.trainer.datamodule
+        #     # update memory after training current task data, not after replay memory
+        #     # if dm.train_filter_fn is None:
+        #     self.update_memory(dm)
+        return
 
     def on_fit_end(self):
         if self.need_snapshot_old:
             self.snapshot_old()
+            dm = self.trainer.datamodule
+            self.update_memory(dm)
