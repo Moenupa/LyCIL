@@ -131,7 +131,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"v2_snapold_20_herding_select_force_reset_b_onlyold_mask_fixfc1_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"v2_snapold_20_herding_select_force_reset_b_onlynew_mask_fixfc1_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -166,7 +166,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # model.backbone.requires_grad_(False)
             # model.classifier.requires_grad_(True)
             dm.use_buffer = True
-            dm.buffer_only_new = False
+            dm.buffer_only_new = True
             dm.train_filter_fn = lambda e: False
 
             logger2 = OffsetWandbLogger(
