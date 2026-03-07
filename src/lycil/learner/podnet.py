@@ -217,8 +217,61 @@ class PODNet(ICaRL):
 
 
 
+    # def training_step(
+    #     self, batch: dict[str, torch.Tensor], batch_idx: int
+    # ) -> torch.Tensor:
+    #     x, y = self.unpack_batch(batch)
+    #
+    #     new_fmap = self.forward_layerwise(x)
+    #
+    #     # ce on all classes
+    #     loss_lsc = nca(new_fmap["logits"], y)
+    #
+    #     if self.using_distill:
+    #         # distill on old classes ($trainset \setminus cur$)
+    #         with torch.no_grad():
+    #             old_fmap = self.old_self.forward_layerwise(x)
+    #         loss_flat = F.cosine_embedding_loss(
+    #             new_fmap["features"],
+    #             old_fmap["features"].detach(),
+    #             torch.ones(x.shape[0]).to(self.device),
+    #         )
+    #         loss_spatial = pod_spatial_loss(old_fmap, new_fmap)
+    #
+    #         loss = loss_lsc + self.task_factor * (
+    #             self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
+    #         )
+    #     else:
+    #         loss_spatial = None
+    #         loss_flat = None
+    #         loss = loss_lsc
+    #
+    #
+    #     self.log_dict(
+    #         {
+    #             "train/loss": loss,
+    #             "train/lsc": loss_lsc,
+    #             "train/flat": loss_flat or 0.0,
+    #             "train/spatial": loss_spatial or 0.0,
+    #             "train/classifier_sigma": self.classifier.sigma or 0.0,
+    #             # "train/x_mean": x.detach().float().mean(),
+    #             # "train/x_var": x.detach().float().var(unbiased=False),
+    #         },
+    #         prog_bar=True,
+    #         on_epoch=True,
+    #         on_step=False,
+    #         sync_dist=True,
+    #     )
+    #     return loss
+
+    def _build_distill_mask(self, y: torch.Tensor) -> torch.Tensor | None:
+        # 只对旧类样本蒸馏
+        if self.num_old_classes <= 0:
+            return None
+        return y < self.num_old_classes
+
     def training_step(
-        self, batch: dict[str, torch.Tensor], batch_idx: int
+            self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
 
@@ -228,24 +281,33 @@ class PODNet(ICaRL):
         loss_lsc = nca(new_fmap["logits"], y)
 
         if self.using_distill:
-            # distill on old classes ($trainset \setminus cur$)
-            with torch.no_grad():
-                old_fmap = self.old_self.forward_layerwise(x)
-            loss_flat = F.cosine_embedding_loss(
-                new_fmap["features"],
-                old_fmap["features"].detach(),
-                torch.ones(x.shape[0]).to(self.device),
-            )
-            loss_spatial = pod_spatial_loss(old_fmap, new_fmap)
+            loss_flat = x.new_zeros(())
+            loss_spatial = x.new_zeros(())
+            distill_mask = self._build_distill_mask(y)
+            if distill_mask is not None and distill_mask.any().item():
+                # distill on old classes ($trainset \setminus cur$)
+                with torch.no_grad():
+                    old_fmap = self.old_self.forward_layerwise(x)
 
+                loss_flat = masked_cosine_embedding_loss(
+                    new_fmap["features"],
+                    old_fmap["features"],
+                    sample_mask=distill_mask,
+                )
+
+                loss_spatial = masked_pod_spatial_loss(
+                    old_fmap,
+                    new_fmap,
+                    sample_mask=distill_mask,
+                )
             loss = loss_lsc + self.task_factor * (
-                self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
+                    self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
             )
+
         else:
             loss_spatial = None
             loss_flat = None
             loss = loss_lsc
-
 
         self.log_dict(
             {
@@ -263,66 +325,6 @@ class PODNet(ICaRL):
             sync_dist=True,
         )
         return loss
-
-    def _build_distill_mask(self, y: torch.Tensor) -> torch.Tensor | None:
-        # 只对旧类样本蒸馏
-        if self.num_old_classes <= 0:
-            return None
-        return y < self.num_old_classes
-
-    # def training_step(
-    #         self, batch: dict[str, torch.Tensor], batch_idx: int
-    # ) -> torch.Tensor:
-    #     x, y = self.unpack_batch(batch)
-    #
-    #     new_fmap = self.forward_layerwise(x)
-    #
-    #     # ce on all classes
-    #     loss_lsc = nca(new_fmap["logits"], y)
-    #
-    #     if self.using_distill:
-    #         loss_flat = x.new_zeros(())
-    #         loss_spatial = x.new_zeros(())
-    #         distill_mask = self._build_distill_mask(y)
-    #         if distill_mask is not None and distill_mask.any().item():
-    #             # distill on old classes ($trainset \setminus cur$)
-    #             with torch.no_grad():
-    #                 old_fmap = self.old_self.forward_layerwise(x)
-    #
-    #             loss_flat = masked_cosine_embedding_loss(
-    #                 new_fmap["features"],
-    #                 old_fmap["features"],
-    #                 sample_mask=distill_mask,
-    #             )
-    #
-    #             loss_spatial = masked_pod_spatial_loss(
-    #                 old_fmap,
-    #                 new_fmap,
-    #                 sample_mask=distill_mask,
-    #             )
-    #         loss = loss_lsc + self.task_factor * (
-    #                 self.lambda_spatial * loss_spatial + self.lambda_flat * loss_flat
-    #         )
-    #
-    #     else:
-    #         loss_spatial = None
-    #         loss_flat = None
-    #         loss = loss_lsc
-    #
-    #     self.log_dict(
-    #         {
-    #             "train/loss": loss,
-    #             "train/lsc": loss_lsc,
-    #             "train/flat": loss_flat or 0.0,
-    #             "train/spatial": loss_spatial or 0.0,
-    #             "train/classifier_sigma": self.classifier.sigma or 0.0,
-    #         },
-    #         prog_bar=True,
-    #         on_epoch=True,
-    #         on_step=False,
-    #         sync_dist=True,
-    #     )
-    #     return loss
 
     def setup(self, stage) -> None:
         L.LightningModule.setup(self, stage)
