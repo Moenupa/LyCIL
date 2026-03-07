@@ -150,7 +150,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             #
 
             model.backbone.eval()
-            model.classifier.eval()
+            model.backbone.requires_grad_(False)
+            model.classifier.requires_grad_(False)
             dm.use_buffer = True
             dm.train_filter_fn = lambda e: False
 
