@@ -46,8 +46,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 20
-        EPOCHS_PER_TASK_MEMORY = 10
+        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
@@ -111,6 +111,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
     )
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
+        model.train()
         model.using_distill = should_use_distill(task_idx, use_buffer=False)
         model.buffer_training = False  # Not buffer stage
         dm.set_current_task(task_idx)
@@ -120,7 +121,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"force_reset_unfixed_b_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"force_reset_b_fixednet_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -178,6 +179,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
             trainer2.fit(model, datamodule=dm)
+            model.backbone.requires_grad_(True)
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
