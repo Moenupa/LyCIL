@@ -134,8 +134,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
         print("normal format:", ds1.format)
         print("buffer-only format:", ds2.format)
-        print("normal sample type:", type(ds1[0]["image"]))
-        print("buffer-only sample type:", type(ds2[0]["image"]))
+        print("normal sample type:", type(ds1[0]["img"]))
+        print("buffer-only sample type:", type(ds2[0]["img"]))
 
         logger1 = OffsetWandbLogger(
             resume="allow",
