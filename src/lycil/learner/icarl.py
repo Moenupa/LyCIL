@@ -217,7 +217,7 @@ class ICaRL(BaseLearner):
             )
         )
 
-        feature_tfm = dm.get_effective_transform(mode="train")
+        feature_tfm = dm.get_effective_transform(mode="test")
 
         if exemplar_selection not in {"random", "herding"}:
             raise ValueError(
