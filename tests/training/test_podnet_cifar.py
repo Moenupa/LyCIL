@@ -131,7 +131,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"v2_snapold_160_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"v2_snapold_160_t_train_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
