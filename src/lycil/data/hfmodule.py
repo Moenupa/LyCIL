@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
 from .buffer import BaseExemplarBuffer
-from .transform import register_tf_as_formatter
+from .transform import apply_dataset_transform, get_transform
 from .util import (
     SplitMapping,
     check_bijection,
@@ -47,9 +47,9 @@ class HFDataModule(L.LightningDataModule):
         self._num_classes_per_task = num_classes_per_task
         self.label_column_name = label_column_name
 
+        # Keep the external config as a name/alias, but resolve it to a callable
+        # when building datasets/dataloaders.
         self.transform_name = transform_name
-        if transform_name is not None:
-            register_tf_as_formatter(transform_name)
 
         self.train_loader_kwargs = train_loader_kwargs or {}
         self.val_loader_kwargs = val_loader_kwargs or {}
@@ -69,7 +69,7 @@ class HFDataModule(L.LightningDataModule):
         self._val_loader_names: list[str] = []
         self._test_loader_names: list[str] = []
 
-        self.buffer_only_new=False
+        self.buffer_only_new = False
 
     @property
     def num_tasks(self) -> int:
@@ -144,12 +144,14 @@ class HFDataModule(L.LightningDataModule):
     def _split_test(self) -> str:
         return get_or_identity(self.split_map, "test")
 
-    def get_effective_transform_name(self, mode: Literal["train", "test"] = "train") -> str | None:
+    def get_effective_transform(
+        self, mode: Literal["train", "test"] = "train"
+    ) -> Callable | None:
         if mode not in {"train", "test"}:
             raise ValueError(f"expect mode in 'train'/'test', got {mode}")
-        if self.transform_name is not None:
-            return f"{self.transform_name}_{mode}"
-        return self._FORMAT_FALLBACK
+        if self.transform_name is None:
+            return None
+        return get_transform(self.transform_name, mode)
 
     # ---------- train filter (kept as-is) ----------
     def is_label_in_cur_task(self, e: dict) -> bool:
@@ -159,47 +161,50 @@ class HFDataModule(L.LightningDataModule):
         self,
         split: str,
         filter_fn: Callable[[dict], bool],
-        transform_name: str | None = None,
+        transform: Callable | None = None,
         use_buffer: bool = False,
         buffer_only_new: bool = False,
     ) -> Dataset:
         subset = self.dataset[split].filter(filter_fn)
         subset.reset_format()
-        # if transform_name is not None:
-        #     subset.set_format(transform_name)
         if use_buffer and self.buffer is not None and len(self.buffer) > 0:
-            # subset = concatenate_datasets([subset, self.buffer.make_dataset(transform_name=transform_name)])
-            # subset = concatenate_datasets([subset, self.buffer.make_dataset()])
             if buffer_only_new:
-                buffer_set=self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)])
+                buffer_set = self.buffer.make_dataset(
+                    keys=[str(i) for i in range(self.num_old_classes, self.num_seen_classes)]
+                )
             else:
                 buffer_set = self.buffer.make_dataset()
             buffer_set.reset_format()
             subset = concatenate_datasets([subset, buffer_set])
-        if transform_name is not None:
-            subset.set_format(transform_name)
+        apply_dataset_transform(subset, transform=transform)
         return subset
 
     def get_dataloader(
         self,
         split: str,
         filter_fn: Callable[[dict], bool],
-        transform_name: str | None,
+        transform: Callable | None,
         loader_kwargs: dict,
         use_buffer: bool = False,
         buffer_only_new: bool = False,
     ) -> DataLoader:
-        subset = self.get_filtered_dataset(split, filter_fn, transform_name, use_buffer, buffer_only_new)
+        subset = self.get_filtered_dataset(
+            split,
+            filter_fn,
+            transform,
+            use_buffer,
+            buffer_only_new,
+        )
         return DataLoader(subset, **loader_kwargs)
 
     def train_dataloader(self):
         return self.get_dataloader(
             split=self._split_train,
             filter_fn=self.train_filter_fn or self.is_label_in_cur_task,
-            transform_name=self.get_effective_transform_name("train"),
+            transform=self.get_effective_transform("train"),
             loader_kwargs=self.train_loader_kwargs,
             use_buffer=self.use_buffer,
-            buffer_only_new=self.buffer_only_new
+            buffer_only_new=self.buffer_only_new,
         )
 
     # ---------- eval helpers (cached) ----------
@@ -219,20 +224,29 @@ class HFDataModule(L.LightningDataModule):
         self._idx_cache[key] = idx
         return idx
 
-    def _eval_subset(self, split: str, j: int, mode: Literal["cum", "inc"], tfm: str | None) -> Dataset:
+    def _eval_subset(
+        self,
+        split: str,
+        j: int,
+        mode: Literal["cum", "inc"],
+        transform: Callable | None,
+    ) -> Dataset:
         idx = self._eval_indices(split, j, mode)
         subset = self.dataset[split].select(idx)
-        if tfm is not None:
-            subset.set_format(tfm)
+        apply_dataset_transform(subset, transform=transform)
         return subset
 
     def _make_eval_loaders(self, split: str, loader_kwargs: dict):
-        tfm = self.get_effective_transform_name("test")
+        transform = self.get_effective_transform("test")
         loaders, names = [], []
         for j in range(self._cur_task_id + 1):
-            loaders.append(DataLoader(self._eval_subset(split, j, "cum", tfm), **loader_kwargs))
+            loaders.append(
+                DataLoader(self._eval_subset(split, j, "cum", transform), **loader_kwargs)
+            )
             names.append(f"cum/task{j}")
-            loaders.append(DataLoader(self._eval_subset(split, j, "inc", tfm), **loader_kwargs))
+            loaders.append(
+                DataLoader(self._eval_subset(split, j, "inc", transform), **loader_kwargs)
+            )
             names.append(f"inc/task{j}")
         return loaders, names
 

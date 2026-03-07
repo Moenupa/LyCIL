@@ -217,7 +217,7 @@ class ICaRL(BaseLearner):
             )
         )
 
-        feature_tfm = dm.get_effective_transform_name(mode="train")
+        feature_tfm = dm.get_effective_transform(mode="train")
 
         if exemplar_selection not in {"random", "herding"}:
             raise ValueError(
@@ -236,7 +236,7 @@ class ICaRL(BaseLearner):
 
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
-                transform_name=feature_tfm,
+                transform=feature_tfm,
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
@@ -268,7 +268,7 @@ class ICaRL(BaseLearner):
                 train_loader = dm.get_dataloader(
                     split=dm._split_train,
                     filter_fn=lambda e, c=class_idx: e[_Y_COLUMN_NAME] == c,
-                    transform_name=feature_tfm,
+                    transform=feature_tfm,
                     loader_kwargs=loader_kwargs,
                     use_buffer=False,
                 )
@@ -306,7 +306,7 @@ class ICaRL(BaseLearner):
             # 3) 用选后的 exemplar 重算该类 mean
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
-                transform_name=feature_tfm,
+                transform=feature_tfm,
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)

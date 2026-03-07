@@ -6,6 +6,7 @@ from datasets import Dataset, DatasetDict, concatenate_datasets
 from torch.utils.data import DataLoader
 
 from ..constants import _X_COLUMN_NAME
+from .transform import apply_dataset_transform
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -176,17 +177,13 @@ class BaseExemplarBuffer(DatasetDict):
                 )
 
     def make_dataset(
-        self, keys: str | list[str] | None = None, transform_name: str | None = None
+        self,
+        keys: str | list[str] | None = None,
+        transform: "Callable | None" = None,
     ) -> "Dataset":
         if isinstance(keys, str):
             keys = [keys]
 
-        # collect subsets by filter and concatenate
-        # subsets: list["Dataset"] = [
-        #     v if isinstance(v, Dataset) else Dataset.from_dict(v)
-        #     for k, v in self.items()
-        #     if keys is None or k in keys
-        # ]
         subsets = []
         for k, v in self.items():
             if keys is None or k in keys:
@@ -195,15 +192,14 @@ class BaseExemplarBuffer(DatasetDict):
                 subsets.append(ds)
         ret = concatenate_datasets(subsets)
 
-        if transform_name is not None:
-            ret.set_format(transform_name)
+        apply_dataset_transform(ret, transform=transform)
         return ret
 
     def get_dataloader(
         self,
         keys: str | list[str] | None = None,
-        transform_name: str | None = None,
+        transform: "Callable | None" = None,
         loader_kwargs: dict | None = None,
     ) -> "DataLoader":
-        dataset = self.make_dataset(keys=keys, transform_name=transform_name)
+        dataset = self.make_dataset(keys=keys, transform=transform)
         return DataLoader(dataset, **(loader_kwargs or {}))  # ty: ignore[invalid-argument-type]
