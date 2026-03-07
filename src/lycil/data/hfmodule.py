@@ -173,7 +173,7 @@ class HFDataModule(L.LightningDataModule):
             if buffer_only_new:
                 buffer_set=self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)])
             else:
-                buffer_set = self.buffer.make_dataset().reset_format()
+                buffer_set = self.buffer.make_dataset()
             buffer_set.reset_format()
             subset = concatenate_datasets([subset, buffer_set])
         if transform_name is not None:
