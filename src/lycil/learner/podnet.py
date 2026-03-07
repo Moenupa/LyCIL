@@ -246,6 +246,7 @@ class PODNet(ICaRL):
             loss_flat = None
             loss = loss_lsc
 
+
         self.log_dict(
             {
                 "train/loss": loss,
@@ -253,6 +254,8 @@ class PODNet(ICaRL):
                 "train/flat": loss_flat or 0.0,
                 "train/spatial": loss_spatial or 0.0,
                 "train/classifier_sigma": self.classifier.sigma or 0.0,
+                "train/x_mean": x.detach().float().mean(),
+                "train/x_var": x.detach().float().var(unbiased=False),
             },
             prog_bar=True,
             on_epoch=True,
