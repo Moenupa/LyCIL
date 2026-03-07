@@ -69,6 +69,8 @@ class HFDataModule(L.LightningDataModule):
         self._val_loader_names: list[str] = []
         self._test_loader_names: list[str] = []
 
+        self.buffer_only_new=False
+
     @property
     def num_tasks(self) -> int:
         return len(self.num_classes_per_task)
@@ -159,13 +161,18 @@ class HFDataModule(L.LightningDataModule):
         filter_fn: Callable[[dict], bool],
         transform_name: str | None = None,
         use_buffer: bool = False,
+        buffer_only_new: bool = False,
     ) -> Dataset:
         subset = self.dataset[split].filter(filter_fn)
         # if transform_name is not None:
         #     subset.set_format(transform_name)
         if use_buffer and self.buffer is not None and len(self.buffer) > 0:
             # subset = concatenate_datasets([subset, self.buffer.make_dataset(transform_name=transform_name)])
-            subset = concatenate_datasets([subset, self.buffer.make_dataset()])
+            # subset = concatenate_datasets([subset, self.buffer.make_dataset()])
+            if buffer_only_new:
+                subset = concatenate_datasets([subset, self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)])])
+            else:
+                subset = concatenate_datasets([subset, self.buffer.make_dataset()])
         if transform_name is not None:
             subset.set_format(transform_name)
         return subset
@@ -177,8 +184,9 @@ class HFDataModule(L.LightningDataModule):
         transform_name: str | None,
         loader_kwargs: dict,
         use_buffer: bool = False,
+        buffer_only_new: bool = False,
     ) -> DataLoader:
-        subset = self.get_filtered_dataset(split, filter_fn, transform_name, use_buffer)
+        subset = self.get_filtered_dataset(split, filter_fn, transform_name, use_buffer, buffer_only_new)
         return DataLoader(subset, **loader_kwargs)
 
     def train_dataloader(self):
@@ -188,6 +196,7 @@ class HFDataModule(L.LightningDataModule):
             transform_name=self.get_effective_transform_name("train"),
             loader_kwargs=self.train_loader_kwargs,
             use_buffer=self.use_buffer,
+            buffer_only_new=self.buffer_only_new
         )
 
     # ---------- eval helpers (cached) ----------

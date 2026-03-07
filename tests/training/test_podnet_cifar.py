@@ -152,6 +152,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.using_distill = True
             model.buffer_training = True
             model.need_snapshot_old = True
+
             # use data from buffer only, do not use training data
             # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
             #     model.classifier.old_head.requires_grad_(False)
@@ -163,6 +164,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # model.backbone.requires_grad_(False)
             # model.classifier.requires_grad_(True)
             dm.use_buffer = True
+            dm.buffer_only_new = True
             dm.train_filter_fn = lambda e: False
 
             logger2 = OffsetWandbLogger(
