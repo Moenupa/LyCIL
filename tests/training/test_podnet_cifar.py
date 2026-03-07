@@ -127,6 +127,15 @@ def test_podnet_cifar100(is_dummy_training: bool):
         dm.use_buffer = True
         dm.buffer_only_new = False
         dm.train_filter_fn = None
+
+        ds1 = dm.get_filtered_dataset("train", None, transform_name="cifar100", use_buffer=True)
+        ds2 = dm.get_filtered_dataset("train", lambda e: False, transform_name="cifar100", use_buffer=True)
+
+        print("normal format:", ds1.format)
+        print("buffer-only format:", ds2.format)
+        print("normal sample type:", type(ds1[0]["image"]))
+        print("buffer-only sample type:", type(ds2[0]["image"]))
+
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",

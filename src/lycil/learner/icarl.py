@@ -23,11 +23,11 @@ class ICaRL(BaseLearner):
     """
 
     def __init__(
-        self,
-        *args,
-        distill_T: float = 2.0,
-        distill_lambda: float = 1.0,
-        **kwargs,
+            self,
+            *args,
+            distill_T: float = 2.0,
+            distill_lambda: float = 1.0,
+            **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
@@ -35,7 +35,7 @@ class ICaRL(BaseLearner):
         self.distill_lambda = float(distill_lambda)
 
     def training_step(
-        self, batch: dict[str, torch.Tensor], batch_idx: int
+            self, batch: dict[str, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
@@ -217,7 +217,7 @@ class ICaRL(BaseLearner):
             )
         )
 
-        feature_tfm = dm.get_effective_transform_name()
+        feature_tfm = dm.get_effective_transform_name(mode="train")
 
         if exemplar_selection not in {"random", "herding"}:
             raise ValueError(
