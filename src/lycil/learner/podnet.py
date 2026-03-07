@@ -18,8 +18,8 @@ def nca(
 ) -> torch.Tensor:
     margins = torch.zeros_like(similarities)
     margins[torch.arange(margins.shape[0]), targets] = margin
-    similarities = scale * (similarities - margin)
-    # similarities = scale * (similarities - margins)
+    # similarities = scale * (similarities - margin)
+    similarities = scale * (similarities - margins)
 
     if exclude_pos_denominator:
         similarities = similarities - similarities.max(1)[0].view(-1, 1)
@@ -158,13 +158,14 @@ class PODNet(ICaRL):
     """
 
     def __init__(
-        self,
-        *args,
-        lambda_spatial: float = 5.0,
-        lambda_flat: float = 1.0,
-        using_distill: bool = True,
-        buffer_training: bool = False,
-        **kwargs,
+            self,
+            *args,
+            lambda_spatial: float = 5.0,
+            lambda_flat: float = 1.0,
+            using_distill: bool = True,
+            buffer_training: bool = False,
+            need_snapshot_old: bool = False,
+            **kwargs,
     ):
         super().__init__(*args, **kwargs)
 
@@ -172,6 +173,7 @@ class PODNet(ICaRL):
         self.lambda_flat = float(lambda_flat)
         self.using_distill = using_distill
         self.buffer_training = buffer_training
+        self.need_snapshot_old = need_snapshot_old
 
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
@@ -345,4 +347,5 @@ class PODNet(ICaRL):
             self.update_memory(dm)
 
     def on_fit_end(self):
-        self.snapshot_old()
+        if self.need_snapshot_old:
+            self.snapshot_old()

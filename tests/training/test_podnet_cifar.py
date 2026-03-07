@@ -27,9 +27,16 @@ class OffsetWandbLogger(WandbLogger):
         return super().log_metrics(metrics, step=step)
 
 
-def should_use_distill(task_idx: int, use_buffer: bool) -> bool:
-    # 典型逻辑：非首任务、且不是 memory/buffer 阶段才 distill
-    return (task_idx > 0) and (not use_buffer)
+# def should_use_distill(task_idx: int, use_buffer: bool) -> bool:
+#     # 典型逻辑：非首任务、且不是 memory/buffer 阶段才 distill
+#     return (task_idx > 0) and (not use_buffer)
+
+def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
+    # task 0: 没有 buffer 阶段，主训练结束后直接 snapshot
+    if task_idx == 0:
+        return not use_buffer
+    # task 1+: 只在 buffer 微调阶段结束后 snapshot
+    return use_buffer
 
 
 @pytest.mark.slow
@@ -62,7 +69,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
         val_loader_kwargs={"batch_size": 128, "shuffle": False, "num_workers": 10},
         test_loader_kwargs={"batch_size": 128, "shuffle": False, "num_workers": 10},
-        split_map= {"train": "train", "val": "test", "test": "test"},
+        split_map={"train": "train", "val": "test", "test": "test"},
         buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
     model = PODNet(
@@ -112,16 +119,17 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
-        model.using_distill = should_use_distill(task_idx, use_buffer=False)
-        model.buffer_training = False  # Not buffer stage
+        model.using_distill = task_idx > 0
+        model.need_snapshot_old = task_idx == 0
+        model.buffer_training = False
         dm.set_current_task(task_idx)
-        # use training data, without buffer
+        # use training data, with buffer
         dm.use_buffer = True
         dm.train_filter_fn = None
         logger1 = OffsetWandbLogger(
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"margin_80_rand_select_force_reset_b_mask_fixfc1_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"snapold_80_rand_select_force_reset_b_mask_fixfc1_eval_distill_b_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -141,8 +149,9 @@ def test_podnet_cifar100(is_dummy_training: bool):
         trainer1.fit(model, datamodule=dm)
 
         if task_idx > 0:
-            model.using_distill = should_use_distill(task_idx, use_buffer=False)
-            model.buffer_training = True  # Not buffer stage
+            model.using_distill = True
+            model.buffer_training = True
+            model.need_snapshot_old = True
             # use data from buffer only, do not use training data
             # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
             #     model.classifier.old_head.requires_grad_(False)
