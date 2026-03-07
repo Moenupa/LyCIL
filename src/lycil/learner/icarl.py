@@ -208,7 +208,7 @@ class ICaRL(BaseLearner):
 
         exemplar_selection = kwargs.get(
             "exemplar_selection",
-            getattr(self, "exemplar_selection", "herding"),
+            getattr(self, "exemplar_selection", "random"),
         )
         exemplar_seed = int(
             kwargs.get(
