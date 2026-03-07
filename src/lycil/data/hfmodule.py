@@ -164,15 +164,16 @@ class HFDataModule(L.LightningDataModule):
         buffer_only_new: bool = False,
     ) -> Dataset:
         subset = self.dataset[split].filter(filter_fn)
+        subset.reset_format()
         # if transform_name is not None:
         #     subset.set_format(transform_name)
         if use_buffer and self.buffer is not None and len(self.buffer) > 0:
             # subset = concatenate_datasets([subset, self.buffer.make_dataset(transform_name=transform_name)])
             # subset = concatenate_datasets([subset, self.buffer.make_dataset()])
             if buffer_only_new:
-                subset = concatenate_datasets([subset, self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)])])
+                subset = concatenate_datasets([subset, self.buffer.make_dataset(keys = [str(i) for i in range(self.num_old_classes, self.num_seen_classes)]).reset_format()])
             else:
-                subset = concatenate_datasets([subset, self.buffer.make_dataset()])
+                subset = concatenate_datasets([subset, self.buffer.make_dataset().reset_format()])
         if transform_name is not None:
             subset.set_format(transform_name)
         return subset
