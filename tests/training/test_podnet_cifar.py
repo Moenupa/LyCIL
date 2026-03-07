@@ -128,6 +128,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         dm.buffer_only_new = False
         dm.train_filter_fn = None
 
+        dm.setup(stage="fit")
         ds1 = dm.get_filtered_dataset("train", None, transform_name="cifar100", use_buffer=True)
         ds2 = dm.get_filtered_dataset("train", lambda e: False, transform_name="cifar100", use_buffer=True)
 
