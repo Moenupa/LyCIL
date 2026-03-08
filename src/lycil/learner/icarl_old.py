@@ -79,38 +79,24 @@ class ICaRL(BaseLearner):
         if dm.buffer is None:
             raise RuntimeError("Buffer is not initialized.")
 
-        per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
-
         self.eval()
         if dm.buffer.is_adaptive:
-            # Adaptive memory: reuse the full global budget on the currently
-            # seen classes, then shrink old classes as new ones arrive.
-            dm.buffer.reduce_exemplars(per_class_quota)
-            self._construct_exemplar(
-                dm,
-                per_class_quota=per_class_quota,
-                **kwargs,
-            )
+            # vacate exemplars for more classes
+            dm.buffer.reduce_exemplars(dm.buffer.size_per_class(self.num_seen_classes))
+            self._construct_exemplar(dm, **kwargs)
         else:
-            self._construct_exemplar_unified(
-                dm,
-                per_class_quota=per_class_quota,
-                **kwargs,
-            )
+            self._construct_exemplar_unified(dm, **kwargs)
         self.train()
         return
 
     @torch.no_grad()
     def _construct_exemplar(self, dm: HFDataModule, **kwargs) -> None:
-        """Construct exemplars for adaptive-total-memory buffers.
+        raise NotImplementedError
 
-        This mirrors the non-lightning base behavior:
-        - memory is allocated from a global budget (`mem_size`),
-        - old classes have already been reduced to the new quota,
-        - new classes are then filled up to the same quota.
-        """
-        self._construct_exemplar_impl(dm, **kwargs)
-        return
+        assert dm.buffer is not None
+        # construct exemplar set for current classes
+        for class_idx in range(self.num_old_classes, self.num_seen_classes):
+            pass
 
     # @torch.no_grad()
     # def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
@@ -199,16 +185,18 @@ class ICaRL(BaseLearner):
     #     return
 
     @torch.no_grad()
-    def _construct_exemplar_impl(self, dm: HFDataModule, **kwargs) -> None:
-        """Shared exemplar construction implementation.
+    def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
+        """
+        Unified exemplar construction for fixed-per-class buffer.
 
-        Works for both:
-        - adaptive total-memory buffers (`mem_size`)
-        - fixed per-class buffers (`mem_size_per_class`)
+        支持两种策略：
+        - exemplar_selection="herding"  (默认)
+        - exemplar_selection="random"
 
-        Expected caller behavior:
-        - adaptive mode should reduce old exemplars before calling this method;
-        - fixed mode can directly rebuild means for old classes and add new ones.
+        可选参数：
+        - exemplar_seed: int = 42
+        - exemplar_transform_mode: str = "test"
+          herding / mean 计算时建议固定用 test transform，避免随机增强干扰
         """
         loader_kwargs = dict(
             batch_size=128,
@@ -228,12 +216,6 @@ class ICaRL(BaseLearner):
                 getattr(self, "exemplar_seed", 42),
             )
         )
-        per_class_quota = int(
-            kwargs.get(
-                "per_class_quota",
-                dm.buffer.size_per_class(self.num_seen_classes),
-            )
-        )
 
         feature_tfm = dm.get_effective_transform(mode="test")
 
@@ -245,7 +227,7 @@ class ICaRL(BaseLearner):
 
         per_class_means = {}
 
-        # 1) Recompute class means of old classes with the latest network.
+        # 1) 先用当前网络重算旧类的 class mean
         for class_idx in range(self.num_old_classes):
             if f"{class_idx}" not in dm.buffer:
                 continue
@@ -261,7 +243,7 @@ class ICaRL(BaseLearner):
             mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
             per_class_means[class_idx] = mean.cpu()
 
-        # 2) Construct exemplars for the new classes.
+        # 2) 为当前新类构建 exemplar
         for class_idx in range(self.num_old_classes, self.num_seen_classes):
             class_dataset = dm.get_filtered_dataset(
                 split=dm._split_train,
@@ -273,14 +255,16 @@ class ICaRL(BaseLearner):
             if n_samples == 0:
                 continue
 
-            m = min(per_class_quota, n_samples)
+            m = min(dm.buffer.size_per_class(self.num_seen_classes), n_samples)
 
             if exemplar_selection == "random":
+                # 真随机：不是取前 m 个
                 g = torch.Generator()
                 g.manual_seed(exemplar_seed + int(class_idx))
                 selected_idx = torch.randperm(n_samples, generator=g)[:m].tolist()
 
             else:
+                # 真 herding
                 train_loader = dm.get_dataloader(
                     split=dm._split_train,
                     filter_fn=lambda e, c=class_idx: e[_Y_COLUMN_NAME] == c,
@@ -292,8 +276,9 @@ class ICaRL(BaseLearner):
                     train_loader, self.feature_extractor, self.device
                 )
 
+                # 归一化 class mean，和 per-sample normalized features 对齐
                 class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
-                feats = per_sample_features.cpu()
+                feats = per_sample_features.cpu()  # [n, d]
 
                 selected_idx = []
                 selected_mask = torch.zeros(n_samples, dtype=torch.bool)
@@ -301,8 +286,10 @@ class ICaRL(BaseLearner):
 
                 for k in range(1, m + 1):
                     candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
-                    candidate_feats = feats[candidate_idx]
+                    candidate_feats = feats[candidate_idx]  # [n_remain, d]
 
+                    # iCaRL herding:
+                    # 选使 ||mu - (S + x)/k|| 最小的样本
                     mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
                     dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
                     best_rel = torch.argmin(dist).item()
@@ -316,6 +303,7 @@ class ICaRL(BaseLearner):
             selected_dataset.reset_format()
             dm.buffer[f"{class_idx}"] = selected_dataset
 
+            # 3) 用选后的 exemplar 重算该类 mean
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
                 transform=feature_tfm,
@@ -326,21 +314,4 @@ class ICaRL(BaseLearner):
             per_class_means[class_idx] = mean.cpu()
 
         dm.buffer.per_class_means = per_class_means
-        return
-
-    @torch.no_grad()
-    def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
-        """
-        Unified exemplar construction for fixed-per-class buffer.
-
-        支持两种策略：
-        - exemplar_selection="herding"  (默认)
-        - exemplar_selection="random"
-
-        可选参数：
-        - exemplar_seed: int = 42
-        - exemplar_transform_mode: str = "test"
-          herding / mean 计算时建议固定用 test transform，避免随机增强干扰
-        """
-        self._construct_exemplar_impl(dm, **kwargs)
         return

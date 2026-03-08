@@ -79,24 +79,16 @@ class ICaRL(BaseLearner):
         if dm.buffer is None:
             raise RuntimeError("Buffer is not initialized.")
 
+        per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
+
         self.eval()
         if dm.buffer.is_adaptive:
-            # vacate exemplars for more classes
-            dm.buffer.reduce_exemplars(dm.buffer.size_per_class(self.num_seen_classes))
-            self._construct_exemplar(dm, **kwargs)
-        else:
-            self._construct_exemplar_unified(dm, **kwargs)
+            # Adaptive memory: reuse the full global budget on the currently
+            # seen classes, then shrink old classes as new ones arrive.
+            dm.buffer.reduce_exemplars(per_class_quota)
+        self._construct_exemplar_unified(dm, per_class_quota=per_class_quota, **kwargs, )
         self.train()
         return
-
-    @torch.no_grad()
-    def _construct_exemplar(self, dm: HFDataModule, **kwargs) -> None:
-        raise NotImplementedError
-
-        assert dm.buffer is not None
-        # construct exemplar set for current classes
-        for class_idx in range(self.num_old_classes, self.num_seen_classes):
-            pass
 
     # @torch.no_grad()
     # def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
@@ -187,17 +179,18 @@ class ICaRL(BaseLearner):
     @torch.no_grad()
     def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
         """
-        Unified exemplar construction for fixed-per-class buffer.
+        统一的 exemplar 构建实现。
 
-        支持两种策略：
-        - exemplar_selection="herding"  (默认)
-        - exemplar_selection="random"
+        同时支持两种 buffer 策略：
+        - 总内存自适应模式（`mem_size`）
+        - 固定每类样本数模式（`mem_size_per_class`）
 
-        可选参数：
-        - exemplar_seed: int = 42
-        - exemplar_transform_mode: str = "test"
-          herding / mean 计算时建议固定用 test transform，避免随机增强干扰
+        调用约定：
+        - 自适应总内存模式下，应当在调用本函数前先把旧类 exemplar 裁剪到新的配额；
+        - 固定每类样本数模式下，可以直接调用本函数，对旧类重算 mean，并为新类构建 exemplar。
         """
+        # exemplar 构建时使用的 dataloader 配置
+        # 这里固定不用 shuffle，避免 exemplar 选择过程不稳定
         loader_kwargs = dict(
             batch_size=128,
             shuffle=False,
@@ -206,17 +199,28 @@ class ICaRL(BaseLearner):
 
         assert dm.buffer is not None
 
+        # exemplar 选择策略，默认 herding
         exemplar_selection = kwargs.get(
             "exemplar_selection",
             getattr(self, "exemplar_selection", "herding"),
         )
+        # 随机选择时使用的随机种子
         exemplar_seed = int(
             kwargs.get(
                 "exemplar_seed",
                 getattr(self, "exemplar_seed", 42),
             )
         )
+        # 当前每个类别允许保留的 exemplar 数量
+        # 对于 mem_size 模式，这里会根据当前已见类别数动态计算
+        per_class_quota = int(
+            kwargs.get(
+                "per_class_quota",
+                dm.buffer.size_per_class(self.num_seen_classes),
+            )
+        )
 
+        # 统一使用 test transform 提特征，避免随机增强影响 exemplar 选择和类均值计算
         feature_tfm = dm.get_effective_transform(mode="test")
 
         if exemplar_selection not in {"random", "herding"}:
@@ -227,7 +231,7 @@ class ICaRL(BaseLearner):
 
         per_class_means = {}
 
-        # 1) 先用当前网络重算旧类的 class mean
+        # 1) 用最新网络重新计算旧类别的类中心
         for class_idx in range(self.num_old_classes):
             if f"{class_idx}" not in dm.buffer:
                 continue
@@ -243,7 +247,7 @@ class ICaRL(BaseLearner):
             mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
             per_class_means[class_idx] = mean.cpu()
 
-        # 2) 为当前新类构建 exemplar
+        # 2) 为当前新类别构建 exemplar 集合
         for class_idx in range(self.num_old_classes, self.num_seen_classes):
             class_dataset = dm.get_filtered_dataset(
                 split=dm._split_train,
@@ -255,16 +259,18 @@ class ICaRL(BaseLearner):
             if n_samples == 0:
                 continue
 
-            m = min(dm.buffer.size_per_class(self.num_seen_classes), n_samples)
+            # 当前类实际保留的样本数，不能超过该类真实样本数
+            m = min(per_class_quota, n_samples)
 
+            # 2.1 随机选择 exemplar
             if exemplar_selection == "random":
-                # 真随机：不是取前 m 个
                 g = torch.Generator()
                 g.manual_seed(exemplar_seed + int(class_idx))
                 selected_idx = torch.randperm(n_samples, generator=g)[:m].tolist()
 
+            # 2.2 herding 选择 exemplar
             else:
-                # 真 herding
+                # 先对当前类别全量样本做一次前向，提取特征
                 train_loader = dm.get_dataloader(
                     split=dm._split_train,
                     filter_fn=lambda e, c=class_idx: e[_Y_COLUMN_NAME] == c,
@@ -276,20 +282,18 @@ class ICaRL(BaseLearner):
                     train_loader, self.feature_extractor, self.device
                 )
 
-                # 归一化 class mean，和 per-sample normalized features 对齐
                 class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
-                feats = per_sample_features.cpu()  # [n, d]
+                feats = per_sample_features.cpu()
 
                 selected_idx = []
                 selected_mask = torch.zeros(n_samples, dtype=torch.bool)
                 running_sum = torch.zeros_like(class_mean)
 
+                # 按 herding 规则逐个选择，使 exemplar 均值尽量逼近类中心
                 for k in range(1, m + 1):
                     candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
-                    candidate_feats = feats[candidate_idx]  # [n_remain, d]
+                    candidate_feats = feats[candidate_idx]
 
-                    # iCaRL herding:
-                    # 选使 ||mu - (S + x)/k|| 最小的样本
                     mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
                     dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
                     best_rel = torch.argmin(dist).item()
@@ -299,11 +303,12 @@ class ICaRL(BaseLearner):
                     selected_mask[best_abs] = True
                     running_sum += feats[best_abs]
 
+            # 3) 将选中的 exemplar 写入 buffer
             selected_dataset = class_dataset.select(selected_idx)
             selected_dataset.reset_format()
             dm.buffer[f"{class_idx}"] = selected_dataset
 
-            # 3) 用选后的 exemplar 重算该类 mean
+            # 4) 用选中的 exemplar 重新计算该类的类中心
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
                 transform=feature_tfm,
@@ -313,5 +318,6 @@ class ICaRL(BaseLearner):
             mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
             per_class_means[class_idx] = mean.cpu()
 
+        # 保存所有类别的类中心，供 NME 推理使用
         dm.buffer.per_class_means = per_class_means
         return
