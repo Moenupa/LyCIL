@@ -1,44 +1,20 @@
 import torch
-import torchvision.models as tvm
 from torch import nn
 
+from .basenet import BaseBackbone, ConvNetArgs, get_convnet
 
-class ResNetBackbone(nn.Module):
+
+class ResNetBackbone(BaseBackbone):
     """ResNet backbone returning pooled features and intermediates for POD.
 
-    - forward(x): returns global pooled feature (B, D)
-    - forward_feats(x): returns dict of feature maps from layers { 'l2','l3','l4' }
+    Contains a single convnet, initialized by
+    - ``forward_layerwise(x)`` returns keys {"l1", "l2", "l3", "l4", "features}
+    - ``out_dim`` returns single
     """
 
-    def __init__(
-        self, name: str = "resnet18", pretrained: bool = False, cifar: bool = False
-    ):
-        super().__init__()
-        match name:
-            case "resnet18":
-                net = tvm.resnet18(
-                    weights=tvm.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
-                )
-                feat_dim = 512
-            case "resnet34":
-                net = tvm.resnet34(
-                    weights=tvm.ResNet34_Weights.IMAGENET1K_V1 if pretrained else None
-                )
-                feat_dim = 512
-            case "resnet50":
-                net = tvm.resnet50(
-                    weights=tvm.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
-                )
-                feat_dim = 2048
-                if cifar:
-                    net.conv1 = nn.Conv2d(
-                        3, 64, kernel_size=3, stride=1, padding=2, bias=False
-                    )
-                    net.maxpool = nn.Identity()
-                    net.fc = nn.Identity()
-                # net.load_state_dict(state, strict=False)
-            case _:
-                raise ValueError(f"Unknown ResNet variant: {name}")
+    def __init__(self, convnet_args: ConvNetArgs):
+        super().__init__(convnet_args)
+        net, feat_dim = get_convnet(convnet_args)
 
         self.stem = nn.Sequential(net.conv1, net.bn1, net.relu, net.maxpool)
         self.layer1 = net.layer1
@@ -47,7 +23,7 @@ class ResNetBackbone(nn.Module):
         self.layer4 = net.layer4
 
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.out_dim = feat_dim
+        self.convnet_out_dim = feat_dim
 
     def forward_layerwise(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         x = self.stem(x)
@@ -63,5 +39,9 @@ class ResNetBackbone(nn.Module):
         return feats
 
     @property
+    def out_dim(self) -> int:
+        return self.convnet_out_dim
+
+    @property
     def feature_dim(self) -> int:
-        return self.out_dim
+        return self.convnet_out_dim

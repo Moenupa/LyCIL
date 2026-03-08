@@ -14,6 +14,7 @@ from .constants import (
     CIFAR10_PATH,
     CIFAR100_LABEL_COL,
     CIFAR100_PATH,
+    CONVNET_ARGS,
     TEST_LOADER_KWARGS,
     VAL_LOADER_KWARGS,
 )
@@ -29,12 +30,10 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [2, 2]
         EPOCHS_PER_TASK = 1
-        USE_PRETRAIN_WEIGHTS = False
     else:
         DATAPATH, LABEL_COL = CIFAR100_PATH, CIFAR100_LABEL_COL
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         EPOCHS_PER_TASK = 160
-        USE_PRETRAIN_WEIGHTS = True
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
@@ -49,16 +48,12 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "test", "val": "test"}
-        if EPOCHS_PER_TASK == 1
+        if is_dummy_training
         else {"val": "test"},
         buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
     model = UCIR(
-        backbone_args={
-            "name": "resnet50",
-            "pretrained": USE_PRETRAIN_WEIGHTS,
-            "cifar": True,
-        },
+        backbone_args=CONVNET_ARGS[is_dummy_training],
         head="cosine",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
@@ -92,11 +87,10 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=False,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"ucir_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+                name=f"ucir_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
-                tags=["ucir", "cifar100"]
-                + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
+                tags=["ucir", "cifar100"],
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=10,
