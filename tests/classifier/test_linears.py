@@ -21,7 +21,7 @@ def test_simple_linear(device):
     assert out["logits"].device.type == torch.device(device).type
 
     # Test expansion
-    m_new = SimpleLinear.from_linear(m, num_new=3)
+    m_new = SimpleLinear.from_linear(m, out_delta=3)
     assert m_new.out_features == 8
     assert torch.allclose(m_new.weight[:out_features], m.weight)
     assert m_new.bias is not None
@@ -33,7 +33,7 @@ def test_simple_linear(device):
 @pytest.mark.runs_on(["cpu", "cuda", "npu"])
 def test_simple_linear_from_linear_without_bias(device):
     old = torch.nn.Linear(6, 4, bias=False, device=device)
-    new = SimpleLinear.from_linear(old, num_new=2)
+    new = SimpleLinear.from_linear(old, out_delta=2)
 
     assert new.bias is None
     assert new.out_features == 6
