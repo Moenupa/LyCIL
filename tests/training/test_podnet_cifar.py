@@ -134,7 +134,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             resume="allow",
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_no_buffer_ft_nomask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_ft_allfc_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -159,8 +159,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.need_snapshot_old = True
 
             # use data from buffer only, do not use training data
-            # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
-            #     model.classifier.old_head.requires_grad_(False)
+            if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
+                model.classifier.old_head.requires_grad_(True)
             # if hasattr(model.classifier, "new_head") and model.classifier.new_head is not None:
             #     model.classifier.new_head.requires_grad_(False)
             #
