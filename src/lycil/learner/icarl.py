@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from ..constants import _Y_COLUMN_NAME
 from ..data.buffer import compute_nme
@@ -324,7 +325,11 @@ class ICaRL(BaseLearner):
             class_to_indices[int(y)].append(sample_idx)
 
         # 4) 为当前新类别构建 exemplar 集合
-        for class_idx in range(self.num_old_classes, self.num_seen_classes):
+        # for class_idx in range(self.num_old_classes, self.num_seen_classes):
+        for class_idx in tqdm(
+                range(self.num_old_classes, self.num_seen_classes),
+                desc=f"Building exemplars task {dm.get_current_task()}",
+        ):
             class_indices = class_to_indices.get(class_idx, [])
             if len(class_indices) == 0:
                 continue
