@@ -142,6 +142,10 @@ class BaseExemplarBuffer(DatasetDict):
             return self.mem_size_per_class
 
         # otherwise, adaptive because mem_size must not be None
+        # Example: if final target is 100 classes and we want 20 exemplars/class
+        # at convergence, set mem_size=2000. Then task 0 with 20 seen classes gets
+        # 2000 // 20 = 100 exemplars/class, and later tasks will shrink this quota
+        # as more classes are introduced.
         assert self.mem_size is not None
         if not isinstance(target_num_classes, int) or target_num_classes <= 0:
             raise ValueError("`target_num_classes` must be a positive integer.")
