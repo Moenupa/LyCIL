@@ -115,5 +115,5 @@ class DER(BaseLearner):
         # 1d norm for each class (row) in the weight matrix
         mean_new = torch.mean(vector_norm(w[self.num_old_classes :, :], ord=2, dim=1))
         mean_old = torch.mean(vector_norm(w[: self.num_old_classes, :], ord=2, dim=1))
-        gamma = mean_old / mean_new
+        gamma = mean_old / (mean_new + 1e-8)
         self.classifier.weight.data[self.num_old_classes :, :] *= gamma
