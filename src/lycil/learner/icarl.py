@@ -309,8 +309,16 @@ class ICaRL(BaseLearner):
             mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
             per_class_means[class_idx] = mean.cpu()
 
-        # 2) 先一次性筛出当前 task 的训练子集，避免每个类别都对整份训练集重复 filter
-        task_train_dataset = dm.get_filtered_dataset(
+        # 2) 先一次性筛出当前 task 的训练子集：
+        #    - raw 版本用于真正写入 buffer，必须保留原始 HF features/schema；
+        #    - feat 版本仅用于提特征做 herding。
+        task_train_dataset_raw = dm.get_filtered_dataset(
+            split=dm._split_train,
+            filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
+            transform=None,
+            use_buffer=False,
+        )
+        task_train_dataset_feat = dm.get_filtered_dataset(
             split=dm._split_train,
             filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
             transform=feature_tfm,
@@ -320,7 +328,7 @@ class ICaRL(BaseLearner):
         # 3) 在当前 task 子集内，先建立 “类别 -> 样本索引列表” 的映射
         #    这样后面每个类别直接 select 对应索引即可，不再重复 filter
         class_to_indices = {class_idx: [] for class_idx in range(self.num_old_classes, self.num_seen_classes)}
-        task_labels = task_train_dataset[_Y_COLUMN_NAME]
+        task_labels = task_train_dataset_raw[_Y_COLUMN_NAME]
         for sample_idx, y in enumerate(task_labels):
             class_to_indices[int(y)].append(sample_idx)
 
@@ -335,7 +343,8 @@ class ICaRL(BaseLearner):
                 continue
 
             # 从当前 task 子集中切出该类别的数据
-            class_dataset = task_train_dataset.select(class_indices)
+            class_dataset = task_train_dataset_raw.select(class_indices)
+            class_dataset_feat = task_train_dataset_feat.select(class_indices)
 
             n_samples = len(class_dataset)
             if n_samples == 0:
@@ -353,7 +362,7 @@ class ICaRL(BaseLearner):
             # 4.2 herding 选择 exemplar
             else:
                 # 直接在当前类别子集上做一次前向，提取特征
-                train_loader = torch.utils.data.DataLoader(class_dataset, **loader_kwargs)
+                train_loader = torch.utils.data.DataLoader(class_dataset_feat, **loader_kwargs)
                 class_mean, per_sample_features = compute_nme(
                     train_loader, self.feature_extractor, self.device
                 )
@@ -380,7 +389,7 @@ class ICaRL(BaseLearner):
                     running_sum += feats[best_abs]
 
             # 5) 将选中的 exemplar 写入 buffer
-            # 注意：这里 class_dataset 目前带有 test transform，写入 buffer 前要 reset_format 恢复原始数据
+            #    必须写入 raw dataset，避免把 transform/view 混进 buffer。
             selected_dataset = class_dataset.select(selected_idx)
             selected_dataset.reset_format()
             dm.buffer[f"{class_idx}"] = selected_dataset
@@ -397,4 +406,5 @@ class ICaRL(BaseLearner):
 
         # 保存所有类别的类中心，供 NME 推理使用
         dm.buffer.per_class_means = per_class_means
+
         return

@@ -154,27 +154,54 @@ class BaseExemplarBuffer(DatasetDict):
 
         return self.mem_size // target_num_classes
 
-    def reduce_exemplars(
-        self,
-        per_class_quota: int,
-        trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
-    ) -> None:
-        r"""
-        Reduce exemplars, typically called after new classes arrive.
+    # def reduce_exemplars(
+    #     self,
+    #     per_class_quota: int,
+    #     trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
+    # ) -> None:
+    #     r"""
+    #     Reduce exemplars, typically called after new classes arrive.
+    #
+    #     Args:
+    #         per_class_quota (int): Maximum number of exemplars to keep per class.
+    #         trim_func (Callable[[Dataset, int], Dataset] | None, optional):
+    #             Function to trim exemplars: ``trim_func(dataset, quota) -> trimmed_dataset``
+    #             If None, get first `quota` samples. (default: None)
+    #     """
+    #     trim_func = trim_func or (
+    #         # fallback: get first `quota` samples -> data[:quota]
+    #         lambda dataset, q: dataset if len(dataset) <= q else dataset[:q]
+    #     )
+    #
+    #     for _class_id, _data in self.items():
+    #         self[_class_id] = trim_func(_data, per_class_quota)
+    #         if len(self[_class_id]) > per_class_quota:
+    #             raise ValueError(
+    #                 f"trim_func returned more than {per_class_quota} exemplars."
+    #             )
 
-        Args:
-            per_class_quota (int): Maximum number of exemplars to keep per class.
-            trim_func (Callable[[Dataset, int], Dataset] | None, optional):
-                Function to trim exemplars: ``trim_func(dataset, quota) -> trimmed_dataset``
-                If None, get first `quota` samples. (default: None)
-        """
+    def reduce_exemplars(
+            self,
+            per_class_quota: int,
+            trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
+    ) -> None:
         trim_func = trim_func or (
-            # fallback: get first `quota` samples -> data[:quota]
-            lambda dataset, q: dataset if len(dataset) <= q else dataset[:q]
+            # dataset[:q] 会返回 dict，丢 schema；必须用 select 保持 Dataset 类型
+            lambda dataset, q: dataset if len(dataset) <= q else dataset.select(range(q))
         )
 
         for _class_id, _data in self.items():
-            self[_class_id] = trim_func(_data, per_class_quota)
+            base = _data if isinstance(_data, Dataset) else Dataset.from_dict(_data)
+            trimmed = trim_func(base, per_class_quota)
+
+            if not isinstance(trimmed, Dataset):
+                raise TypeError(
+                    "trim_func must return a `datasets.Dataset` to preserve features."
+                )
+
+            trimmed.reset_format()
+            self[_class_id] = trimmed
+
             if len(self[_class_id]) > per_class_quota:
                 raise ValueError(
                     f"trim_func returned more than {per_class_quota} exemplars."
