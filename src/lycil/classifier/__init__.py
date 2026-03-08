@@ -50,7 +50,7 @@ def make_head(
 
 @torch.no_grad()
 def expand_head(module: nn.Module, out_delta: int, in_delta: int = 0) -> nn.Module:
-    r"""Expand classifier to accommodate for more classes.  :math:`\texttt{num\_new}=n_\text{after} - n_\text{before}\geq0`.
+    r"""Expand classifier to accommodate for more classes.  :math:`\texttt{out\_delta}=n_\text{after} - n_\text{before}\geq0`.
 
     Args:
         module (nn.Module): The classifier module to be expanded.
