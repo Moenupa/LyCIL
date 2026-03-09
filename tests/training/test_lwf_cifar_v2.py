@@ -48,7 +48,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 10},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -65,7 +65,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.3,
+                "lr": 0.1,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
@@ -73,10 +73,9 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "linear_warmup_cosine_annealing",
-                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-                "max_epochs": EPOCHS_PER_TASK,
-            }
+                "type": "cosine_annealing",
+                "T_max": EPOCHS_PER_TASK,
+            },
         },
         distill_T=1.0,
         distill_lambda=0.1,
@@ -93,7 +92,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"lwf_cifar100_task{task_idx}",
+                name=f"hparms_from_pod_lwf_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["lwf", "cifar100"],
