@@ -21,10 +21,10 @@ def compute_nme(
 
     Args:
         dataloader (DataLoader):
-            Dataloader, usually only contains samples in a single class
+            Dataloader, usually only contains samples in a single class.
         feature_extractor (Callable[[torch.Tensor], torch.Tensor]):
-            Function to extract features
-        device (torch.device): device to use for computation
+            Function to extract features.
+        device (torch.device): device to use for computation.
 
     Raises:
         TypeError: if ``dataloader`` does not yield dict or Tensor
@@ -32,7 +32,7 @@ def compute_nme(
     Returns:
         tuple: 2 tensors
             - 1d tensor, sample-wise mean of feature vector, shaped (n_features),
-            - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features)
+            - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features).
 
     """
     from torch.nn import functional as F
@@ -56,14 +56,29 @@ def compute_nme(
 
 
 class BaseExemplarBuffer(DatasetDict):
-    r"""Fixed-size buffer with per-class lists.
+    r"""Fixed-size per-class exemplar buffer backed by a :class:`~datasets.DatasetDict`.
+
+    Supports two memory management modes:
+
+    - **Adaptive** (``mem_size`` given): total budget is fixed; per-class quota
+      shrinks as new classes arrive via
+      :math:`\lfloor mem\_size / n\_classes\_seen \rfloor`.
+    - **Fixed** (``mem_size_per_class`` given): each class always stores the same
+      number of exemplars regardless of the number of tasks seen.
+
+    Exactly one of ``mem_size`` or ``mem_size_per_class`` must be provided.
 
     Args:
-        mem_size (int, optional): Exemplar size in total, each class gets
-            :math:`\lfloor(\frac{mem\_size}{n_{classes\_seen}})\rfloor`. (default: 2000)
-        args: Additional args passed to ``datasets.DatasetDict``.
-        kwargs: Additional kwargs passed to ``datasets.DatasetDict``.
+        mem_size (int | None, optional): Total exemplar budget across all classes.
+            Mutually exclusive with ``mem_size_per_class``. (default: ``None``)
+        mem_size_per_class (int | None, optional): Fixed per-class exemplar quota.
+            Mutually exclusive with ``mem_size``. (default: ``None``)
+        args: Positional arguments forwarded to :class:`~datasets.DatasetDict`.
+        kwargs: Keyword arguments forwarded to :class:`~datasets.DatasetDict`.
 
+    Raises:
+        ValueError: If neither or both of ``mem_size`` / ``mem_size_per_class`` are
+            provided, or if the supplied value is not a positive integer.
     """
 
     @classmethod
@@ -124,22 +139,29 @@ class BaseExemplarBuffer(DatasetDict):
 
     @property
     def mem_size_used(self) -> int:
+        """Total number of exemplars currently stored."""
         return sum(len(subset) for subset in self.values())
 
     @property
     def is_adaptive(self) -> bool:
-        """Whether to allow adaptive per-class size.
+        r"""Whether the buffer uses an adaptive (total-budget) memory policy.
 
-        If adaptive: per-class size is computed as `mem_size // num_classes`.
-        E.g., if given total=200, per-class size is 20 at 10 classes, 10 at 20 classes, etc.
-
-        Returns:
-            bool: True if per-class size is adaptive.
-
+        - If ``True``, per-class quota should be dynamically computed as
+        :math:`\lfloor\frac{\text{mem\_size}}{\text{n\_classes}}\rfloor`
+        - If ``False``, each class always keeps exactly ``mem_size_per_class`` exemplars.
         """
         return self.mem_size_per_class is None
 
     def size_per_class(self, target_num_classes: int) -> int:
+        """Calculate per-class quota, if given a target number of seen classes.
+
+        Args:
+            target_num_classes (int):
+                Target number of classes, to calculate the per-class quota for.
+
+        Returns:
+            int: Number of exemplars to keep per class for the target number of classes.
+        """
         if self.mem_size_per_class is not None:
             return self.mem_size_per_class
 
@@ -181,6 +203,18 @@ class BaseExemplarBuffer(DatasetDict):
     def make_dataset(
         self, keys: str | list[str] | None = None, transform_name: str | None = None
     ) -> "Dataset":
+        """Concatenate exemplar subsets into a single :class:`~datasets.Dataset`.
+
+        Args:
+            keys (str | list[str] | None, optional): Class-id string keys to
+                include. If ``None``, all stored classes are included.
+                (default: ``None``)
+            transform_name (str | None, optional): HuggingFace formatter name
+                to set on the returned dataset. (default: ``None``)
+
+        Returns:
+            Dataset: Concatenated dataset from the requested class subsets.
+        """
         if isinstance(keys, str):
             keys = [keys]
 
@@ -202,5 +236,19 @@ class BaseExemplarBuffer(DatasetDict):
         transform_name: str | None = None,
         loader_kwargs: dict | None = None,
     ) -> "DataLoader":
+        """Build a :class:`~torch.utils.data.DataLoader` over exemplar subsets.
+
+        Args:
+            keys (str | list[str] | None, optional): Class-id string keys to
+                include. If ``None``, all stored classes are used.
+                (default: ``None``)
+            transform_name (str | None, optional): HuggingFace formatter name
+                to apply. (default: ``None``)
+            loader_kwargs (dict | None, optional): Keyword arguments forwarded
+                to :class:`~torch.utils.data.DataLoader`. (default: ``None``)
+
+        Returns:
+            DataLoader: DataLoader over the selected exemplar subsets.
+        """
         dataset = self.make_dataset(keys=keys, transform_name=transform_name)
         return DataLoader(dataset, **(loader_kwargs or {}))  # ty: ignore[invalid-argument-type]

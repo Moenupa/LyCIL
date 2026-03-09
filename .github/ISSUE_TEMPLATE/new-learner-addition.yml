@@ -1,6 +1,6 @@
-name: "\U0001F31F New model addition"
-description: Submit a proposal/request to implement a new model
-labels: [ "New model" ]
+name: "\U0001F31F New learner addition"
+description: Submit a proposal/request to implement a new learner
+labels: [ "New learner" ]
 
 body:
   - type: textarea
@@ -8,18 +8,18 @@ body:
     validations:
       required: true
     attributes:
-      label: Model description
+      label: Learner description
       description: |
-        Put any and all important information relative to the model
+        Put any and all important information relative to the learner
 
   - type: checkboxes
     id: information-tasks
     attributes:
       label: Open source status
       description: |
-          Please note that if the model implementation isn't available, we are less likely to implement it in `LyCIL`.
+          Please note that if the learner implementation isn't available, we are less likely to implement it in `LyCIL`.
       options:
-        - label: "The model implementation is available"
+        - label: "The learner implementation is available"
 
   - type: textarea
     id: additional-info

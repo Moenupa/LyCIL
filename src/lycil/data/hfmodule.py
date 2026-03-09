@@ -25,6 +25,20 @@ def preprocess_for_cl(
     label2idx: dict[Any, int],
     idx2taskid: dict[int, int],
 ) -> dict[str, int]:
+    """Map a dataset sample's label to a CL class index and task ID.
+
+    Designed for use with :meth:`datasets.Dataset.map`.
+
+    Args:
+        sample (dict[str, Any]): A single dataset sample.
+        label_column_name (str): Column name containing the original label.
+        label2idx (dict[Any, int]): Mapping from original label to CL class index.
+        idx2taskid (dict[int, int]): Mapping from CL class index to task ID.
+
+    Returns:
+        dict[str, int]: Dict containing ``_Y_COLUMN_NAME`` (class index) and
+            ``_CLTASK_COLUMN_NAME`` (task ID) entries.
+    """
     class_idx = label2idx[sample[label_column_name]]
     task_id_belonged = idx2taskid[class_idx]
     return {
@@ -42,6 +56,40 @@ def filter_by_classid(sample: dict[str, Any], class_idx: int) -> bool:
 
 
 class HFDataModule(L.LightningDataModule):
+    """HuggingFace Datasets-backed data module for class-incremental learning.
+
+    Loads a dataset via :func:`~datasets.load_dataset`, partitions classes into
+    sequential CL tasks, remaps labels to contiguous zero-based indices, and
+    provides per-task dataloaders with optional exemplar buffer integration.
+
+    Args:
+        path (str): Dataset identifier passed to :func:`~datasets.load_dataset`.
+        dataset_kwargs (dict | None, optional): Extra keyword arguments forwarded
+            to :func:`~datasets.load_dataset`. (default: ``None``)
+        num_tasks (int | None, optional): Total number of CL tasks. Required when
+            ``num_classes_per_task`` is ``None``. (default: ``None``)
+        num_classes_per_task (int | list[int] | None, optional): Number of classes
+            per task as a scalar or per-task list. (default: ``None``)
+        label_column_name (str, optional): Column name for class labels in the raw
+            dataset. (default: ``"label"``)
+        label_map (dict[int, Any] | list[Any] | None, optional): Explicit mapping
+            from CL class index to original label. If ``None``, labels are shuffled
+            deterministically using the global seed. (default: ``None``)
+        transform_name (str | None, optional): Name of a registered image transform
+            set (e.g., ``"cifar10"``). (default: ``None``)
+        train_loader_kwargs (dict | None, optional): Keyword arguments for the
+            training :class:`~torch.utils.data.DataLoader`. (default: ``None``)
+        val_loader_kwargs (dict | None, optional): Keyword arguments for the
+            validation :class:`~torch.utils.data.DataLoader`. (default: ``None``)
+        test_loader_kwargs (dict | None, optional): Keyword arguments for the
+            test :class:`~torch.utils.data.DataLoader`. (default: ``None``)
+        split_map (SplitMapping | None, optional): Custom split-name mapping for
+            datasets that use non-standard split names. (default: ``None``)
+        buffer_kwargs (dict | None, optional): Keyword arguments forwarded to
+            :class:`~lycil.data.buffer.BaseExemplarBuffer`. If ``None``, no buffer
+            is created. (default: ``None``)
+    """
+
     _FORMAT_FALLBACK = "torch"
 
     def __init__(
@@ -98,16 +146,17 @@ class HFDataModule(L.LightningDataModule):
 
     @property
     def num_tasks(self) -> int:
+        """Total number of CL tasks derived from ``num_classes_per_task``."""
         return len(self.num_classes_per_task)
 
     @property
     def num_old_classes(self) -> int:
-        # cumulative sum of classes, < current task ID
+        """Cumulative number of classes, introduced < current task."""
         return sum(self.num_classes_per_task[: self._cur_task_id])
 
     @property
     def num_seen_classes(self) -> int:
-        # cumulative sum of classes, <= current task ID
+        """Cumulative number of classes, introduced <= current task."""
         return sum(self.num_classes_per_task[: self._cur_task_id + 1])
 
     def prepare_data(self):
@@ -188,21 +237,23 @@ class HFDataModule(L.LightningDataModule):
     def get_effective_transform_name(
         self, mode: Literal["train", "test"] = "train"
     ) -> str | None:
-        """Get transform settings's name in effect, under the given ``mode``.
+        """Return the active HuggingFace formatter name for the given mode.
 
-        A fallback is ``self._FORMAT_FALLBACK`` which defaults to 'torch',
-        which enables :class:``dataset.Dataset`` to return PyTorch tensors.
+        Falls back to ``self._FORMAT_FALLBACK`` (default ``"torch"``) when no
+        named transform set is configured, so that
+        :class:`~datasets.Dataset` always returns PyTorch tensors.
 
         Args:
-            mode (Literal["train", "test"], optional):
-                Use transform train or test. (default: "train")
-
-        Raises:
-            ValueError: If mode is not "train" or "test".
+            mode (Literal["train", "test"], optional): Whether to use the
+                training or test augmentation variant. (default: ``"train"``)
 
         Returns:
-            str | None: The format name to be used, or None if not set.
+            str | None: Formatter name to pass to
+                :meth:`~datasets.Dataset.set_format`, or ``None`` if no
+                fallback is configured.
 
+        Raises:
+            ValueError: If ``mode`` is not ``"train"`` or ``"test"``.
         """
         if mode not in {"train", "test"}:
             raise ValueError(
@@ -223,6 +274,21 @@ class HFDataModule(L.LightningDataModule):
         transform_name: str | None = None,
         use_buffer: bool = False,
     ) -> Dataset:
+        """Filter a dataset split and optionally merge with the exemplar buffer.
+
+        Args:
+            split (str): Dataset split name (e.g., ``"train"``).
+            filter_fn (Callable[[dict], bool]): Per-sample predicate; samples
+                for which it returns ``False`` are excluded.
+            transform_name (str | None, optional): HuggingFace formatter name
+                to set on the returned dataset. (default: ``None``)
+            use_buffer (bool, optional): If ``True`` and a non-empty buffer
+                exists, its exemplars are concatenated to the filtered subset.
+                (default: ``False``)
+
+        Returns:
+            Dataset: Filtered (and optionally buffer-augmented) dataset.
+        """
         subset = self.dataset[split].filter(filter_fn)
         if transform_name is not None:
             subset.set_format(transform_name)
@@ -239,6 +305,21 @@ class HFDataModule(L.LightningDataModule):
         loader_kwargs: dict,
         use_buffer: bool = False,
     ) -> DataLoader:
+        """Build a DataLoader from a filtered split with optional buffer mixing.
+
+        Args:
+            split (str): Dataset split name (e.g., ``"train"``).
+            filter_fn (Callable[[dict], bool]): Per-sample filter predicate.
+            transform_name (str | None): HuggingFace formatter name to apply.
+            loader_kwargs (dict): Keyword arguments forwarded to
+                :class:`~torch.utils.data.DataLoader`.
+            use_buffer (bool, optional): If ``True`` and a non-empty buffer
+                exists, its exemplars are appended to the split.
+                (default: ``False``)
+
+        Returns:
+            DataLoader: DataLoader over the filtered split.
+        """
         subset = self.get_filtered_dataset(
             split=split,
             filter_fn=filter_fn,
