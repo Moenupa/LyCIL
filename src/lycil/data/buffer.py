@@ -1,5 +1,5 @@
 import copy
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional,Callable
 
 import torch
 from datasets import Dataset, DatasetDict, concatenate_datasets
@@ -9,8 +9,8 @@ from torch.nn import functional as F
 from ..constants import _X_COLUMN_NAME
 from .transform import apply_dataset_transform
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+# if TYPE_CHECKING:
+#     from collections.abc import Callable
 
 
 @torch.no_grad()
