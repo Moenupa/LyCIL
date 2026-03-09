@@ -67,7 +67,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
                 "type": "sgd",
                 "lr": 0.1,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
-                "weight_decay": 2e-4,
+                "weight_decay": 5e-4,
             },
             0: {
                 "type": "sgd",
@@ -79,10 +79,9 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "linear_warmup_cosine_annealing",
-                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-                "max_epochs": EPOCHS_PER_TASK,
-            }
+                "type": "cosine_annealing",
+                "T_max": EPOCHS_PER_TASK,
+            },
         },
         lambda_ewc=1000,
         fisher_max=0.0001,
