@@ -262,24 +262,30 @@ class BaseLearner(L.LightningModule):
             case _:
                 raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
 
+
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
 
-        # a waterfall lookup for optimizer/scheduler kwargs:
-        # per-task specific > default (-1) > empty dict
+        # Select stage-specific key for optimizer/scheduler configs.
+
+        # Waterfall lookup: stage_key -> default -> {}
         optim_kwargs = (
-            self.per_task_optim_args.get(self.task_id)
-            or self.per_task_optim_args.get(-1)
-            or {}
+                self.per_task_optim_args.get(self.task_id)
+                or self.per_task_optim_args.get("default")
+                or {}
         )
         sched_kwargs = (
-            self.per_task_sched_args.get(self.task_id)
-            or self.per_task_sched_args.get(-1)
-            or {}
+                self.per_task_sched_args.get(self.task_id)
+                or self.per_task_sched_args.get("default")
+                or {}
         )
-        optim = self._get_optimizer(params, **optim_kwargs)
-        sched = self._get_scheduler(optim, **sched_kwargs)
 
+        optim = self._get_optimizer(params, **optim_kwargs)
+        # If sched_kwargs is None (or explicitly disabled), return optimizer only
+        if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+            return optim
+
+        sched = self._get_scheduler(optim, **sched_kwargs)
         return {
             "optimizer": optim,
             "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
