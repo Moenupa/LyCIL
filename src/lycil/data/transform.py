@@ -12,6 +12,9 @@ _CIFAR10_STD = (0.2470, 0.2435, 0.2616)
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
 
+_IMAGENET1K_MEAN = (0.485, 0.456, 0.406)
+_IMAGENET1K_STD = (0.229, 0.224, 0.225)
+
 
 def get_transforms(name: str) -> tuple["Callable", "Callable"]:
     """Return train and test transforms for a named dataset preset.
@@ -27,12 +30,13 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
     Raises:
         ValueError: If ``name`` is not a recognized preset.
     """
-    match name:
+    match name.lower():
         case "cifar10":
             train_tf = T.Compose(
                 [
                     T.RandomCrop(32, padding=4),
                     T.RandomHorizontalFlip(),
+                    T.ColorJitter(brightness=63 / 255),
                     T.ToTensor(),
                     T.Normalize(_CIFAR10_MEAN, _CIFAR10_STD),
                 ]
@@ -49,6 +53,7 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
                 [
                     T.RandomCrop(32, padding=4),
                     T.RandomHorizontalFlip(),
+                    T.ColorJitter(brightness=63 / 255),
                     T.ToTensor(),
                     T.Normalize(_CIFAR100_MEAN, _CIFAR100_STD),
                 ]
@@ -60,8 +65,68 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
                 ]
             )
             return train_tf, test_tf
+        case "imagenet-1k" | "imagenet1k" | "imagenet" | "ilsvrc2012":
+            train_tf = T.Compose(
+                [
+                    T.RandomResizedCrop(224),
+                    T.RandomHorizontalFlip(),
+                    T.ColorJitter(brightness=63 / 255),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            test_tf = T.Compose(
+                [
+                    T.Resize(256),
+                    T.CenterCrop(224),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            return train_tf, test_tf
+        case "imagenet-100" | "imagenet100":
+            train_tf = T.Compose(
+                [
+                    T.RandomResizedCrop(224),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            test_tf = T.Compose(
+                [
+                    T.Resize(256),
+                    T.CenterCrop(224),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            return train_tf, test_tf
+        case "tiny-imagenet" | "tiny-imagenet-200" | "tinyimagenet" | "tinyimagenet200":
+            train_tf = T.Compose(
+                [
+                    T.RandomResizedCrop(64),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            test_tf = T.Compose(
+                [
+                    T.Resize(64),
+                    T.CenterCrop(64),
+                    T.ToTensor(),
+                    T.Normalize(_IMAGENET1K_MEAN, _IMAGENET1K_STD),
+                ]
+            )
+            return train_tf, test_tf
         case _:
-            raise ValueError(f"Unknown transform name: {name}")
+            _support_msg = (
+                "We support most common datasets and aliases to our best effort,"
+                + "but you may have a custom dataset or a uncommon alias."
+                + "Consider raising an issue https://github.com/Moenupa/LyCIL/issues."
+            )
+            raise ValueError(f"Unknown dataset/transform: {name}. {_support_msg}")
 
 
 def register_tf_as_formatter(name: str) -> None:
