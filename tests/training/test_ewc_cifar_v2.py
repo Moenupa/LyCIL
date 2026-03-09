@@ -98,7 +98,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"ewc_cifar100_task{task_idx}",
+                name=f"hparms_from_pod_ewc_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["ewc", "cifar100"],
