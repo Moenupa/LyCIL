@@ -130,6 +130,7 @@ class HFDataModule(L.LightningDataModule):
         )
         self.use_buffer: bool = True
         self.buffer_only_new = False
+        self.train_filter_fn: Callable[[dict], bool] | None = None
 
         self._cur_task_id: int = 0
         self.dataset: DatasetDict
@@ -316,7 +317,7 @@ class HFDataModule(L.LightningDataModule):
     def train_dataloader(self):
         return self.get_dataloader(
             split=self._split_train,
-            filter_fn=self.is_label_in_cur_task,
+            filter_fn=self.train_filter_fn or self.is_label_in_cur_task,
             transform=self.get_effective_transform("train"),
             loader_kwargs=self.train_loader_kwargs,
             use_buffer=self.use_buffer,
