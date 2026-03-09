@@ -27,10 +27,6 @@ class OffsetWandbLogger(WandbLogger):
         return super().log_metrics(metrics, step=step)
 
 
-# def should_use_distill(task_idx: int, use_buffer: bool) -> bool:
-#     # 典型逻辑：非首任务、且不是 memory/buffer 阶段才 distill
-#     return (task_idx > 0) and (not use_buffer)
-
 def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     # task 0: 没有 buffer 阶段，主训练结束后直接 snapshot
     if task_idx == 0:
@@ -53,7 +49,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK = 10
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
     if not osp.exists(DATAPATH):
@@ -139,7 +135,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_ft_allfc_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"adpmem_nopretrain_sgd_momentum_v2_160_t_test_herding_select_buffer_ft_all_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"adpmem_nopretrain_sgd_momentum_v2_10_t_test_herding_select_buffer_ft_all_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
