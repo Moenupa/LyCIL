@@ -124,7 +124,7 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
             _support_msg = (
                 "We support most common datasets and aliases to our best effort,"
                 + "but you may have a custom dataset or a uncommon alias."
-                + "Consider raising an issue https://github.com/Moenupa/LyCIL/issues."
+                + "Consider raising an issue https://github.com/Moenupa/LyCIL/issues/new?template=new-data-addition.yml."
             )
             raise ValueError(f"Unknown dataset/transform: {name}. {_support_msg}")
 
