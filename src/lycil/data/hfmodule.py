@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
 from .buffer import BaseExemplarBuffer
-from .transform import register_tf_as_formatter
+from .transform import apply_dataset_transform, get_transform
 from .util import (
     SplitMapping,
     check_bijection,
@@ -20,10 +20,10 @@ from .util import (
 
 
 def preprocess_for_cl(
-    sample: dict[str, Any],
-    label_column_name: str,
-    label2idx: dict[Any, int],
-    idx2taskid: dict[int, int],
+        sample: dict[str, Any],
+        label_column_name: str,
+        label2idx: dict[Any, int],
+        idx2taskid: dict[int, int],
 ) -> dict[str, int]:
     """Map a dataset sample's label to a CL class index and task ID.
 
@@ -89,49 +89,37 @@ class HFDataModule(L.LightningDataModule):
             :class:`~lycil.data.buffer.BaseExemplarBuffer`. If ``None``, no buffer
             is created. (default: ``None``)
     """
-
     _FORMAT_FALLBACK = "torch"
 
     def __init__(
-        self,
-        path: str,
-        *,
-        dataset_kwargs: dict | None = None,
-        num_tasks: int | None = None,
-        num_classes_per_task: int | list[int] | None = None,
-        label_column_name: str = "label",
-        label_map: dict[int, Any] | list[Any] | None = None,
-        transform_name: str | None = None,
-        # DataLoader kwargs
-        train_loader_kwargs: dict | None = None,
-        val_loader_kwargs: dict | None = None,
-        test_loader_kwargs: dict | None = None,
-        # train/val/test map in case some dataset uses different split names
-        split_map: SplitMapping | None = None,
-        buffer_kwargs: dict | None = None,
+            self,
+            path: str,
+            dataset_kwargs: dict | None = None,
+            num_tasks: int | None = None,
+            num_classes_per_task: int | list[int] | None = None,
+            label_column_name: str = "label",
+            label_map: dict[int, Any] | list[Any] | None = None,
+            transform_name: str | None = None,
+            train_loader_kwargs: dict | None = None,
+            val_loader_kwargs: dict | None = None,
+            test_loader_kwargs: dict | None = None,
+            split_map: dict | None = None,
+            buffer_kwargs: dict | None = None,
     ):
         super().__init__()
-
-        # load_dataset(path, **self.load_kwargs)
         self.path = path
         self.load_kwargs: dict = dataset_kwargs or {}
-
-        # key mapping for customization, e.g.,
-        # {"train": "your_custom_split_for_train", ...}
-        self.split_map: SplitMapping = split_map or SplitMapping()
+        self.split_map: dict = split_map or SplitMapping()
         self.label_map: dict[int, Any] | list[Any] | None = label_map
 
-        # task config, lazy init
         self.num_classes_per_task: list[int]
         self._num_tasks = num_tasks
         self._num_classes_per_task = num_classes_per_task
-
         self.label_column_name = label_column_name
-        # custom stage; fallback to lazy init in self.setup()
 
+        # Keep the external config as a name/alias, but resolve it to a callable
+        # when building datasets/dataloaders.
         self.transform_name = transform_name
-        if transform_name is not None:
-            register_tf_as_formatter(transform_name)
 
         self.train_loader_kwargs = train_loader_kwargs or {}
         self.val_loader_kwargs = val_loader_kwargs or {}
@@ -140,9 +128,18 @@ class HFDataModule(L.LightningDataModule):
         self.buffer: BaseExemplarBuffer | None = (
             BaseExemplarBuffer(**buffer_kwargs) if buffer_kwargs is not None else None
         )
+        self.use_buffer: bool = True
+        self.buffer_only_new = False
 
         self._cur_task_id: int = 0
         self.dataset: DatasetDict
+
+        # --- cache for eval subsets (indices) ---
+        self._idx_cache: dict[tuple[str, int, str], list[int]] = {}  # (split, j, mode)->indices
+        self._val_loader_names: list[str] = []
+        self._test_loader_names: list[str] = []
+
+
 
     @property
     def num_tasks(self) -> int:
@@ -160,7 +157,7 @@ class HFDataModule(L.LightningDataModule):
         return sum(self.num_classes_per_task[: self._cur_task_id + 1])
 
     def prepare_data(self):
-        load_dataset(self.path)
+        load_dataset("cifar100", cache_dir=self.path)
 
     def setup(self, stage: str | None = None):
         self.dataset: DatasetDict = load_dataset(self.path, **self.load_kwargs)
@@ -224,131 +221,156 @@ class HFDataModule(L.LightningDataModule):
 
     @property
     def _split_train(self) -> str:
-        return get_or_identity(self.split_map, "train")  # ty: ignore[invalid-argument-type]
+        return get_or_identity(self.split_map, "train")
 
     @property
     def _split_val(self) -> str:
-        return get_or_identity(self.split_map, "val")  # ty: ignore[invalid-argument-type]
+        return get_or_identity(self.split_map, "val")
 
     @property
     def _split_test(self) -> str:
-        return get_or_identity(self.split_map, "test")  # ty: ignore[invalid-argument-type]
+        return get_or_identity(self.split_map, "test")
 
-    def get_effective_transform_name(
-        self, mode: Literal["train", "test"] = "train"
-    ) -> str | None:
-        """Return the active HuggingFace formatter name for the given mode.
-
-        Falls back to ``self._FORMAT_FALLBACK`` (default ``"torch"``) when no
-        named transform set is configured, so that
-        :class:`~datasets.Dataset` always returns PyTorch tensors.
+    def get_effective_transform(
+            self, mode: Literal["train", "test"] = "train"
+    ) -> Callable | None:
+        """Return the active transform for the given mode.
 
         Args:
-            mode (Literal["train", "test"], optional): Whether to use the
-                training or test augmentation variant. (default: ``"train"``)
+            mode (Literal["train", "test"], optional): Transform mode to use.
+                Defaults to ``"train"``.
 
         Returns:
-            str | None: Formatter name to pass to
-                :meth:`~datasets.Dataset.set_format`, or ``None`` if no
-                fallback is configured.
+            Callable | None: The transform for the given mode, or ``None`` if no
+            transform is configured.
 
         Raises:
             ValueError: If ``mode`` is not ``"train"`` or ``"test"``.
         """
         if mode not in {"train", "test"}:
-            raise ValueError(
-                f"Format/Transform: expect mode in 'train' or 'test', got {mode}."
-            )
+            raise ValueError(f"expect mode in 'train'/'test', got {mode}")
+        if self.transform_name is None:
+            return None
+        return get_transform(self.transform_name, mode)
 
-        if self.transform_name is not None:
-            return f"{self.transform_name}_{mode}"
-        elif self._FORMAT_FALLBACK is not None:
-            return self._FORMAT_FALLBACK
-
-        return None
+    # ---------- train filter (kept as-is) ----------
 
     def get_filtered_dataset(
-        self,
-        split: str,
-        filter_fn: Callable[[dict], bool],
-        transform_name: str | None = None,
-        use_buffer: bool = False,
+            self,
+            split: str,
+            filter_fn: Callable[[dict], bool],
+            transform: Callable | None = None,
+            use_buffer: bool = False,
+            buffer_only_new: bool = False,
     ) -> Dataset:
-        """Filter a dataset split and optionally merge with the exemplar buffer.
-
-        Args:
-            split (str): Dataset split name (e.g., ``"train"``).
-            filter_fn (Callable[[dict], bool]): Per-sample predicate; samples
-                for which it returns ``False`` are excluded.
-            transform_name (str | None, optional): HuggingFace formatter name
-                to set on the returned dataset. (default: ``None``)
-            use_buffer (bool, optional): If ``True`` and a non-empty buffer
-                exists, its exemplars are concatenated to the filtered subset.
-                (default: ``False``)
-
-        Returns:
-            Dataset: Filtered (and optionally buffer-augmented) dataset.
-        """
         subset = self.dataset[split].filter(filter_fn)
-        if transform_name is not None:
-            subset.set_format(transform_name)
+        subset.reset_format()
         if use_buffer and self.buffer is not None and len(self.buffer) > 0:
-            buffer_dset = self.buffer.make_dataset(transform_name=transform_name)
-            subset = concatenate_datasets([subset, buffer_dset])
+            if buffer_only_new:
+                buffer_set = self.buffer.make_dataset(
+                    keys=[str(i) for i in range(self.num_old_classes, self.num_seen_classes)]
+                )
+            else:
+                buffer_set = self.buffer.make_dataset()
+            buffer_set.reset_format()
+            subset = concatenate_datasets([subset, buffer_set])
+        apply_dataset_transform(subset, transform=transform)
         return subset
 
     def get_dataloader(
-        self,
-        split: str,
-        filter_fn: Callable[[dict], bool],
-        transform_name: str | None,
-        loader_kwargs: dict,
-        use_buffer: bool = False,
+            self,
+            split: str,
+            filter_fn: Callable[[dict], bool],
+            transform: Callable | None,
+            loader_kwargs: dict,
+            use_buffer: bool = False,
+            buffer_only_new: bool = False,
     ) -> DataLoader:
-        """Build a DataLoader from a filtered split with optional buffer mixing.
+        """Build a dataloader from a filtered split with optional buffer mixing.
 
         Args:
-            split (str): Dataset split name (e.g., ``"train"``).
-            filter_fn (Callable[[dict], bool]): Per-sample filter predicate.
-            transform_name (str | None): HuggingFace formatter name to apply.
-            loader_kwargs (dict): Keyword arguments forwarded to
+            split (str): Dataset split name.
+            filter_fn (Callable[[dict], bool]): Filter applied to each sample.
+            transform (Callable | None): Transform applied to samples.
+            loader_kwargs (dict): Extra arguments for
                 :class:`~torch.utils.data.DataLoader`.
-            use_buffer (bool, optional): If ``True`` and a non-empty buffer
-                exists, its exemplars are appended to the split.
-                (default: ``False``)
+            use_buffer (bool, optional): Whether to append buffer exemplars.
+                Defaults to ``False``.
+            buffer_only_new (bool, optional): Whether to use only new exemplars
+                from the buffer when ``use_buffer`` is enabled. Defaults to
+                ``False``.
 
         Returns:
-            DataLoader: DataLoader over the filtered split.
+            DataLoader: Dataloader over the selected data.
         """
         subset = self.get_filtered_dataset(
             split=split,
             filter_fn=filter_fn,
-            transform_name=transform_name,
+            transform=transform,
             use_buffer=use_buffer,
+            buffer_only_new=buffer_only_new,
         )
-        return DataLoader(subset, **loader_kwargs)  # ty: ignore[invalid-argument-type]
+        return DataLoader(subset, **loader_kwargs)
 
     def train_dataloader(self):
         return self.get_dataloader(
             split=self._split_train,
             filter_fn=self.is_label_in_cur_task,
-            transform_name=self.get_effective_transform_name("train"),
+            transform=self.get_effective_transform("train"),
             loader_kwargs=self.train_loader_kwargs,
-            use_buffer=True,
+            use_buffer=self.use_buffer,
+            buffer_only_new=self.buffer_only_new,
         )
+
+    # ---------- eval helpers (cached) ----------
+    def _eval_indices(self, split: str, j: int, mode: Literal["cum", "inc"]) -> list[int]:
+        key = (split, j, mode)
+        if key in self._idx_cache:
+            return self._idx_cache[key]
+
+        dset = self.dataset[split]
+        if mode == "cum":
+            # 0..j
+            idx = [k for k, t in enumerate(dset[_CLTASK_COLUMN_NAME]) if t <= j]
+        else:
+            # only j
+            idx = [k for k, t in enumerate(dset[_CLTASK_COLUMN_NAME]) if t == j]
+
+        self._idx_cache[key] = idx
+        return idx
+
+    def _eval_subset(
+            self,
+            split: str,
+            j: int,
+            mode: Literal["cum", "inc"],
+            transform: Callable | None,
+    ) -> Dataset:
+        idx = self._eval_indices(split, j, mode)
+        subset = self.dataset[split].select(idx)
+        apply_dataset_transform(subset, transform=transform)
+        return subset
+
+    def _make_eval_loaders(self, split: str, loader_kwargs: dict):
+        transform = self.get_effective_transform("test")
+        loaders, names = [], []
+        for j in range(self._cur_task_id + 1):
+            loaders.append(
+                DataLoader(self._eval_subset(split, j, "cum", transform), **loader_kwargs)
+            )
+            names.append(f"cum/task{j}")
+            loaders.append(
+                DataLoader(self._eval_subset(split, j, "inc", transform), **loader_kwargs)
+            )
+            names.append(f"inc/task{j}")
+        return loaders, names
 
     def val_dataloader(self):
-        return self.get_dataloader(
-            split=self._split_val,
-            filter_fn=self.is_label_in_seen_task,
-            transform_name=self.get_effective_transform_name("test"),
-            loader_kwargs=self.val_loader_kwargs,
-        )
+        loaders, names = self._make_eval_loaders(self._split_val, self.val_loader_kwargs)
+        self._val_loader_names = names
+        return loaders
 
     def test_dataloader(self):
-        return self.get_dataloader(
-            split=self._split_test,
-            filter_fn=self.is_label_in_seen_task,
-            transform_name=self.get_effective_transform_name("test"),
-            loader_kwargs=self.test_loader_kwargs,
-        )
+        loaders, names = self._make_eval_loaders(self._split_test, self.test_loader_kwargs)
+        self._test_loader_names = names
+        return loaders
