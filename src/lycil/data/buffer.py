@@ -13,9 +13,9 @@ from .transform import apply_dataset_transform
 
 @torch.no_grad()
 def compute_nme(
-    dataloader: "DataLoader",
-    feature_extractor: "Callable[[torch.Tensor], torch.Tensor]",
-    device: "torch.device",
+    dataloader: DataLoader,
+    feature_extractor: Callable[[torch.Tensor], torch.Tensor],
+    device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     r"""Compute the normalized mean feature vector for a given dataloader.
 
