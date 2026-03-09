@@ -7,6 +7,7 @@ import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.podnet import PODNet
+from lycil.backbone import ConvNetArgs
 
 BUFFER_SIZE_PER_CLASS = 20
 
@@ -73,11 +74,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         buffer_kwargs={"mem_size": total_buffer_size},
     )
     model = PODNet(
-        backbone_args={
-            "name": "resnet50",
-            "pretrained": USE_PRETRAIN_WEIGHTS,
-            "cifar": True,
-        },
+        backbone_args=ConvNetArgs(name="resnet50", pretrained=True, cifar=True),
         head="cosine",
         per_task_optim_args={
             # for buffer training, small learning rate
