@@ -10,7 +10,7 @@ from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.ucir import UCIR
 
-from .constants import (
+from tests.training.constants import (
     CIFAR10_LABEL_COL,
     CIFAR10_PATH,
     CIFAR100_LABEL_COL,
