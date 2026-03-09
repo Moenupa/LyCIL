@@ -16,6 +16,21 @@ def harmonize_keyname(
     _from: str = ".",
     _to: str = "-",
 ) -> str:
+    """Substitute a substring in a parameter name for safe :class:`~torch.nn.ParameterDict` storage.
+
+    PyTorch does not allow ``"."`` in ``ParameterDict`` keys, so parameter
+    names must have dots replaced before storage.
+
+    Args:
+        key (str): Parameter name string to transform.
+        inverse (bool, optional): If ``True``, perform the reverse substitution
+            (``_to`` → ``_from``). (default: ``False``)
+        _from (str, optional): Substring to replace. (default: ``"."``)
+        _to (str, optional): Replacement substring. (default: ``"-"``)
+
+    Returns:
+        str: Transformed key string.
+    """
     # pytorch restricts the use of "." in parameter names
     # we replace it with "-" when storing in the fisher_dict and mean_dict
     if inverse:
@@ -78,6 +93,18 @@ class EWC(BaseLearner):
         return loss
 
     def harmonize_named_parameters(self, *args, **kwargs):
+        """Yield ``(harmonized_name, param)`` pairs, excluding EWC statistic buffers.
+
+        Wraps :meth:`named_parameters` to:
+
+        - Skip parameters inside ``fisher_dict`` and ``mean_dict``, preventing
+          recursive inclusion when accumulating Fisher statistics.
+        - Replace ``"."`` with ``"-"`` in names for safe storage in
+          :class:`~torch.nn.ParameterDict`.
+
+        Yields:
+            tuple[str, torch.nn.Parameter]: Harmonized name and parameter tensor.
+        """
         for n, p in self.named_parameters(*args, **kwargs):
             # prevent recursive inclusion of fisher_dict and mean_dict
             if "fisher_dict." in n or "mean_dict." in n:
@@ -86,6 +113,14 @@ class EWC(BaseLearner):
             yield harmonize_keyname(n), p
 
     def compute_ewc_loss(self) -> torch.Tensor:
+        r"""Compute the quadratic EWC penalty for parameters appearing in ``fisher_dict``.
+
+        Per parameter, accumulates :math:`\frac{1}{2} F_i (\theta_i - \theta^*_i)^2`
+        where :math:`F_i` is the Fisher diagonal and :math:`\theta^*_i` is the stored post-task mean.
+
+        Returns:
+            torch.Tensor: Scalar EWC penalty loss.
+        """
         loss_ewc = torch.tensor(0.0, device=self.device)
         for n, p in self.harmonize_named_parameters():
             # Only consider parameters that were present in the previous task
@@ -100,11 +135,25 @@ class EWC(BaseLearner):
         return loss_ewc
 
     def on_train_end(self) -> None:
+        """Refresh Fisher and parameter-mean statistics after training."""
         dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
         self.update_fisher_and_mean(dm)
 
     @torch.no_grad()
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
+        """Estimate diagonal Fisher information and store current parameter means.
+
+        Accumulates squared gradients over one full pass of the training
+        dataloader as a diagonal Fisher approximation, then normalizes and
+        clips by ``fisher_max``.
+        If a previous Fisher estimate already exists,
+        blends it with the new one using a class-count-weighted average.
+
+        Updates ``self.fisher_dict`` and ``self.mean_dict`` in place.
+
+        Args:
+            dm (HFDataModule): Data module providing the training dataloader.
+        """
         new_fisher = {
             n: torch.zeros_like(p, device=self.device)
             for n, p in self.harmonize_named_parameters()

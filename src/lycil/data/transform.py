@@ -14,14 +14,18 @@ _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
 
 
 def get_transforms(name: str) -> tuple["Callable", "Callable"]:
-    """Get train and test transforms according to common alias ``name``.
+    """Return train and test transforms for a named dataset preset.
 
-    Raises:
-        ValueError: Unknown ``name``
+    Args:
+        name (str): Transform preset name. Supported values: ``"cifar10"``,
+            ``"cifar100"``.
 
     Returns:
-        tuple[T.Compose, T.Compose]: train_transform, test_transform
+        tuple[Callable, Callable]: ``(train_transform, test_transform)`` pair of
+            :class:`~torchvision.transforms.Compose` objects.
 
+    Raises:
+        ValueError: If ``name`` is not a recognized preset.
     """
     match name:
         case "cifar10":
@@ -61,14 +65,16 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
 
 
 def register_tf_as_formatter(name: str) -> None:
-    """Register custom formatter with transforms for the given ``name``.
+    """Register HuggingFace dataset formatters for train and test transforms.
 
-    Raises:
-        ValueError: Unknown ``name``
+    Creates two named formatters, ``"{name}_train"`` and ``"{name}_test"``,
+    by calling :func:`_register_custom_formatter` for each transform variant.
 
     Args:
-        name (str): Name of the transform set to register.
+        name (str): Transform preset name (e.g., ``"cifar10"``).
 
+    Raises:
+        ValueError: If ``name`` is not a recognized transform preset.
     """
     train_tf, test_tf = get_transforms(name)
 
@@ -81,26 +87,30 @@ def _register_custom_formatter(
     name: str,
     aliases: list[str] | None = None,
 ):
-    """Register a custom formatter that applies the given transform `transform` before converting PIL images to torch tensors.
+    """Register a HuggingFace dataset formatter that applies a PIL transform.
+
+    The registered formatter intercepts PIL images before they are converted to
+    tensors and applies ``transform`` in-place, then falls back to the standard
+    :class:`~datasets.formatting.TorchFormatter` for all other value types.
 
     Args:
-        transform (Callable[[PIL.Image.Image], torch.Tensor]): A transform function that takes a
-            PIL Image and returns a torch Tensor. E.g.,
-            ```py
-            import torchvision.transforms as T
+        transform (Callable[[PIL.Image.Image], torch.Tensor]): Transform applied
+            to each PIL image before tensor conversion. Example::
 
-            transform = T.Compose(
-                [
-                    T.RandomCrop(32, padding=4),
-                    T.RandomHorizontalFlip(),
-                    T.ToTensor(),
-                    T.Normalize(_CIFAR10_MEAN, _CIFAR10_STD),
-                ]
-            )
-            ```
-        name (str): Name of the formatter to register.
-        aliases (list[str] | None, optional): Extra aliases for the formatter. (default: None)
+                import torchvision.transforms as T
 
+                transform = T.Compose(
+                    [
+                        T.RandomCrop(32, padding=4),
+                        T.RandomHorizontalFlip(),
+                        T.ToTensor(),
+                        T.Normalize(mean, std),
+                    ]
+                )
+
+        name (str): Formatter name used with :meth:`~datasets.Dataset.set_format`.
+        aliases (list[str] | None, optional): Additional aliases for the same
+            formatter. (default: ``None``)
     """
 
     # injects the transform into the formatter

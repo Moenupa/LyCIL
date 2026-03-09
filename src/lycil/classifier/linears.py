@@ -15,6 +15,21 @@ class FactoryKwargs(TypedDict):
 
 
 class SimpleLinear(nn.Linear):
+    """Linear classification head returning outputs as a dict.
+
+    A thin wrapper around :class:`torch.nn.Linear` whose :meth:`forward`
+    returns ``{"logits": ...}`` for API compatibility with other classifier
+    heads in this library.
+
+    Args:
+        in_features (int): Size of each input sample.
+        out_features (int): Number of output classes.
+        bias (bool, optional): If ``False``, the layer has no additive bias.
+            (default: ``True``)
+        device: Device for parameter allocation.
+        dtype: Data type for parameter allocation.
+    """
+
     def __init__(
         self,
         in_features: int,
@@ -58,7 +73,24 @@ class SimpleLinear(nn.Linear):
 
 
 class CosineLinear(nn.Module):
-    """Cosine Linear layer with proxy support."""
+    """Cosine similarity-based classification head with optional proxy support.
+
+    Computes normalized dot products between L2-normalized input features and
+    weight vectors. Supports multiple proxy vectors per class (reduced via
+    :func:`reduce_proxies`) and an optional learnable scale parameter ``sigma``.
+
+    Args:
+        in_features (int): Size of each input feature vector.
+        out_features (int): Number of output classes.
+        num_proxy (int, optional): Number of proxy vectors per class.
+            (default: ``1``)
+        to_reduce (bool, optional): If ``True``, apply :func:`reduce_proxies`
+            in :meth:`forward`. (default: ``False``)
+        learn_scale (bool, optional): If ``True``, add a learnable scalar
+            ``sigma`` that multiplies the output logits. (default: ``True``)
+        device: Device for parameter allocation.
+        dtype: Data type for parameter allocation.
+    """
 
     def __init__(
         self,
@@ -109,7 +141,23 @@ class CosineLinear(nn.Module):
 
 
 class SplitCosineLinear(nn.Module):
-    """Split Cosine Linear layer for incremental learning."""
+    """Cosine head split into frozen old-class and trainable new-class sub-heads.
+
+    Used in incremental learning to keep old-class weights fixed while training
+    new ones. :meth:`forward` returns per-group cosine scores and their
+    concatenation, all scaled by a single learnable ``sigma``.
+
+    Args:
+        in_features (int): Size of each input feature vector.
+        old_out_features (int): Number of old (already-seen) classes.
+        new_out_features (int): Number of new classes added in the current task.
+        num_proxy (int, optional): Number of proxy vectors per class.
+            (default: ``1``)
+        learn_scale (bool, optional): If ``True``, add a learnable scalar
+            ``sigma`` shared across both sub-heads. (default: ``True``)
+        device: Device for parameter allocation.
+        dtype: Data type for parameter allocation.
+    """
 
     def __init__(
         self,

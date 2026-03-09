@@ -5,11 +5,13 @@ from .basenet import BaseBackbone, ConvNetArgs, get_convnet
 
 
 class ResNetBackbone(BaseBackbone):
-    """ResNet backbone returning pooled features and intermediates for POD.
+    """ResNet backbone returning pooled features and intermediates outputs.
 
-    Contains a single convnet, initialized by
-    - ``forward_layerwise(x)`` returns keys {"l1", "l2", "l3", "l4", "features}
-    - ``out_dim`` returns single
+    - Contains a single convnet, initialized by ``args``,
+    - ``forward_layerwise(x)`` returns keys {"l1", "l2", "l3", "l4", "features"}.
+
+    Args:
+        args (ConvNetArgs): Arguments specifying the convnet architecture and options.
     """
 
     def __init__(self, convnet_args: ConvNetArgs):

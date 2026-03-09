@@ -71,4 +71,5 @@ class ICaRL(BaseLearner):
         return loss
 
     def on_train_end(self):
+        """Update exemplar memory when finishing task training."""
         self.update_memory(self.trainer.datamodule)  # ty: ignore[unresolved-attribute]
