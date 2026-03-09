@@ -9,8 +9,6 @@ from lycil.data.hfmodule import HFDataModule
 from lycil.learner.podnet import PODNet
 from lycil.backbone import ConvNetArgs
 
-BUFFER_SIZE_PER_CLASS = 20
-
 
 class OffsetWandbLogger(WandbLogger):
     def __init__(self, step_offset: int = 0, epoch_offset: int = 0, **kwargs):
@@ -46,13 +44,15 @@ def test_podnet_cifar100(is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
         EPOCHS_PER_TASK_MEMORY = 1
         USE_PRETRAIN_WEIGHTS = False
+        BUFFER_SIZE_PER_CLASS = 20
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 10
+        EPOCHS_PER_TASK = 160
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
+        BUFFER_SIZE_PER_CLASS = 20
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
@@ -93,21 +93,11 @@ def test_podnet_cifar100(is_dummy_training: bool):
             },
         },
         per_task_sched_args={
-            # for all tasks, use the same scheduler kwargs
-            # "default": {
-            #     "type": "linear_warmup_cosine_annealing",
-            #     "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-            #     "max_epochs": EPOCHS_PER_TASK,
-            # },
             "default": {
                 "type": "cosine_annealing",
                 "T_max": EPOCHS_PER_TASK,
             },
             "buffer": {
-                # "type":None # No scheduler during buffer training
-                # "type": "linear_warmup_cosine_annealing",
-                # "warmup_epochs": 5,
-                # "max_epochs": EPOCHS_PER_TASK_MEMORY,
                 "type": "cosine_annealing",
                 "T_max": EPOCHS_PER_TASK_MEMORY,
             },
@@ -132,7 +122,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_ft_allfc_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"adpmem_nopretrain_sgd_momentum_v2_10_t_test_herding_select_buffer_ft_all_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"main_adpmem_nopretrain_sgd_momentum_160_t_test_herding_select_buffer_ft_all_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -146,7 +136,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
             precision="16-mixed",
             logger=logger1,
             check_val_every_n_epoch=1,
-            # log_every_n_steps=10,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer1.fit(model, datamodule=dm)
@@ -156,11 +145,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.buffer_training = True
             model.need_snapshot_old = True
 
-            # use data from buffer only, do not use training data
-            # if hasattr(model.classifier, "old_head") and model.classifier.old_head is not None:
-            #     model.classifier.old_head.requires_grad_(True)
-            # if hasattr(model.classifier, "new_head") and model.classifier.new_head is not None:
-            #     model.classifier.new_head.requires_grad_(False)
             #
 
             # model.backbone.eval()
@@ -189,7 +173,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 precision="16-mixed",
                 logger=logger2,
                 check_val_every_n_epoch=1,
-                # log_every_n_steps=10,
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
             trainer2.fit(model, datamodule=dm)
