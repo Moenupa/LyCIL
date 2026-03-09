@@ -93,7 +93,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
             enable_checkpointing=False,
-            enable_progress_bar=False,
+            enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
                 name=f"ucir_cifar100_task{task_idx}",
