@@ -1,11 +1,14 @@
 import copy
+from tqdm import tqdm
 from abc import abstractmethod
 from functools import partial
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Optional
 
 import lightning as L
 import torch
+import torch.nn.functional as F
 from torch.optim import lr_scheduler
+
 
 from ..backbone import BaseBackbone, ConvNetArgs, ResNetBackbone
 from ..classifier import expand_head, make_head
@@ -25,30 +28,30 @@ if TYPE_CHECKING:
 class BaseLearner(L.LightningModule):
     r"""Base class providing backbone, classifier head, optimizer, and memory helpers.
 
-    Subclasses must implement:
+        Subclasses must implement:
 
-    - :meth:`training_step` — define the per-batch loss.
-    - :meth:`on_train_end` — triggered after each task's training loop; override
-      to call :meth:`update_memory` for replay-based methods. The default
-      implementation does nothing (no memory update).
+        - :meth:`training_step` — define the per-batch loss.
+        - :meth:`on_train_end` — triggered after each task's training loop; override
+          to call :meth:`update_memory` for replay-based methods. The default
+          implementation does nothing (no memory update).
 
-    Args:
-        backbone_cls (type[BaseBackbone], optional): Backbone class to
-            instantiate. (default: :class:`~lycil.backbone.ResNetBackbone`)
-        backbone_args (ConvNetArgs | None, optional): Arguments forwarded to
-            ``backbone_cls``. Uses :class:`~lycil.backbone.ConvNetArgs` defaults
-            if ``None``. (default: ``None``)
-        head (Literal["linear", "cosine"], optional): Classifier head type.
-            (default: ``"linear"``)
-        data_column_translate (dict[str, str] | None, optional): Column name
-            remapping applied when reading batches. (default: ``None``)
-        per_task_optim_args (dict[int, dict] | None, optional): Per-task
-            optimizer keyword arguments keyed by task ID. Use ``-1`` as a
-            fallback key. (default: ``None``)
-        per_task_sched_args (dict[int, dict] | None, optional): Per-task
-            scheduler keyword arguments keyed by task ID. Use ``-1`` as a
-            fallback key. (default: ``None``)
-    """
+        Args:
+            backbone_cls (type[BaseBackbone], optional): Backbone class to
+                instantiate. (default: :class:`~lycil.backbone.ResNetBackbone`)
+            backbone_args (ConvNetArgs | None, optional): Arguments forwarded to
+                ``backbone_cls``. Uses :class:`~lycil.backbone.ConvNetArgs` defaults
+                if ``None``. (default: ``None``)
+            head (Literal["linear", "cosine"], optional): Classifier head type.
+                (default: ``"linear"``)
+            data_column_translate (dict[str, str] | None, optional): Column name
+                remapping applied when reading batches. (default: ``None``)
+            per_task_optim_args (dict[int, dict] | None, optional): Per-task
+                optimizer keyword arguments keyed by task ID. Use ``-1`` as a
+                fallback key. (default: ``None``)
+            per_task_sched_args (dict[int, dict] | None, optional): Per-task
+                scheduler keyword arguments keyed by task ID. Use ``-1`` as a
+                fallback key. (default: ``None``)
+        """
 
     def __init__(
         self,
@@ -71,9 +74,9 @@ class BaseLearner(L.LightningModule):
         self._old_self: BaseLearner | None = None
 
         # lazy init by `set_task_id()` to sync with data module
-        self.task_id: int = None  # ty: ignore[invalid-assignment]
-        self.num_old_classes: int = None  # ty: ignore[invalid-assignment]
-        self.num_seen_classes: int = None  # ty: ignore[invalid-assignment]
+        self.task_id: int = None
+        self.num_old_classes: int = None
+        self.num_seen_classes: int = None
 
         self.data_column_translate: dict[str, str] = data_column_translate or {}
         # kwargs for optimizer/scheduler per task_id
@@ -110,7 +113,7 @@ class BaseLearner(L.LightningModule):
         """
         dm_task_id = dm.get_current_task()
         if self.task_id is not None and dm_task_id == self.task_id:
-            # in sync, no update needed
+            # in sync, no update
             return
         if self.task_id is not None and self.task_id < 0:
             # a special bypass rule for multi-stage training per task,
@@ -124,13 +127,13 @@ class BaseLearner(L.LightningModule):
 
         incoming_expansion = dm.num_seen_classes - (self.num_seen_classes or 0)
         if incoming_expansion <= 0:
-            # task id increased, but no new classes, likely manually set var bugs
             raise RuntimeError(
                 f"Expect an incoming expansion, got {incoming_expansion} new classes. "
                 + f"Data has {dm.num_seen_classes} seen classes, "
                 + f"but Model has {self.num_seen_classes} seen classes. "
                 + "Ensure that `sync_with_datamodule()` is called after datamodule updates."
             )
+
         self.expand_head(incoming_expansion)
 
         self.num_old_classes = self.num_seen_classes or 0
@@ -159,6 +162,7 @@ class BaseLearner(L.LightningModule):
             x = x.to(device)
             y = y.to(device)
         return x, y
+
 
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
@@ -327,36 +331,41 @@ class BaseLearner(L.LightningModule):
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
-    def validation_step(self, batch, batch_idx: int) -> None:
+    def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
-        self.log_dict(
-            {
-                f"val/acc1/task{self.task_id}": acc1,
-                f"val/acc5/task{self.task_id}": acc5,
-            },
+
+        dm = self.trainer.datamodule  # HFDataModule
+        name = getattr(dm, "_val_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            name=f"val_{suffix}",
+            value=acc1,
             prog_bar=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
 
-    def test_step(self, batch, batch_idx: int) -> None:
+    def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
-        self.log_dict(
-            {
-                f"test/acc1/task{self.task_id}": acc1,
-                f"test/acc5/task{self.task_id}": acc5,
-            },
+
+        dm = self.trainer.datamodule
+        name = getattr(dm, "_test_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            name=f"test_{suffix}",
+            value=acc1,
             prog_bar=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
-
     @torch.no_grad()
-    def update_memory(self, dm: "HFDataModule", **kwargs) -> None:
+    def update_memory(self, dm: HFDataModule, **kwargs) -> None:
         """Update datamodule's exemplar memory (i.e., iCaRL).
 
         To be opted-in after training of each task, e.g. in ``on_train_end()``.
@@ -371,13 +380,14 @@ class BaseLearner(L.LightningModule):
         if dm.buffer is None:
             raise RuntimeError("Buffer is not initialized.")
 
+        per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
+
         self.eval()
         if dm.buffer.is_adaptive:
-            # vacate exemplars for more classes
-            dm.buffer.reduce_exemplars(dm.buffer.size_per_class(self.num_seen_classes))
-            self._construct_exemplar(dm, **kwargs)
-        else:
-            self._construct_exemplar_unified(dm, **kwargs)
+            # Adaptive memory: reuse the full global budget on the currently
+            # seen classes, then shrink old classes as new ones arrive.
+            dm.buffer.reduce_exemplars(per_class_quota)
+        self._construct_exemplar_unified(dm, per_class_quota=per_class_quota, **kwargs, )
         self.train()
         return
 
@@ -398,89 +408,172 @@ class BaseLearner(L.LightningModule):
             pass
 
     @torch.no_grad()
-    def _construct_exemplar_unified(self, dm: "HFDataModule", **kwargs) -> None:
-        """Construct exemplars when memory size per class is fixed.
-
-        Args:
-            dm (HFDataModule): Data module to update, containing the buffer.
-            kwargs: Additional arguments for exemplar construction.
-
+    def _construct_exemplar_unified(self, dm: HFDataModule, **kwargs) -> None:
         """
-        # for dataloader during exemplar construction,
-        # rather conservative because args are hard-coded here
+        统一的 exemplar 构建实现。
+
+        同时支持两种 buffer 策略：
+        - 总内存自适应模式（`mem_size`）
+        - 固定每类样本数模式（`mem_size_per_class`）
+
+        调用约定：
+        - 自适应总内存模式下，应当在调用本函数前先把旧类 exemplar 裁剪到新的配额；
+        - 固定每类样本数模式下，可以直接调用本函数，对旧类重算 mean，并为新类构建 exemplar。
+        """
+        # exemplar 构建时使用的 dataloader 配置
+        # 这里固定不用 shuffle，避免 exemplar 选择过程不稳定
         loader_kwargs = dict(
-            batch_size=1,
+            batch_size=128,
             shuffle=False,
             num_workers=8,
         )
 
         assert dm.buffer is not None
+
+        # exemplar 选择策略，默认 herding
+        exemplar_selection = kwargs.get(
+            "exemplar_selection",
+            getattr(self, "exemplar_selection", "herding"),
+        )
+        # 随机选择时使用的随机种子
+        exemplar_seed = int(
+            kwargs.get(
+                "exemplar_seed",
+                getattr(self, "exemplar_seed", 42),
+            )
+        )
+        # 当前每个类别允许保留的 exemplar 数量
+        # 对于 mem_size 模式，这里会根据当前已见类别数动态计算
+        per_class_quota = int(
+            kwargs.get(
+                "per_class_quota",
+                dm.buffer.size_per_class(self.num_seen_classes),
+            )
+        )
+
+        # 统一使用 test transform 提特征，避免随机增强影响 exemplar 选择和类均值计算
+        feature_tfm = dm.get_effective_transform(mode="test")
+
+        if exemplar_selection not in {"random", "herding"}:
+            raise ValueError(
+                f"Unsupported exemplar_selection={exemplar_selection}, "
+                "expected one of {'random', 'herding'}."
+            )
+
         per_class_means = {}
 
-        # find means of old classes with newly trained network
+        # 1) 用最新网络重新计算旧类别的类中心
         for class_idx in range(self.num_old_classes):
+            if f"{class_idx}" not in dm.buffer:
+                continue
+            if len(dm.buffer[f"{class_idx}"]) == 0:
+                continue
+
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
+                transform=feature_tfm,
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
+            mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
+            per_class_means[class_idx] = mean.cpu()
 
-        # construct exemplar set for current classes
-        for class_idx in range(self.num_old_classes, self.num_seen_classes):
-            # 1. single pass on all data
-            train_loader = dm.get_dataloader(
-                split=dm._split_train,
-                filter_fn=partial(filter_by_classid, class_idx=class_idx),
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
-            )
-            mean, per_sample_features = compute_nme(
-                train_loader, self.feature_extractor, self.device
-            )
+        # 2) 先一次性筛出当前 task 的训练子集：
+        #    - raw 版本用于真正写入 buffer，必须保留原始 HF features/schema；
+        #    - feat 版本仅用于提特征做 herding。
+        task_train_dataset_raw = dm.get_filtered_dataset(
+            split=dm._split_train,
+            filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
+            transform=None,
+            use_buffer=False,
+        )
+        task_train_dataset_feat = dm.get_filtered_dataset(
+            split=dm._split_train,
+            filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
+            transform=feature_tfm,
+            use_buffer=False,
+        )
 
-            # 2. select exemplars by herding
-            # for now, use first m samples
-            m = dm.buffer.size_per_class(self.num_seen_classes)
-            selected_idx = list(range(0, m))
-            # TODO: implement full herding
-            # herding implementation from another library is below:
-            # selected_exemplars = []
-            # exemplar_vectors = []
-            # for k in range(1, m + 1):
-            #     S = np.sum(
-            #         exemplar_vectors, axis=0
-            #     )  # [feature_dim] sum of selected exemplars vectors
-            #     mu_p = (vectors + S) / k  # [n, feature_dim] sum to all vectors
-            #     i = np.argmin(np.sqrt(np.sum((class_mean - mu_p) ** 2, axis=1)))
+        # 3) 在当前 task 子集内，先建立 “类别 -> 样本索引列表” 的映射
+        #    这样后面每个类别直接 select 对应索引即可，不再重复 filter
+        class_to_indices = {class_idx: [] for class_idx in range(self.num_old_classes, self.num_seen_classes)}
+        task_labels = task_train_dataset_raw[_Y_COLUMN_NAME]
+        for sample_idx, y in enumerate(task_labels):
+            class_to_indices[int(y)].append(sample_idx)
 
-            #     selected_exemplars.append(
-            #         np.array(data[i])
-            #     )  # New object to avoid passing by inference
-            #     exemplar_vectors.append(
-            #         np.array(vectors[i])
-            #     )  # New object to avoid passing by inference
+        # 4) 为当前新类别构建 exemplar 集合
+        # for class_idx in range(self.num_old_classes, self.num_seen_classes):
+        for class_idx in tqdm(
+                range(self.num_old_classes, self.num_seen_classes),
+                desc=f"Building exemplars task {dm.get_current_task()}",
+        ):
+            class_indices = class_to_indices.get(class_idx, [])
+            if len(class_indices) == 0:
+                continue
 
-            #     vectors = np.delete(
-            #         vectors, i, axis=0
-            #     )  # Remove it to avoid duplicative selection
-            #     data = np.delete(
-            #         data, i, axis=0
-            #     )  # Remove it to avoid duplicative selection
-            selected_dataset = dm.get_filtered_dataset(
-                split=dm._split_train,
-                filter_fn=partial(filter_by_classid, class_idx=class_idx),
-            ).select(selected_idx)
+            # 从当前 task 子集中切出该类别的数据
+            class_dataset = task_train_dataset_raw.select(class_indices)
+            class_dataset_feat = task_train_dataset_feat.select(class_indices)
+
+            n_samples = len(class_dataset)
+            if n_samples == 0:
+                continue
+
+            # 当前类实际保留的样本数，不能超过该类真实样本数
+            m = min(per_class_quota, n_samples)
+
+            # 4.1 随机选择 exemplar
+            if exemplar_selection == "random":
+                g = torch.Generator()
+                g.manual_seed(exemplar_seed + int(class_idx))
+                selected_idx = torch.randperm(n_samples, generator=g)[:m].tolist()
+
+            # 4.2 herding 选择 exemplar
+            else:
+                # 直接在当前类别子集上做一次前向，提取特征
+                train_loader = torch.utils.data.DataLoader(class_dataset_feat, **loader_kwargs)
+                class_mean, per_sample_features = compute_nme(
+                    train_loader, self.feature_extractor, self.device
+                )
+
+                class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
+                feats = per_sample_features.cpu()
+
+                selected_idx = []
+                selected_mask = torch.zeros(n_samples, dtype=torch.bool)
+                running_sum = torch.zeros_like(class_mean)
+
+                # 按 herding 规则逐个选择，使 exemplar 均值尽量逼近类中心
+                for k in range(1, m + 1):
+                    candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
+                    candidate_feats = feats[candidate_idx]
+
+                    mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
+                    dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
+                    best_rel = torch.argmin(dist).item()
+                    best_abs = candidate_idx[best_rel].item()
+
+                    selected_idx.append(best_abs)
+                    selected_mask[best_abs] = True
+                    running_sum += feats[best_abs]
+
+            # 5) 将选中的 exemplar 写入 buffer
+            #    必须写入 raw dataset，避免把 transform/view 混进 buffer。
+            selected_dataset = class_dataset.select(selected_idx)
+            selected_dataset.reset_format()
             dm.buffer[f"{class_idx}"] = selected_dataset
 
-            # 3. recompute class mean after selection
+            # 6) 用选中的 exemplar 重新计算该类的类中心
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
+                transform=feature_tfm,
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
+            mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
+            per_class_means[class_idx] = mean.cpu()
 
+        # 保存所有类别的类中心，供 NME 推理使用
         dm.buffer.per_class_means = per_class_means
+
+        return
