@@ -1,7 +1,6 @@
 import copy
 from tqdm import tqdm
 from abc import abstractmethod
-from functools import partial
 from typing import TYPE_CHECKING, Literal, Optional
 
 import lightning as L
