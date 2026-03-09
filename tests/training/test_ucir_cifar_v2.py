@@ -9,6 +9,7 @@ import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.ucir import UCIR
+from lycil.backbone import ConvNetArgs
 
 from tests.training.constants import (
     CIFAR10_LABEL_COL,
@@ -60,7 +61,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
     model = UCIR(
-        backbone_args=CONVNET_ARGS[is_dummy_training],
+        backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="cosine",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
