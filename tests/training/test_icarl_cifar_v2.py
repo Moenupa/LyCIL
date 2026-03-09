@@ -66,7 +66,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         head="linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
-            -1: {
+            "default": {
                 "type": "sgd",
                 "lr": 0.3,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
@@ -75,7 +75,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            -1: {
+            "default": {
                 "type": "linear_warmup_cosine_annealing",
                 "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
                 "max_epochs": EPOCHS_PER_TASK,
