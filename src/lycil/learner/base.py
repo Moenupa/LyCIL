@@ -1,7 +1,7 @@
 import copy
 from tqdm import tqdm
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import Literal, Optional
 
 import lightning as L
 import torch
@@ -17,11 +17,10 @@ from ..data.hfmodule import filter_by_classid
 from ..metrics.accuracy import accuracy, accuracy_topk
 from ..scheduler import LinearWarmupCosineAnnealingLR
 
-if TYPE_CHECKING:
-    import torch.nn as nn
+import torch.nn as nn
 
-    from ..data.buffer import BaseExemplarBuffer
-    from ..data.hfmodule import HFDataModule
+from ..data.buffer import BaseExemplarBuffer
+from ..data.hfmodule import HFDataModule
 
 
 class BaseLearner(L.LightningModule):
