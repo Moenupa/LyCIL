@@ -183,7 +183,7 @@ class BaseExemplarBuffer(DatasetDict):
     def reduce_exemplars(
             self,
             per_class_quota: int,
-            trim_func: Optional[Callable[[Dataset, int], Dataset]] = None,
+            trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
     ) -> None:
         r"""Reduce exemplars, typically called after new classes arrive.
 
