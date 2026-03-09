@@ -5,6 +5,16 @@ from .basenet import BaseBackbone, ConvNetArgs, get_convnet
 
 
 class DERNetBackbone(BaseBackbone):
+    """DER-style backbone that concatenates features from task-specific convnets.
+
+    - Contains a bank of convnets, initialized by ``args``,
+    - Convnet load from the last convnet when a new task arrives,
+    - ``forward_layerwise(x)`` returns keys {"features"}.
+
+    Args:
+        args (ConvNetArgs): Arguments specifying the convnet architecture and options.
+    """
+
     def __init__(self, convnet_args: ConvNetArgs):
         super().__init__(convnet_args)
         self.convnets = nn.ModuleList()
@@ -33,6 +43,12 @@ class DERNetBackbone(BaseBackbone):
 
     @torch.no_grad()
     def prepare_for_new_task(self):
+        """Add a new task-specific convnet to the backbone's convnet bank.
+
+        A fresh convnet is created from ``self.convnet_args``. If the bank is
+        non-empty, the new network's weights are copied from the last convnet.
+        After this call, :attr:`out_dim` and :attr:`feature_dim` are valid.
+        """
         new_convnet, self.convnet_out_dim = get_convnet(self.convnet_args)
 
         if len(self.convnets) > 0:

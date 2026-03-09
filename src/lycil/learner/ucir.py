@@ -9,6 +9,31 @@ from .base import BaseLearner
 class UCIR(BaseLearner):
     r"""`UCIR`_: Learning a Unified Classifier Incrementally via Rebalancing. (Hou et al., CVPR 2019).
 
+    Requires a cosine classifier head (``head="cosine"``). Combines three loss
+    components per task:
+
+    - **Cross-entropy** on all seen classes.
+    - **Less-forgetting loss**: cosine embedding loss between current and
+      old-model feature vectors, weighted by :attr:`task_factor`.
+    - **Inter-class separation loss**: margin ranking loss pushing top-K new
+      class scores below the ground-truth old-class score, applied only to
+      samples from old classes.
+
+    Args:
+        lambda_lf (float, optional): Weight for the less-forgetting cosine
+            embedding loss. (default: ``10.0``)
+        K (int, optional): Number of hard negatives from new classes used in
+            the inter-class separation loss. (default: ``2``)
+        margin (float, optional): Margin for
+            :func:`~torch.nn.functional.margin_ranking_loss`.
+            (default: ``0.5``)
+        args: See :class:`BaseLearner` for additional positional arguments.
+        kwargs: See :class:`BaseLearner` for additional keyword arguments.
+            Must include ``head="cosine"``.
+
+    Raises:
+        ValueError: If ``head`` is not set to ``"cosine"``.
+
     .. _UCIR:
         http://openaccess.thecvf.com/content_CVPR_2019/html/Hou_Learning_a_Unified_Classifier_Incrementally_via_Rebalancing_CVPR_2019_paper.html
     """
@@ -32,6 +57,12 @@ class UCIR(BaseLearner):
 
     @property
     def task_factor(self) -> float:
+        r"""Task-dependent scale for the less-forgetting loss.
+
+        - ``0.0`` for the first task (no forgetting to guard against), otherwise
+        - Computed as :math:`\sqrt{n_{seen} / n_{new}}` where :math:`n_{new}`
+        is the number of classes added in the current task.
+        """
         if self.task_id == 0:
             return 0.0
 
@@ -99,4 +130,5 @@ class UCIR(BaseLearner):
         return loss
 
     def on_train_end(self):
+        """Update exemplar memory when finishing task training."""
         self.update_memory(self.trainer.datamodule)  # ty: ignore[unresolved-attribute]

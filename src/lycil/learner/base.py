@@ -23,25 +23,31 @@ if TYPE_CHECKING:
 
 
 class BaseLearner(L.LightningModule):
-    r"""Base class providing backbone, optimizer, and memory helpers.
+    r"""Base class providing backbone, classifier head, optimizer, and memory helpers.
 
     Subclasses must implement:
-      - ``training_step()`` with appropriate losses
-      - ``on_train_end()`` for replaying history tasks, or other strategies.
-        By default, memory updates are disabled.
+
+    - :meth:`training_step` — define the per-batch loss.
+    - :meth:`on_train_end` — triggered after each task's training loop; override
+      to call :meth:`update_memory` for replay-based methods. The default
+      implementation does nothing (no memory update).
 
     Args:
-        backbone_args (dict, optional):
-            Args to init backbone. (default: None)
-        head (Literal[linear, cosine], optional):
-            Head type. (default: "linear")
-        data_column_translate (dict[str, str], optional):
-            Data column mapping that translate to Lycil-recogizable column
-            names. (default: None)
-        per_task_optim_args (dict[int, dict], optional):
-            Per-task optimizer arguments. (default: None)
-        per_task_sched_args (dict[int, dict], optional):
-            Per-task scheduler arguments. (default: None)
+        backbone_cls (type[BaseBackbone], optional): Backbone class to
+            instantiate. (default: :class:`~lycil.backbone.ResNetBackbone`)
+        backbone_args (ConvNetArgs | None, optional): Arguments forwarded to
+            ``backbone_cls``. Uses :class:`~lycil.backbone.ConvNetArgs` defaults
+            if ``None``. (default: ``None``)
+        head (Literal["linear", "cosine"], optional): Classifier head type.
+            (default: ``"linear"``)
+        data_column_translate (dict[str, str] | None, optional): Column name
+            remapping applied when reading batches. (default: ``None``)
+        per_task_optim_args (dict[int, dict] | None, optional): Per-task
+            optimizer keyword arguments keyed by task ID. Use ``-1`` as a
+            fallback key. (default: ``None``)
+        per_task_sched_args (dict[int, dict] | None, optional): Per-task
+            scheduler keyword arguments keyed by task ID. Use ``-1`` as a
+            fallback key. (default: ``None``)
     """
 
     def __init__(
@@ -78,19 +84,29 @@ class BaseLearner(L.LightningModule):
 
     @property
     def feature_dim(self) -> int:
+        """Expose backbone feature dimension used by classifier heads."""
         return self.backbone.feature_dim
 
     def set_task_id(self, task_id: int):
         self.task_id = task_id
 
     def sync_with_datamodule(self, dm: "HFDataModule"):
-        """Synchronizes task states with datamodule.
+        """Synchronize task state and expand the classifier head to match the data module.
 
-        - Updates ``task_id`` from datamodule's current task.
-        - If datamodule is newer, updates ``num_old_classes`` and ``num_seen_classes``.
+        Reads the current task ID and class counts from ``dm`` and, when the data
+        module has advanced to a new task, expands the classifier head by the
+        appropriate number of new classes.
+
+        A negative ``task_id`` acts as a bypass: head expansion is skipped,
+        which is useful for multi-stage per-task training (e.g., first stage
+        without buffer, second stage with buffer).
 
         Args:
-            dm (HFDataModule): Data module to sync with.
+            dm (HFDataModule): Data module to sync from.
+
+        Raises:
+            RuntimeError: If the data module reports more seen classes than
+                expected, indicating a call-order bug.
         """
         dm_task_id = dm.get_current_task()
         if self.task_id is not None and dm_task_id == self.task_id:
@@ -125,6 +141,18 @@ class BaseLearner(L.LightningModule):
         batch: dict[str, torch.Tensor],
         device: torch.device | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Extract the input tensor and label tensor from a batch dict.
+
+        Args:
+            batch (dict[str, torch.Tensor]): Batch dict from a dataloader,
+                keyed by internal column names.
+            device (torch.device | None, optional): If provided, moves both
+                tensors to this device before returning. (default: ``None``)
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: ``(x, y)`` — input images and
+                integer class labels.
+        """
         x = batch[_X_COLUMN_NAME]
         y = batch[_Y_COLUMN_NAME]
         if device is not None:
@@ -134,6 +162,15 @@ class BaseLearner(L.LightningModule):
 
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
+        """Initialize or expand the classifier head to accommodate new classes.
+
+        On the first call (when ``self.classifier`` is ``None``), creates a
+        fresh head with ``num_new`` outputs. On subsequent calls, delegates to
+        :func:`~lycil.classifier.expand_head` to grow the existing head.
+
+        Args:
+            num_new (int): Number of new output classes to add.
+        """
         if self.classifier is None:
             self.classifier = make_head(
                 self.feature_dim, num_new, head_type=self.head_type
@@ -151,10 +188,41 @@ class BaseLearner(L.LightningModule):
 
     @torch.no_grad()
     def forward_no_grad(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass without tracking gradients. Useful for memory updates."""
+        """Run forward pass without gradient tracking.
+
+        Convenience wrapper used when computing distillation targets or
+        exemplar statistics from a frozen model snapshot.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape
+                ``(batch_size, channels, height, width)``.
+
+        Returns:
+            torch.Tensor: Logit tensor of shape ``(batch_size, num_seen_classes)``.
+        """
         return self.forward(x)
 
     def forward_layerwise(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        """Run a full forward pass and return backbone intermediates plus classifier outputs.
+
+        Merges the dict returned by
+        :meth:`~lycil.backbone.BaseBackbone.forward_layerwise` with the dict
+        returned by the classifier head, so the result contains both feature
+        maps and logits under a single namespace.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape
+                ``(batch_size, channels, height, width)``.
+
+        Returns:
+            dict[str, torch.Tensor]: Combined dict with backbone intermediate
+                keys (e.g., ``"l1"``–``"l4"``, ``"features"``) and classifier
+                outputs (e.g., ``"logits"``).
+
+        Raises:
+            RuntimeError: If the classifier head has not been initialized yet.
+                Call :meth:`expand_head` before the first forward pass.
+        """
         if self.classifier is None:
             raise RuntimeError(
                 "Classifier head is not initialized. Call expand_head before training."
@@ -217,7 +285,12 @@ class BaseLearner(L.LightningModule):
 
     @torch.no_grad()
     def snapshot_old(self):
-        """Keep a frozen copy of the current model."""
+        """Store a frozen deep copy of the current model as the old-task reference.
+
+        The snapshot is set to eval mode and all its parameters have
+        ``requires_grad=False``. Called automatically by :meth:`on_fit_end`
+        after each task.
+        """
         # prevent recursive copies
         self._old_self = None
 
@@ -228,7 +301,14 @@ class BaseLearner(L.LightningModule):
 
     @property
     def old_self(self) -> "BaseLearner":
-        """Returns a frozen copy of the old model. Call `snapshot_old()` to update the snapshot."""
+        """Frozen snapshot of the model after the previous task.
+
+        Updated by :meth:`snapshot_old` (called automatically in
+        :meth:`on_fit_end`). Useful for knowledge-distillation losses.
+
+        Raises:
+            RuntimeError: If :meth:`snapshot_old` has not been called yet.
+        """
         if self._old_self is None:
             raise RuntimeError(
                 "No old model snapshot stored. Call `snapshot_old()` first."
@@ -303,6 +383,13 @@ class BaseLearner(L.LightningModule):
 
     @torch.no_grad()
     def _construct_exemplar(self, dm: "HFDataModule", **kwargs) -> None:
+        """Construct class exemplars for adaptive-memory strategies.
+
+        Args:
+            dm (HFDataModule): Data module to update, containing the buffer.
+            kwargs: Additional arguments for exemplar construction.
+
+        """
         raise NotImplementedError
 
         assert dm.buffer is not None
@@ -312,6 +399,13 @@ class BaseLearner(L.LightningModule):
 
     @torch.no_grad()
     def _construct_exemplar_unified(self, dm: "HFDataModule", **kwargs) -> None:
+        """Construct exemplars when memory size per class is fixed.
+
+        Args:
+            dm (HFDataModule): Data module to update, containing the buffer.
+            kwargs: Additional arguments for exemplar construction.
+
+        """
         # for dataloader during exemplar construction,
         # rather conservative because args are hard-coded here
         loader_kwargs = dict(
