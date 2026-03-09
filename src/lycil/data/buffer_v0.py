@@ -4,10 +4,8 @@ from typing import TYPE_CHECKING, Optional
 import torch
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from torch.utils.data import DataLoader
-from torch.nn import functional as F
 
 from ..constants import _X_COLUMN_NAME
-from .transform import apply_dataset_transform
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -37,6 +35,7 @@ def compute_nme(
             - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features).
 
     """
+    from torch.nn import functional as F
 
     feature_list = []
     for batch in dataloader:
@@ -59,28 +58,28 @@ def compute_nme(
 class BaseExemplarBuffer(DatasetDict):
     r"""Fixed-size per-class exemplar buffer backed by a :class:`~datasets.DatasetDict`.
 
-       Supports two memory management modes:
+    Supports two memory management modes:
 
-       - **Adaptive** (``mem_size`` given): total budget is fixed; per-class quota
-         shrinks as new classes arrive via
-         :math:`\lfloor mem\_size / n\_classes\_seen \rfloor`.
-       - **Fixed** (``mem_size_per_class`` given): each class always stores the same
-         number of exemplars regardless of the number of tasks seen.
+    - **Adaptive** (``mem_size`` given): total budget is fixed; per-class quota
+      shrinks as new classes arrive via
+      :math:`\lfloor mem\_size / n\_classes\_seen \rfloor`.
+    - **Fixed** (``mem_size_per_class`` given): each class always stores the same
+      number of exemplars regardless of the number of tasks seen.
 
-       Exactly one of ``mem_size`` or ``mem_size_per_class`` must be provided.
+    Exactly one of ``mem_size`` or ``mem_size_per_class`` must be provided.
 
-       Args:
-           mem_size (int | None, optional): Total exemplar budget across all classes.
-               Mutually exclusive with ``mem_size_per_class``. (default: ``None``)
-           mem_size_per_class (int | None, optional): Fixed per-class exemplar quota.
-               Mutually exclusive with ``mem_size``. (default: ``None``)
-           args: Positional arguments forwarded to :class:`~datasets.DatasetDict`.
-           kwargs: Keyword arguments forwarded to :class:`~datasets.DatasetDict`.
+    Args:
+        mem_size (int | None, optional): Total exemplar budget across all classes.
+            Mutually exclusive with ``mem_size_per_class``. (default: ``None``)
+        mem_size_per_class (int | None, optional): Fixed per-class exemplar quota.
+            Mutually exclusive with ``mem_size``. (default: ``None``)
+        args: Positional arguments forwarded to :class:`~datasets.DatasetDict`.
+        kwargs: Keyword arguments forwarded to :class:`~datasets.DatasetDict`.
 
-       Raises:
-           ValueError: If neither or both of ``mem_size`` / ``mem_size_per_class`` are
-               provided, or if the supplied value is not a positive integer.
-       """
+    Raises:
+        ValueError: If neither or both of ``mem_size`` / ``mem_size_per_class`` are
+            provided, or if the supplied value is not a positive integer.
+    """
 
     @classmethod
     def from_dataset_dict(
@@ -88,8 +87,7 @@ class BaseExemplarBuffer(DatasetDict):
         dataset_dict: DatasetDict,
         mem_size: int = 2000,
     ) -> "BaseExemplarBuffer":
-        r"""
-        Create a BaseExemplarBuffer instance from an existing DatasetDict.
+        r"""Create a BaseExemplarBuffer instance from an existing DatasetDict.
 
         Args:
             dataset_dict (DatasetDict): The source DatasetDict.
@@ -97,6 +95,7 @@ class BaseExemplarBuffer(DatasetDict):
 
         Returns:
             BaseExemplarBuffer: A new instance of BaseExemplarBuffer.
+
         """
         buffer = cls(mem_size=mem_size)
         for key, dataset in dataset_dict.items():
@@ -145,12 +144,11 @@ class BaseExemplarBuffer(DatasetDict):
 
     @property
     def is_adaptive(self) -> bool:
-        """Whether to allow adaptive per-class size.
-        If adaptive: per-class size is computed as `mem_size // num_classes`.
-        E.g., if given total=200, per-class size is 20 at 10 classes, 10 at 20 classes, etc.
+        r"""Whether the buffer uses an adaptive (total-budget) memory policy.
 
-        Returns:
-            bool: True if per-class size is adaptive.
+        - If ``True``, per-class quota should be dynamically computed as
+        :math:`\lfloor\frac{\text{mem\_size}}{\text{n\_classes}}\rfloor`
+        - If ``False``, each class always keeps exactly ``mem_size_per_class`` exemplars.
         """
         return self.mem_size_per_class is None
 
@@ -168,10 +166,6 @@ class BaseExemplarBuffer(DatasetDict):
             return self.mem_size_per_class
 
         # otherwise, adaptive because mem_size must not be None
-        # Example: if final target is 100 classes and we want 20 exemplars/class
-        # at convergence, set mem_size=2000. Then task 0 with 20 seen classes gets
-        # 2000 // 20 = 100 exemplars/class, and later tasks will shrink this quota
-        # as more classes are introduced.
         assert self.mem_size is not None
         if not isinstance(target_num_classes, int) or target_num_classes <= 0:
             raise ValueError("`target_num_classes` must be a positive integer.")
@@ -181,9 +175,9 @@ class BaseExemplarBuffer(DatasetDict):
         return self.mem_size // target_num_classes
 
     def reduce_exemplars(
-            self,
-            per_class_quota: int,
-            trim_func: Optional[Callable[[Dataset, int], Dataset]] = None,
+        self,
+        per_class_quota: int,
+        trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
     ) -> None:
         r"""Reduce exemplars, typically called after new classes arrive.
 
@@ -195,30 +189,19 @@ class BaseExemplarBuffer(DatasetDict):
 
         """
         trim_func = trim_func or (
-            lambda dataset, q: dataset if len(dataset) <= q else dataset.select(range(q))
+            # fallback: get first `quota` samples -> data[:quota]
+            lambda dataset, q: dataset if len(dataset) <= q else dataset[:q]
         )
 
         for _class_id, _data in self.items():
-            base = _data if isinstance(_data, Dataset) else Dataset.from_dict(_data)
-            trimmed = trim_func(base, per_class_quota)
-
-            if not isinstance(trimmed, Dataset):
-                raise TypeError(
-                    "trim_func must return a `datasets.Dataset` to preserve features."
-                )
-
-            trimmed.reset_format()
-            self[_class_id] = trimmed
-
+            self[_class_id] = trim_func(_data, per_class_quota)
             if len(self[_class_id]) > per_class_quota:
                 raise ValueError(
                     f"trim_func returned more than {per_class_quota} exemplars."
                 )
 
     def make_dataset(
-        self,
-        keys: str | list[str] | None = None,
-        transform: Callable | None = None,
+        self, keys: str | list[str] | None = None, transform_name: str | None = None
     ) -> "Dataset":
         """Concatenate exemplar subsets into a single :class:`~datasets.Dataset`.
 
@@ -226,7 +209,8 @@ class BaseExemplarBuffer(DatasetDict):
             keys (str | list[str] | None, optional): Class-id string keys to
                 include. If ``None``, all stored classes are included.
                 (default: ``None``)
-            transform (Callable | None, optional): Transform applied to samples.
+            transform_name (str | None, optional): HuggingFace formatter name
+                to set on the returned dataset. (default: ``None``)
 
         Returns:
             Dataset: Concatenated dataset from the requested class subsets.
@@ -234,34 +218,37 @@ class BaseExemplarBuffer(DatasetDict):
         if isinstance(keys, str):
             keys = [keys]
 
-        subsets = []
-        for k, v in self.items():
-            if keys is None or k in keys:
-                ds = v if isinstance(v, Dataset) else Dataset.from_dict(v)
-                ds.reset_format()
-                subsets.append(ds)
+        # collect subsets by filter and concatenate
+        subsets: list[Dataset] = [
+            v if isinstance(v, Dataset) else Dataset.from_dict(v)
+            for k, v in self.items()
+            if keys is None or k in keys
+        ]
         ret = concatenate_datasets(subsets)
 
-        apply_dataset_transform(ret, transform=transform)
+        if transform_name is not None:
+            ret.set_format(transform_name)
         return ret
 
     def get_dataloader(
-            self,
-            keys: str | list[str] | None = None,
-            transform: Callable | None = None,
-            loader_kwargs: dict | None = None,
-    ) -> DataLoader:
+        self,
+        keys: str | list[str] | None = None,
+        transform_name: str | None = None,
+        loader_kwargs: dict | None = None,
+    ) -> "DataLoader":
         """Build a :class:`~torch.utils.data.DataLoader` over exemplar subsets.
 
         Args:
-            keys (str | list[str] | None, optional): Selected class keys. If
-                ``None``, use all classes.
-            transform (Callable | None, optional): Transform applied to samples.
-            loader_kwargs (dict | None, optional): Extra arguments for
-                :class:`~torch.utils.data.DataLoader`.
+            keys (str | list[str] | None, optional): Class-id string keys to
+                include. If ``None``, all stored classes are used.
+                (default: ``None``)
+            transform_name (str | None, optional): HuggingFace formatter name
+                to apply. (default: ``None``)
+            loader_kwargs (dict | None, optional): Keyword arguments forwarded
+                to :class:`~torch.utils.data.DataLoader`. (default: ``None``)
 
         Returns:
-            DataLoader: Dataloader for the selected subsets.
+            DataLoader: DataLoader over the selected exemplar subsets.
         """
-        dataset = self.make_dataset(keys=keys, transform=transform)
-        return DataLoader(dataset, **(loader_kwargs or {}))
+        dataset = self.make_dataset(keys=keys, transform_name=transform_name)
+        return DataLoader(dataset, **(loader_kwargs or {}))  # ty: ignore[invalid-argument-type]
