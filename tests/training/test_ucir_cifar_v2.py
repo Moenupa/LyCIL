@@ -21,7 +21,7 @@ from tests.training.constants import (
     VAL_LOADER_KWARGS,
 )
 
-BUFFER_SIZE_PER_CLASS = 20
+
 
 
 @pytest.mark.slow
