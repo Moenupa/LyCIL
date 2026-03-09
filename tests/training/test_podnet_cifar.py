@@ -53,6 +53,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
+        PRETRAIN_WEIGHTS = False
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
@@ -74,7 +75,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         buffer_kwargs={"mem_size": total_buffer_size},
     )
     model = PODNet(
-        backbone_args=ConvNetArgs(name="resnet50", pretrained=True, cifar=True),
+        backbone_args=ConvNetArgs(name="resnet50", pretrained=PRETRAIN_WEIGHTS, cifar=True),
         head="cosine",
         per_task_optim_args={
             # for buffer training, small learning rate
@@ -82,13 +83,13 @@ def test_podnet_cifar100(is_dummy_training: bool):
             "default": {
                 "type": "sgd",
                 "lr": 0.1,
-                "momentum": 0.9,
+                "momentum": 0 if PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
             "buffer": {
                 "type": "sgd",
                 "lr": 0.005,
-                "momentum": 0.9,
+                "momentum": 0 if PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
         },
