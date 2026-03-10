@@ -139,7 +139,7 @@ def log_acc_to_wandb(trainer, statistics_summary):
     ]
 
     for metric_prefix, acc_key, acc_title, fg_key, fg_title in metric_configs:
-        # 1) 你原来的 acc（对角线）
+        # 1) 每个阶段的 last acc（对角线）
         acc_data = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
@@ -172,6 +172,8 @@ def log_acc_to_wandb(trainer, statistics_summary):
                     title=fg_title,
                 )
             })
+
+
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 def test_podnet_cifar100(is_dummy_training: bool):
