@@ -33,6 +33,34 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     # task 1+: 只在 buffer 微调阶段结束后 snapshot
     return use_buffer
 
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
+
+@rank_zero_only
+def log_acc_to_wandb(trainer, final_test_outputs):
+    data = sorted(
+        [
+            [round(float(v) * 100, 2), int(k.split("task")[-1]) + 1]
+            for out in final_test_outputs
+            for k, v in out.items()
+            if k.startswith("test_cum/task")
+        ],
+        key=lambda x: x[1],
+    )
+
+    table = wandb.Table(
+        data=data,
+        columns=["acc", "task"],
+    )
+
+    trainer.logger.experiment.log({
+        "statistics/acc": wandb.plot.line(
+            table=table,
+            x="task",
+            y="acc",
+            title="Final Acc Cum",
+        )
+    })
+
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
@@ -123,22 +151,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
         }
     )
 
-    from lightning.pytorch.utilities.rank_zero import rank_zero_only
-
-    @rank_zero_only
-    def log_acc_to_wandb(logger, final_test_outputs):
-        exp = logger.experiment
-        exp.define_metric("task")
-        exp.define_metric("statistics/acc", step_metric="task")
-
-        for out in final_test_outputs:
-            for k, v in out.items():
-                if k.startswith("test_cum/task"):
-                    task_idx = int(k.split("task")[-1])
-                    exp.log({
-                        "task": task_idx,
-                        "statistics/acc": round(float(v) * 100, 2),
-                    })
 
 
 
@@ -220,7 +232,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             ckpt_path=None,
         )
 
-        log_acc_to_wandb(final_trainer.logger, final_test_outputs)
+        log_acc_to_wandb(final_trainer, final_test_outputs)
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
