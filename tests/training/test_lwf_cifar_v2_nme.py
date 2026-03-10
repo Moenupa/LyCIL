@@ -109,7 +109,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
             },
         },
         distill_T=1.0,
-        distill_lambda=0.1,
+        distill_lambda=1.0,
         buffer_args={
             "selection": "herding",
             "seed": 42,
@@ -123,7 +123,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
-                "every_n_epochs": 10,  # 新增：每隔多少个 epoch 做一次 val nme
+                "every_n_epochs": 200,  # 新增：每隔多少个 epoch 做一次 val nme
             },
         },
     )
@@ -140,7 +140,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"nme_warmup_hparms_wd_5e4_lwf_cifar100_task{task_idx}",
+                name=f"lambda1.0_nme_warmup_hparms_wd_5e4_lwf_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["lwf", "cifar100"],
