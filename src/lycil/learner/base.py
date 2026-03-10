@@ -647,6 +647,7 @@ class BaseLearner(L.LightningModule):
             dm: HFDataModule,
             include_new_tmp: bool,
     ) -> tuple[torch.Tensor, torch.Tensor] | None:
+        import pdb;pdb.set_trace()
         if dm.buffer is None:
             return None
 
