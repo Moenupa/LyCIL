@@ -38,16 +38,13 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
 
 
 
-
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
     for metric_prefix, log_key, title in [
         ("test_cum", "statistics/acc", "Final Acc"),
         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
     ]:
-        long_data = []
-        task_row = ["task"]
-        acc_row = ["acc"]
+        data_i = []
 
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
@@ -56,29 +53,21 @@ def log_acc_to_wandb(trainer, statistics_summary):
                 if target_key in out:
                     acc = round(float(out[target_key]) * 100, 2)
                     break
+            data_i.append([int(task_idx), acc])
 
-            long_data.append([int(task_idx), acc])
-            task_row.append(int(task_idx))
-            acc_row.append(acc)
-
-        line_table = wandb.Table(
-            data=long_data,
-            columns=["task", "acc"],
-        )
-
-        summary_table = wandb.Table(
-            data=[task_row, acc_row],
-            columns=["metric"] + [f"task{i}" for i in range(len(task_row) - 1)],
+        data_i = list(map(list, zip(*data_i)))
+        table = wandb.Table(
+            data=data_i,
+            rows=["task", "acc"],
         )
 
         trainer.logger.experiment.log({
             log_key: wandb.plot.line(
-                table=line_table,
+                table=table,
                 x="task",
                 y="acc",
                 title=title,
-            ),
-            f"{log_key}_table": summary_table,
+            )
         })
 
 @pytest.mark.slow
