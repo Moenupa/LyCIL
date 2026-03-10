@@ -767,6 +767,7 @@ class BaseLearner(L.LightningModule):
         self._cached_val_nme = None
 
     def on_test_epoch_start(self) -> None:
+        import pdb;pdb.set_trace()
         if not self.buffer_args["nme_eval"].get("enable", True):
             self._cached_test_nme = None
             return
