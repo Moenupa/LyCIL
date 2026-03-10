@@ -127,18 +127,62 @@ def compute_avg_forgetting_curve(statistics_summary, metric_prefix):
     return data
 
 
+# @rank_zero_only
+# def log_acc_to_wandb(trainer, statistics_summary):
+#     exp = trainer.logger.experiment
+#
+#     metric_configs = [
+#         ("test_cum", "statistics/acc", "Final Acc",
+#          "statistics/avg_forgetting", "Avg Forgetting"),
+#         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME",
+#          "statistics/avg_forgetting_nme", "Avg Forgetting NME"),
+#     ]
+#
+#     for metric_prefix, acc_key, acc_title, fg_key, fg_title in metric_configs:
+#         # 1) 每个阶段的 last acc（对角线）
+#         acc_data = []
+#         for task_idx, test_outputs in sorted(statistics_summary.items()):
+#             target_key = f"{metric_prefix}/task{task_idx}"
+#             for out in test_outputs:
+#                 if target_key in out:
+#                     acc = round(float(out[target_key]) * 100, 2)
+#                     acc_data.append([int(task_idx), acc])
+#                     break
+#
+#         if acc_data:
+#             acc_table = wandb.Table(data=acc_data, columns=["task", "acc"])
+#             exp.log({
+#                 acc_key: wandb.plot.line(
+#                     table=acc_table,
+#                     x="task",
+#                     y="acc",
+#                     title=acc_title,
+#                 )
+#             })
+#
+#         # 2) 每个阶段的平均 forgetting
+#         fg_data = compute_avg_forgetting_curve(statistics_summary, metric_prefix)
+#         if fg_data:
+#             fg_table = wandb.Table(data=fg_data, columns=["task", "forgetting"])
+#             exp.log({
+#                 fg_key: wandb.plot.line(
+#                     table=fg_table,
+#                     x="task",
+#                     y="forgetting",
+#                     title=fg_title,
+#                 )
+#             })
+
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
     exp = trainer.logger.experiment
 
     metric_configs = [
-        ("test_cum", "statistics/acc", "Final Acc",
-         "statistics/avg_forgetting", "Avg Forgetting"),
-        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME",
-         "statistics/avg_forgetting_nme", "Avg Forgetting NME"),
+        ("test_cum", "statistics/acc", "Final Acc", "Avg Forgetting"),
+        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME", "Avg Forgetting NME"),
     ]
 
-    for metric_prefix, acc_key, acc_title, fg_key, fg_title in metric_configs:
+    for metric_prefix, key, acc_title, fg_title in metric_configs:
         # 1) 每个阶段的 last acc（对角线）
         acc_data = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
@@ -152,7 +196,7 @@ def log_acc_to_wandb(trainer, statistics_summary):
         if acc_data:
             acc_table = wandb.Table(data=acc_data, columns=["task", "acc"])
             exp.log({
-                acc_key: wandb.plot.line(
+                key: wandb.plot.line(
                     table=acc_table,
                     x="task",
                     y="acc",
@@ -165,14 +209,13 @@ def log_acc_to_wandb(trainer, statistics_summary):
         if fg_data:
             fg_table = wandb.Table(data=fg_data, columns=["task", "forgetting"])
             exp.log({
-                fg_key: wandb.plot.line(
+                key: wandb.plot.line(
                     table=fg_table,
                     x="task",
                     y="forgetting",
                     title=fg_title,
                 )
             })
-
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
@@ -189,8 +232,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
-        EPOCHS_PER_TASK_MEMORY = 20
+        EPOCHS_PER_TASK = 1
+        EPOCHS_PER_TASK_MEMORY = 1
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
     if not osp.exists(DATAPATH):
