@@ -62,7 +62,7 @@ class BaseLearner(L.LightningModule):
             data_column_translate: dict[str, str] | None = None,
             per_task_optim_args: dict[int, dict] | None = None,
             per_task_sched_args: dict[int, dict] | None = None,
-            nme_eval_args: dict[str, Any] | None = None,
+            buffer_args: dict[str, Any] | None = None,
     ):
         super().__init__()
 
@@ -86,11 +86,7 @@ class BaseLearner(L.LightningModule):
         self.per_task_optim_args: dict[int, dict] = per_task_optim_args or {}
         self.per_task_sched_args: dict[int, dict] = per_task_sched_args or {}
 
-        self.nme_eval_args: dict[str, Any] = {
-            "enable": True,
-            "topk": 1,
-            "dynamic_old": True,
-            "dynamic_new": True,
+        self.buffer_args: dict[str, Any] = {
             "selection": "herding",
             "seed": 42,
             "loader_kwargs": {
@@ -98,9 +94,18 @@ class BaseLearner(L.LightningModule):
                 "shuffle": False,
                 "num_workers": 8,
             },
+            "nme_eval": {
+                "enable": True,
+                "topk": 1,
+                "dynamic_old": True,
+                "dynamic_new": True,
+            },
         }
-        if nme_eval_args is not None:
-            self.nme_eval_args.update(nme_eval_args)
+
+        if buffer_args is not None:
+            self.buffer_args.update(copy.deepcopy(buffer_args))
+            if "nme_eval" in buffer_args:
+                self.buffer_args["nme_eval"].update(copy.deepcopy(buffer_args["nme_eval"]))
 
         self._cached_val_nme = None
         self._cached_test_nme = None
@@ -456,22 +461,23 @@ class BaseLearner(L.LightningModule):
 
         assert dm.buffer is not None
 
-        nme_eval_args = self.nme_eval_args
         loader_kwargs = kwargs.get(
             "loader_kwargs",
-            nme_eval_args.get(
+            self.buffer_args.get(
                 "loader_kwargs",
                 {"batch_size": 128, "shuffle": False, "num_workers": 8},
             ),
         )
+
         exemplar_selection = kwargs.get(
             "exemplar_selection",
-            nme_eval_args.get("selection", "herding"),
+            self.buffer_args.get("selection", "herding"),
         )
+
         exemplar_seed = int(
             kwargs.get(
                 "exemplar_seed",
-                nme_eval_args.get("seed", 42),
+                self.buffer_args.get("seed", 42),
             )
         )
 
@@ -644,14 +650,15 @@ class BaseLearner(L.LightningModule):
         if dm.buffer is None:
             return None
 
-        nme_eval_args = self.nme_eval_args
-        loader_kwargs = nme_eval_args.get(
+        loader_kwargs = self.buffer_args.get(
             "loader_kwargs",
             {"batch_size": 128, "shuffle": False, "num_workers": 8},
         )
-        dynamic_old = bool(nme_eval_args.get("dynamic_old", True))
-        exemplar_selection = str(nme_eval_args.get("selection", "herding"))
-        exemplar_seed = int(nme_eval_args.get("seed", 42))
+
+        dynamic_old = bool(self.buffer_args["nme_eval"].get("dynamic_old", True))
+
+        exemplar_selection = str(self.buffer_args.get("selection", "herding"))
+        exemplar_seed = int(self.buffer_args.get("seed", 42))
 
         feature_tfm = dm.get_effective_transform(mode="test")
         per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
@@ -697,9 +704,6 @@ class BaseLearner(L.LightningModule):
                 class_idx: [] for class_idx in range(self.num_old_classes, self.num_seen_classes)
             }
             task_labels = task_train_dataset_raw[_Y_COLUMN_NAME]
-
-
-
 
 
             for sample_idx, y in enumerate(task_labels):
@@ -748,12 +752,12 @@ class BaseLearner(L.LightningModule):
         return class_ids_t, class_means_t
 
     def on_validation_epoch_start(self) -> None:
-        if not self.nme_eval_args.get("enable", True):
+        if not self.buffer_args["nme_eval"].get("enable", True):
             self._cached_val_nme = None
             return
 
         dm: HFDataModule = self.trainer.datamodule
-        include_new_tmp = bool(self.nme_eval_args.get("dynamic_new", True))
+        include_new_tmp = bool(self.buffer_args["nme_eval"].get("dynamic_new", True))
         self._cached_val_nme = self._build_eval_nme_state(
             dm,
             include_new_tmp=include_new_tmp,
@@ -763,7 +767,7 @@ class BaseLearner(L.LightningModule):
         self._cached_val_nme = None
 
     def on_test_epoch_start(self) -> None:
-        if not self.nme_eval_args.get("enable", True):
+        if not self.buffer_args["nme_eval"].get("enable", True):
             self._cached_test_nme = None
             return
 
@@ -815,7 +819,7 @@ class BaseLearner(L.LightningModule):
         )
 
         if self._cached_val_nme is not None:
-            topk = int(self.nme_eval_args.get("topk", 1))
+            topk = int(self.buffer_args["nme_eval"].get("topk", 1))
             class_ids, class_means = self._cached_val_nme
             rank_pred = self._predict_nme_rank(x, class_ids, class_means, topk=topk)
             nme_acc1 = self._rank_top1_acc(rank_pred, y)
@@ -847,7 +851,7 @@ class BaseLearner(L.LightningModule):
         )
 
         if self._cached_test_nme is not None:
-            topk = int(self.nme_eval_args.get("topk", 1))
+            topk = int(self.buffer_args["nme_eval"].get("topk", 1))
             class_ids, class_means = self._cached_test_nme
             rank_pred = self._predict_nme_rank(x, class_ids, class_means, topk=topk)
             nme_acc1 = self._rank_top1_acc(rank_pred, y)
