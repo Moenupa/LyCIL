@@ -118,6 +118,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
+                "every_n_epochs": 10,  # 新增：每隔多少个 epoch 做一次 val nme
             },
         }
     )

@@ -752,7 +752,7 @@ class BaseLearner(L.LightningModule):
         return class_ids_t, class_means_t
 
     def on_validation_epoch_start(self) -> None:
-        if not self.buffer_args["nme_eval"].get("enable", True):
+        if not self._should_run_val_nme_eval():
             self._cached_val_nme = None
             return
 
@@ -863,3 +863,33 @@ class BaseLearner(L.LightningModule):
                 sync_dist=True,
                 add_dataloader_idx=False,
             )
+
+    def _should_run_val_nme_eval(self) -> bool:
+        nme_cfg = self.buffer_args.get("nme_eval", {})
+        trainer = self.trainer
+
+        # 1) 总开关关掉，直接不评估
+        if not nme_cfg.get("enable", True):
+            return False
+
+        # 2) sanity checking 阶段不评估
+        if getattr(trainer, "sanity_checking", False):
+            return False
+
+        every_n_epochs = max(1, int(nme_cfg.get("every_n_epochs", 20)))
+
+        # Lightning 的 current_epoch 是 0-based，这里转成 1-based 更直观
+        epoch_idx = trainer.current_epoch + 1
+        max_epochs = getattr(trainer, "max_epochs", None)
+
+        # 3) 最后一个 epoch 必定评估
+        is_last_epoch = (
+                isinstance(max_epochs, int)
+                and max_epochs > 0
+                and epoch_idx >= max_epochs
+        )
+
+        # 4) 普通情况下每隔 every_n_epochs 评估一次
+        is_interval_epoch = (epoch_idx % every_n_epochs == 0)
+
+        return is_interval_epoch or is_last_epoch
