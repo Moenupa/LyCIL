@@ -49,7 +49,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK = 20
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
@@ -133,10 +133,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
         logger1 = OffsetWandbLogger(
             resume="allow",
-            # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_ft_allfc_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"main_adpmem_nopretrain_sgd_momentum_160_t_test_herding_select_buffer_ft_all_nomask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"NME_main_adpmem_nopretrain_20_herding_select_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
