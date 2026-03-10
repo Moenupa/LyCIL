@@ -24,6 +24,10 @@ from ..data.buffer import BaseExemplarBuffer
 from ..data.hfmodule import HFDataModule
 from ..data.transform import apply_dataset_transform
 
+import time
+
+
+
 
 class BaseLearner(L.LightningModule):
     r"""Base class providing backbone, classifier head, optimizer, and memory helpers.
@@ -591,6 +595,7 @@ class BaseLearner(L.LightningModule):
 
         return
 
+
     @torch.no_grad()
     def _select_exemplar_indices(
             self,
@@ -605,6 +610,8 @@ class BaseLearner(L.LightningModule):
         if n_samples == 0 or m <= 0:
             return []
 
+        m = min(m, n_samples)
+
         if exemplar_selection == "random":
             g = torch.Generator()
             g.manual_seed(exemplar_seed + int(class_idx))
@@ -618,28 +625,88 @@ class BaseLearner(L.LightningModule):
             loader, self.feature_extractor, self.device
         )
 
-        # 不再转 CPU
         class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0)
-        feats = per_sample_features
+        feats = per_sample_features  # [N, D]
+
+        # 如果 compute_nme 返回的 per_sample_features 还没归一化，可以打开这一行
+        # feats = F.normalize(feats, dim=1)
+
+        # 预先算好每个样本的平方范数，后面循环里复用
+        feat_sq_norm = (feats * feats).sum(dim=1)  # [N]
 
         selected_idx = []
         selected_mask = torch.zeros(n_samples, dtype=torch.bool, device=feats.device)
         running_sum = torch.zeros_like(class_mean)
 
-        for k in range(1, min(m, n_samples) + 1):
-            candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
-            candidate_feats = feats[candidate_idx]
+        for k in range(1, m + 1):
+            # 原目标：
+            #   argmin_i || class_mean - (running_sum + f_i) / k ||_2
+            #
+            # 等价于：
+            #   argmin_i || k * class_mean - running_sum - f_i ||_2
+            #
+            # 再展开平方范数，可转成最大化：
+            #   2 * <target, f_i> - ||f_i||^2
+            target = k * class_mean - running_sum  # [D]
 
-            mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
-            dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
-            best_rel = torch.argmin(dist).item()
-            best_abs = candidate_idx[best_rel].item()
+            scores = 2.0 * (feats @ target) - feat_sq_norm  # [N]
+            scores.masked_fill_(selected_mask, float("-inf"))
 
+            best_abs = int(scores.argmax().item())
             selected_idx.append(best_abs)
             selected_mask[best_abs] = True
             running_sum += feats[best_abs]
 
         return selected_idx
+    # @torch.no_grad()
+    # def _select_exemplar_indices(
+    #         self,
+    #         class_dataset_feat: Dataset,
+    #         m: int,
+    #         loader_kwargs: dict,
+    #         exemplar_selection: str,
+    #         exemplar_seed: int,
+    #         class_idx: int,
+    # ) -> list[int]:
+    #     n_samples = len(class_dataset_feat)
+    #     if n_samples == 0 or m <= 0:
+    #         return []
+    #
+    #     if exemplar_selection == "random":
+    #         g = torch.Generator()
+    #         g.manual_seed(exemplar_seed + int(class_idx))
+    #         return torch.randperm(n_samples, generator=g)[:m].tolist()
+    #
+    #     if exemplar_selection != "herding":
+    #         raise ValueError(f"Unsupported exemplar_selection={exemplar_selection}")
+    #
+    #     loader = torch.utils.data.DataLoader(class_dataset_feat, **loader_kwargs)
+    #     class_mean, per_sample_features = compute_nme(
+    #         loader, self.feature_extractor, self.device
+    #     )
+    #
+    #     # 不再转 CPU
+    #     class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0)
+    #     feats = per_sample_features
+    #
+    #     selected_idx = []
+    #     selected_mask = torch.zeros(n_samples, dtype=torch.bool, device=feats.device)
+    #     running_sum = torch.zeros_like(class_mean)
+    #
+    #     for k in range(1, min(m, n_samples) + 1):
+    #         candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
+    #         candidate_feats = feats[candidate_idx]
+    #
+    #         mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
+    #         dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
+    #         best_rel = torch.argmin(dist).item()
+    #         best_abs = candidate_idx[best_rel].item()
+    #
+    #         selected_idx.append(best_abs)
+    #         selected_mask[best_abs] = True
+    #         running_sum += feats[best_abs]
+    #
+    #     return selected_idx
 
     @torch.no_grad()
     def _build_eval_nme_state(
@@ -741,10 +808,7 @@ class BaseLearner(L.LightningModule):
             #         mean.unsqueeze(0), dim=1
             #     ).squeeze(0).cpu()
 
-            import time
-            import torch
-            import torch.nn.functional as F
-            from tqdm import tqdm
+
 
             time_stats = []
 
