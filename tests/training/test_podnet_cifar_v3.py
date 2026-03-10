@@ -35,9 +35,6 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     return use_buffer
 
 
-
-
-
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
     for metric_prefix, log_key, title in [
@@ -50,18 +47,21 @@ def log_acc_to_wandb(trainer, statistics_summary):
             target_key = f"{metric_prefix}/task{task_idx}"
             acc = next(
                 (
-                    round(float(out[target_key]) * 100, 2)
+                    out[target_key]
                     for out in test_outputs
                     if target_key in out
                 ),
                 None,
             )
             tasks.append(int(task_idx))
-            accs.append(acc)
+            accs.append(round(float(acc) * 100, 2))
 
         table = wandb.Table(
-            data=[tasks, accs],
-            rows=["task", "acc"],
+            columns=["metric"] + [f"task{t}" for t in tasks],
+            data=[
+                ["task", *tasks],
+                ["acc", *accs],
+            ],
         )
 
         trainer.logger.experiment.log({
