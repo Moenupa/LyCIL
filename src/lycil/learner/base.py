@@ -776,7 +776,7 @@ class BaseLearner(L.LightningModule):
         dm: HFDataModule = self.trainer.datamodule
         self._cached_test_nme = self._build_eval_nme_state(
             dm,
-            include_new_tmp=False,
+            include_new_tmp=True,
         )
 
     def on_test_epoch_end(self) -> None:
