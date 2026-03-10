@@ -242,6 +242,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             verbose=False,
             ckpt_path=None,
         )
+        import pdb; pdb.set_trace()
 
         cur_acc_cum = collect_acc_cum(final_test_outputs, task_idx)
 
