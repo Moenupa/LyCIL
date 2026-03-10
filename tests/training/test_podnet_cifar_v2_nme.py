@@ -133,9 +133,9 @@ def log_acc_to_wandb(trainer, statistics_summary):
 
     metric_configs = [
         ("test_cum", "statistics/acc", "Final Acc",
-         "statistics/avg_forgetting", "Average Forgetting"),
+         "statistics/avg_forgetting", "Avg Forgetting"),
         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME",
-         "statistics/avg_forgetting_nme", "Average Forgetting NME"),
+         "statistics/avg_forgetting_nme", "Avg Forgetting NME"),
     ]
 
     for metric_prefix, acc_key, acc_title, fg_key, fg_title in metric_configs:
