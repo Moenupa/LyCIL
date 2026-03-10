@@ -223,21 +223,20 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # model.backbone.requires_grad_(True)
 
 
-            final_test_outputs = final_trainer.test(
-                model=model,
-                datamodule=dm,
-                verbose=False,
-                ckpt_path=None,
-            )
+        final_test_outputs = final_trainer.test(
+            model=model,
+            datamodule=dm,
+            verbose=False,
+            ckpt_path=None,
+        )
 
-            cur_acc_cum = collect_acc_cum(final_test_outputs, task_idx)
+        cur_acc_cum = collect_acc_cum(final_test_outputs, task_idx)
 
-            statistics["acc"][task_idx] = cur_acc_cum.copy()
-            acc_cum_list.append(cur_acc_cum.copy())
+        statistics["acc"][task_idx] = cur_acc_cum.copy()
+        acc_cum_list.append(cur_acc_cum.copy())
 
-            log_acc_to_wandb(final_trainer.logger, task_idx, cur_acc_cum)
+        log_acc_to_wandb(final_trainer.logger, task_idx, cur_acc_cum)
 
-            wandb.finish()
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
