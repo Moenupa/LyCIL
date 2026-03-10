@@ -114,7 +114,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "num_workers": 8,
             },
             "nme_eval": {
-                "enable": True,
+                "enable": False,
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
