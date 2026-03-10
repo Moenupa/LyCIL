@@ -76,8 +76,9 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
         },
         distill_T=1.0,
@@ -95,7 +96,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"hparms_wd_2e4_icarl_cifar100_task{task_idx}",
+                name=f"warmup_hparms_wd_2e4_icarl_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["icarl", "cifar100"],
