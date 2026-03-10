@@ -119,7 +119,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
                 "num_workers": 8,
             },
             "nme_eval": {
-                "enable": False,
+                "enable": True,
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
