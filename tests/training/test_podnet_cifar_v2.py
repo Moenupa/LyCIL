@@ -109,7 +109,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             "enable": True,
             "topk": 1,
             "dynamic_old": True,
-            "dynamic_new": False,
+            "dynamic_new": True,
             "selection": "random",
             "seed": 42,
             "loader_kwargs": {

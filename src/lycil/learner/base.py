@@ -697,32 +697,51 @@ class BaseLearner(L.LightningModule):
                 class_idx: [] for class_idx in range(self.num_old_classes, self.num_seen_classes)
             }
             task_labels = task_train_dataset_raw[_Y_COLUMN_NAME]
+
+
+
+
+
             for sample_idx, y in enumerate(task_labels):
                 class_to_indices[int(y)].append(sample_idx)
 
-            for class_idx in range(self.num_old_classes, self.num_seen_classes):
+            for class_idx in tqdm(
+                    range(self.num_old_classes, self.num_seen_classes),
+                    desc=f"Building TMP exemplars task {dm.get_current_task()} for NME evaluation",
+            ):
+                # class_indices = class_to_indices.get(class_idx, [])
+                # if len(class_indices) == 0:
+                #     continue
+                #
+                # class_dataset_raw = task_train_dataset_raw.select(class_indices)
+                # class_dataset_feat = task_train_dataset_feat.select(class_indices)
+                #
+                # m = min(per_class_quota, len(class_dataset_raw))
+                # selected_idx = self._select_exemplar_indices(
+                #     class_dataset_feat=class_dataset_feat,
+                #     m=m,
+                #     loader_kwargs=loader_kwargs,
+                #     exemplar_selection=exemplar_selection,
+                #     exemplar_seed=exemplar_seed,
+                #     class_idx=class_idx,
+                # )
+                #
+                # tmp_dataset = class_dataset_raw.select(selected_idx)
+                # tmp_dataset.reset_format()
+                # apply_dataset_transform(tmp_dataset, transform=feature_tfm)
+                #
+                # loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
+                # mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+                # per_class_means[class_idx] = F.normalize(
+                #     mean.unsqueeze(0), dim=1
+                # ).squeeze(0).cpu()
                 class_indices = class_to_indices.get(class_idx, [])
                 if len(class_indices) == 0:
                     continue
 
-                class_dataset_raw = task_train_dataset_raw.select(class_indices)
-                class_dataset_feat = task_train_dataset_feat.select(class_indices)
+                class_dataset = task_train_dataset_raw.select(class_indices)
+                loader = torch.utils.data.DataLoader(class_dataset, **loader_kwargs)
 
-                m = min(per_class_quota, len(class_dataset_raw))
-                selected_idx = self._select_exemplar_indices(
-                    class_dataset_feat=class_dataset_feat,
-                    m=m,
-                    loader_kwargs=loader_kwargs,
-                    exemplar_selection=exemplar_selection,
-                    exemplar_seed=exemplar_seed,
-                    class_idx=class_idx,
-                )
-
-                tmp_dataset = class_dataset_raw.select(selected_idx)
-                tmp_dataset.reset_format()
-                apply_dataset_transform(tmp_dataset, transform=feature_tfm)
-
-                loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
                 mean, _ = compute_nme(loader, self.feature_extractor, self.device)
                 per_class_means[class_idx] = F.normalize(
                     mean.unsqueeze(0), dim=1
