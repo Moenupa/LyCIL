@@ -49,7 +49,7 @@ def log_acc_to_wandb(trainer, final_test_outputs):
 
     table = wandb.Table(
         data=data,
-        columns=["acc", "task"],
+        rows=["acc", "task"],
     )
 
     trainer.logger.experiment.log({
