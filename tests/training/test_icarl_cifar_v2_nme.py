@@ -143,7 +143,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"warmup_hparms_wd_5e4_icarl_cifar100_task{task_idx}",
+                name=f"nme_warmup_hparms_wd_5e4_icarl_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["icarl", "cifar100"],
