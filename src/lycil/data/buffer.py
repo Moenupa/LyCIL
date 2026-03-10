@@ -45,7 +45,8 @@ def compute_nme(
         else:
             raise TypeError(f"batch must be dict or Tensor, got {type(batch)}")
 
-        features = F.normalize(feature_extractor(x), dim=1).cpu()
+        features = F.normalize(feature_extractor(x), dim=1)
+        # features = F.normalize(feature_extractor(x), dim=1).cpu()
         feature_list.append(features)
 
     # shaped (n_samples, n_features)
