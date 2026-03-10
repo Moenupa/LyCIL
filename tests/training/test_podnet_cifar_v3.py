@@ -49,8 +49,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 10
-        EPOCHS_PER_TASK_MEMORY = 10
+        EPOCHS_PER_TASK = 1
+        EPOCHS_PER_TASK_MEMORY = 1
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
     if not osp.exists(DATAPATH):
@@ -141,7 +141,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             data=[[i + 1, acc] for i, acc in enumerate(acc_cum)],
             columns=["task", "acc"],
         )
-        logger.experiment.log({
+        logger.log({
             "statistics/acc": wandb.plot.line(
                 table,
                 "task",
