@@ -3,6 +3,7 @@ import lightning as L
 import pytest
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
@@ -34,38 +35,51 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     return use_buffer
 
 
-from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 
 
 
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
-    data = []
-    acc = None
-    for task_idx, test_outputs in sorted(statistics_summary.items()):
-        target_key = f"test_cum/task{task_idx}"
-        for out in test_outputs:
-            if target_key in out:
-                acc = round(float(out[target_key]) * 100, 2)
-                break
+    for metric_prefix, log_key, title in [
+        ("test_cum", "statistics/acc", "Final Acc"),
+        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
+    ]:
+        long_data = []
+        task_row = ["task"]
+        acc_row = ["acc"]
 
-        data.append([int(task_idx), acc])
+        for task_idx, test_outputs in sorted(statistics_summary.items()):
+            target_key = f"{metric_prefix}/task{task_idx}"
+            acc = None
+            for out in test_outputs:
+                if target_key in out:
+                    acc = round(float(out[target_key]) * 100, 2)
+                    break
 
-    table = wandb.Table(
-        data=data,
-        columns=["task", "acc"],
-    )
+            long_data.append([int(task_idx), acc])
+            task_row.append(int(task_idx))
+            acc_row.append(acc)
 
-    trainer.logger.experiment.log({
-        "statistics/acc": wandb.plot.line(
-            table=table,
-            x="task",
-            y="acc",
-            title="Final Acc Cum",
+        line_table = wandb.Table(
+            data=long_data,
+            columns=["task", "acc"],
         )
-    })
 
+        summary_table = wandb.Table(
+            data=[task_row, acc_row],
+            columns=["metric"] + [f"task{i}" for i in range(len(task_row) - 1)],
+        )
+
+        trainer.logger.experiment.log({
+            log_key: wandb.plot.line(
+                table=line_table,
+                x="task",
+                y="acc",
+                title=title,
+            ),
+            f"{log_key}_table": summary_table,
+        })
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
