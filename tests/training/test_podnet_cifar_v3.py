@@ -123,8 +123,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         }
     )
 
-    statistics = {"acc": {}}   # 每个 task 结束后的 acc cum
-    acc_cum_list = []          # 也保留一个 list 版本
+    statistics = {"acc": {}}  # 每个 task 结束后的 acc cum
+    acc_cum_list = []  # 也保留一个 list 版本
 
     def collect_acc_cum(test_outputs, cur_task_idx: int):
         acc_cum = []
@@ -135,7 +135,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
             )
             acc_cum.append(acc)
         return acc_cum
-
 
     from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
@@ -154,14 +153,14 @@ def test_podnet_cifar100(is_dummy_training: bool):
     @rank_zero_only
     def log_acc_to_wandb(logger, cur_task_idx: int, acc_cum: list[float]):
         table = wandb.Table(
-            data=[[i + 1, 100*acc] for i, acc in enumerate(acc_cum)],
-            columns=["task", "acc"],
+            data=[[100 * acc, i + 1] for i, acc in enumerate(acc_cum)],
+            columns=["acc", "task"],
         )
         logger.experiment.log({
             "statistics/acc": wandb.plot.line(
-                table,
-                "task",
-                "acc",
+                table=table,
+                x="task",
+                y="acc",
                 title=f"Final Acc Cum",
             )
         })
@@ -237,7 +236,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
             final_trainer = trainer2
             # model.backbone.requires_grad_(True)
 
-
         final_test_outputs = final_trainer.test(
             model=model,
             datamodule=dm,
@@ -252,11 +250,9 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
         log_acc_to_wandb(final_trainer.logger, task_idx, cur_acc_cum)
 
-
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
 
 
 if __name__ == "__main__":
     test_podnet_cifar100(is_dummy_training=False)
-
