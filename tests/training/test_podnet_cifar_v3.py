@@ -39,9 +39,7 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 @rank_zero_only
 def log_acc_to_wandb(trainer, final_test_outputs):
-    acc_col = []
-    task_col = []
-
+    data = []
     for out in final_test_outputs:
         for k, v in out.items():
             if not k.startswith("test_cum/task"):
@@ -49,15 +47,12 @@ def log_acc_to_wandb(trainer, final_test_outputs):
 
             task_idx = int(k.split("task")[-1]) + 1
             acc = round(float(v) * 100, 2)
+            data.append([acc, task_idx])
 
-            acc_col.append(acc)
-            task_col.append(task_idx)
-
-    # 先按 task 排序
-    rows = sorted(zip(acc_col, task_col), key=lambda x: x[1])
+    data.sort(key=lambda x: x[1])
 
     table = wandb.Table(
-        data=rows,
+        data=data,
         columns=["acc", "task"],
     )
 
