@@ -1,14 +1,13 @@
 import copy
 from tqdm import tqdm
 from abc import abstractmethod
-from typing import Literal, Optional, Any
-
-from datasets import Dataset
+from typing import Literal, Optional
 
 import lightning as L
 import torch
 import torch.nn.functional as F
 from torch.optim import lr_scheduler
+
 
 from ..backbone import BaseBackbone, ConvNetArgs, ResNetBackbone
 from ..classifier import expand_head, make_head
@@ -22,7 +21,6 @@ import torch.nn as nn
 
 from ..data.buffer import BaseExemplarBuffer
 from ..data.hfmodule import HFDataModule
-from ..data.transform import apply_dataset_transform
 
 
 class BaseLearner(L.LightningModule):
@@ -54,15 +52,14 @@ class BaseLearner(L.LightningModule):
         """
 
     def __init__(
-            self,
-            *,
-            backbone_cls: "type[BaseBackbone]" = ResNetBackbone,
-            backbone_args: ConvNetArgs | None = None,
-            head: Literal["linear", "cosine"] = "linear",
-            data_column_translate: dict[str, str] | None = None,
-            per_task_optim_args: dict[int, dict] | None = None,
-            per_task_sched_args: dict[int, dict] | None = None,
-            nme_eval_args: dict[str, Any] | None = None,
+        self,
+        *,
+        backbone_cls: "type[BaseBackbone]" = ResNetBackbone,
+        backbone_args: ConvNetArgs | None = None,
+        head: Literal["linear", "cosine"] = "linear",
+        data_column_translate: dict[str, str] | None = None,
+        per_task_optim_args: dict[int, dict] | None = None,
+        per_task_sched_args: dict[int, dict] | None = None,
     ):
         super().__init__()
 
@@ -85,25 +82,6 @@ class BaseLearner(L.LightningModule):
         # first task SGD(lr=0.1), second task SGD(lr=0.01)
         self.per_task_optim_args: dict[int, dict] = per_task_optim_args or {}
         self.per_task_sched_args: dict[int, dict] = per_task_sched_args or {}
-
-        self.nme_eval_args: dict[str, Any] = {
-            "enable": True,
-            "topk": 1,
-            "dynamic_old": True,
-            "dynamic_new": True,
-            "selection": "herding",
-            "seed": 42,
-            "loader_kwargs": {
-                "batch_size": 128,
-                "shuffle": False,
-                "num_workers": 8,
-            },
-        }
-        if nme_eval_args is not None:
-            self.nme_eval_args.update(nme_eval_args)
-
-        self._cached_val_nme = None
-        self._cached_test_nme = None
 
     @property
     def feature_dim(self) -> int:
@@ -161,8 +139,8 @@ class BaseLearner(L.LightningModule):
 
     @staticmethod
     def unpack_batch(
-            batch: dict[str, torch.Tensor],
-            device: torch.device | None = None,
+        batch: dict[str, torch.Tensor],
+        device: torch.device | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Extract the input tensor and label tensor from a batch dict.
 
@@ -182,6 +160,7 @@ class BaseLearner(L.LightningModule):
             x = x.to(device)
             y = y.to(device)
         return x, y
+
 
     @torch.no_grad()
     def expand_head(self, num_new: int) -> None:
@@ -283,6 +262,7 @@ class BaseLearner(L.LightningModule):
             case _:
                 raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
 
+
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
 
@@ -353,43 +333,41 @@ class BaseLearner(L.LightningModule):
         self.snapshot_old()
 
     @abstractmethod
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        ...
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
-    # def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-    #     x, y = self.unpack_batch(batch)
-    #     logits: torch.Tensor = self(x)
-    #     acc1 = accuracy(logits, y)
-    #
-    #     dm = self.trainer.datamodule  # HFDataModule
-    #     name = getattr(dm, "_val_loader_names", None)
-    #     suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-    #
-    #     self.log(
-    #         name=f"val_{suffix}",
-    #         value=acc1,
-    #         prog_bar=False,
-    #         sync_dist=True,
-    #         add_dataloader_idx=False,
-    #     )
-    #
-    # def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-    #     x, y = self.unpack_batch(batch)
-    #     logits: torch.Tensor = self(x)
-    #     acc1 = accuracy(logits, y)
-    #
-    #     dm = self.trainer.datamodule
-    #     name = getattr(dm, "_test_loader_names", None)
-    #     suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-    #
-    #     self.log(
-    #         name=f"test_{suffix}",
-    #         value=acc1,
-    #         prog_bar=False,
-    #         sync_dist=True,
-    #         add_dataloader_idx=False,
-    #     )
+    def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
+        x, y = self.unpack_batch(batch)
+        logits: torch.Tensor = self(x)
+        acc1 = accuracy(logits, y)
 
+        dm = self.trainer.datamodule  # HFDataModule
+        name = getattr(dm, "_val_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            name=f"val_{suffix}",
+            value=acc1,
+            prog_bar=False,
+            sync_dist=True,
+            add_dataloader_idx=False,
+        )
+
+    def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
+        x, y = self.unpack_batch(batch)
+        logits: torch.Tensor = self(x)
+        acc1 = accuracy(logits, y)
+
+        dm = self.trainer.datamodule
+        name = getattr(dm, "_test_loader_names", None)
+        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
+
+        self.log(
+            name=f"test_{suffix}",
+            value=acc1,
+            prog_bar=False,
+            sync_dist=True,
+            add_dataloader_idx=False,
+        )
     @torch.no_grad()
     def update_memory(self, dm: HFDataModule, **kwargs) -> None:
         """Update datamodule's exemplar memory (i.e., iCaRL).
@@ -448,34 +426,26 @@ class BaseLearner(L.LightningModule):
         """
         # exemplar 构建时使用的 dataloader 配置
         # 这里固定不用 shuffle，避免 exemplar 选择过程不稳定
-        # loader_kwargs = dict(
-        #     batch_size=128,
-        #     shuffle=False,
-        #     num_workers=8,
-        # )
+        loader_kwargs = dict(
+            batch_size=128,
+            shuffle=False,
+            num_workers=8,
+        )
 
         assert dm.buffer is not None
 
-        nme_eval_args = self.nme_eval_args
-        loader_kwargs = kwargs.get(
-            "loader_kwargs",
-            nme_eval_args.get(
-                "loader_kwargs",
-                {"batch_size": 128, "shuffle": False, "num_workers": 8},
-            ),
-        )
+        # exemplar 选择策略，默认 herding
         exemplar_selection = kwargs.get(
             "exemplar_selection",
-            nme_eval_args.get("selection", "herding"),
+            getattr(self, "exemplar_selection", "herding"),
         )
+        # 随机选择时使用的随机种子
         exemplar_seed = int(
             kwargs.get(
                 "exemplar_seed",
-                nme_eval_args.get("seed", 42),
+                getattr(self, "exemplar_seed", 42),
             )
         )
-
-
         # 当前每个类别允许保留的 exemplar 数量
         # 对于 mem_size 模式，这里会根据当前已见类别数动态计算
         per_class_quota = int(
@@ -555,14 +525,41 @@ class BaseLearner(L.LightningModule):
 
             # 当前类实际保留的样本数，不能超过该类真实样本数
             m = min(per_class_quota, n_samples)
-            selected_idx = self._select_exemplar_indices(
-                class_dataset_feat=class_dataset_feat,
-                m=m,
-                loader_kwargs=loader_kwargs,
-                exemplar_selection=exemplar_selection,
-                exemplar_seed=exemplar_seed,
-                class_idx=class_idx,
-            )
+
+            # 4.1 随机选择 exemplar
+            if exemplar_selection == "random":
+                g = torch.Generator()
+                g.manual_seed(exemplar_seed + int(class_idx))
+                selected_idx = torch.randperm(n_samples, generator=g)[:m].tolist()
+
+            # 4.2 herding 选择 exemplar
+            else:
+                # 直接在当前类别子集上做一次前向，提取特征
+                train_loader = torch.utils.data.DataLoader(class_dataset_feat, **loader_kwargs)
+                class_mean, per_sample_features = compute_nme(
+                    train_loader, self.feature_extractor, self.device
+                )
+
+                class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
+                feats = per_sample_features.cpu()
+
+                selected_idx = []
+                selected_mask = torch.zeros(n_samples, dtype=torch.bool)
+                running_sum = torch.zeros_like(class_mean)
+
+                # 按 herding 规则逐个选择，使 exemplar 均值尽量逼近类中心
+                for k in range(1, m + 1):
+                    candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
+                    candidate_feats = feats[candidate_idx]
+
+                    mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
+                    dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
+                    best_rel = torch.argmin(dist).item()
+                    best_abs = candidate_idx[best_rel].item()
+
+                    selected_idx.append(best_abs)
+                    selected_mask[best_abs] = True
+                    running_sum += feats[best_abs]
 
             # 5) 将选中的 exemplar 写入 buffer
             #    必须写入 raw dataset，避免把 transform/view 混进 buffer。
@@ -584,268 +581,3 @@ class BaseLearner(L.LightningModule):
         dm.buffer.per_class_means = per_class_means
 
         return
-
-    @torch.no_grad()
-    def _select_exemplar_indices(
-            self,
-            class_dataset_feat: Dataset,
-            m: int,
-            loader_kwargs: dict,
-            exemplar_selection: str,
-            exemplar_seed: int,
-            class_idx: int,
-    ) -> list[int]:
-        n_samples = len(class_dataset_feat)
-        if n_samples == 0 or m <= 0:
-            return []
-
-        if exemplar_selection == "random":
-            g = torch.Generator()
-            g.manual_seed(exemplar_seed + int(class_idx))
-            return torch.randperm(n_samples, generator=g)[:m].tolist()
-
-        if exemplar_selection != "herding":
-            raise ValueError(f"Unsupported exemplar_selection={exemplar_selection}")
-
-        loader = torch.utils.data.DataLoader(class_dataset_feat, **loader_kwargs)
-        class_mean, per_sample_features = compute_nme(
-            loader, self.feature_extractor, self.device
-        )
-
-        class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
-        feats = per_sample_features.cpu()
-
-        selected_idx = []
-        selected_mask = torch.zeros(n_samples, dtype=torch.bool)
-        running_sum = torch.zeros_like(class_mean)
-
-        for k in range(1, min(m, n_samples) + 1):
-            candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
-            candidate_feats = feats[candidate_idx]
-
-            mu_p = (running_sum.unsqueeze(0) + candidate_feats) / k
-            dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
-            best_rel = torch.argmin(dist).item()
-            best_abs = candidate_idx[best_rel].item()
-
-            selected_idx.append(best_abs)
-            selected_mask[best_abs] = True
-            running_sum += feats[best_abs]
-
-        return selected_idx
-
-    @torch.no_grad()
-    def _build_eval_nme_state(
-            self,
-            dm: "HFDataModule",
-            include_new_tmp: bool,
-    ) -> tuple[torch.Tensor, torch.Tensor] | None:
-        if dm.buffer is None:
-            return None
-
-        nme_eval_args = self.nme_eval_args
-        loader_kwargs = nme_eval_args.get(
-            "loader_kwargs",
-            {"batch_size": 128, "shuffle": False, "num_workers": 8},
-        )
-        dynamic_old = bool(nme_eval_args.get("dynamic_old", True))
-        exemplar_selection = str(nme_eval_args.get("selection", "herding"))
-        exemplar_seed = int(nme_eval_args.get("seed", 42))
-
-        feature_tfm = dm.get_effective_transform(mode="test")
-        per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
-
-        per_class_means: dict[int, torch.Tensor] = {}
-
-        # old classes: 用当前模型动态重算 buffer exemplar 的中心
-        for class_idx in range(self.num_old_classes):
-            key = f"{class_idx}"
-            if key not in dm.buffer or len(dm.buffer[key]) == 0:
-                continue
-
-            if dynamic_old:
-                old_dataset = dm.buffer[key]
-                old_dataset.reset_format()
-                apply_dataset_transform(old_dataset, transform=feature_tfm)
-
-                loader = torch.utils.data.DataLoader(old_dataset, **loader_kwargs)
-                mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-                per_class_means[class_idx] = F.normalize(
-                    mean.unsqueeze(0), dim=1
-                ).squeeze(0).cpu()
-            else:
-                if class_idx in dm.buffer.per_class_means:
-                    per_class_means[class_idx] = dm.buffer.per_class_means[class_idx].cpu()
-
-        # new classes: 先做 tmp selecting，再算 tmp mean
-        if include_new_tmp and self.num_seen_classes > self.num_old_classes:
-            task_train_dataset_raw = dm.get_filtered_dataset(
-                split=dm._split_train,
-                filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
-                transform=None,
-                use_buffer=False,
-            )
-            task_train_dataset_feat = dm.get_filtered_dataset(
-                split=dm._split_train,
-                filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
-                transform=feature_tfm,
-                use_buffer=False,
-            )
-
-            class_to_indices = {
-                class_idx: [] for class_idx in range(self.num_old_classes, self.num_seen_classes)
-            }
-            task_labels = task_train_dataset_raw[_Y_COLUMN_NAME]
-            for sample_idx, y in enumerate(task_labels):
-                class_to_indices[int(y)].append(sample_idx)
-
-            for class_idx in range(self.num_old_classes, self.num_seen_classes):
-                class_indices = class_to_indices.get(class_idx, [])
-                if len(class_indices) == 0:
-                    continue
-
-                class_dataset_raw = task_train_dataset_raw.select(class_indices)
-                class_dataset_feat = task_train_dataset_feat.select(class_indices)
-
-                m = min(per_class_quota, len(class_dataset_raw))
-                selected_idx = self._select_exemplar_indices(
-                    class_dataset_feat=class_dataset_feat,
-                    m=m,
-                    loader_kwargs=loader_kwargs,
-                    exemplar_selection=exemplar_selection,
-                    exemplar_seed=exemplar_seed,
-                    class_idx=class_idx,
-                )
-
-                tmp_dataset = class_dataset_raw.select(selected_idx)
-                tmp_dataset.reset_format()
-                apply_dataset_transform(tmp_dataset, transform=feature_tfm)
-
-                loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
-                mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-                per_class_means[class_idx] = F.normalize(
-                    mean.unsqueeze(0), dim=1
-                ).squeeze(0).cpu()
-
-        if len(per_class_means) == 0:
-            return None
-
-        class_ids = sorted(per_class_means.keys())
-        class_ids_t = torch.tensor(class_ids, dtype=torch.long)
-        class_means_t = torch.stack([per_class_means[c] for c in class_ids], dim=0)
-        class_means_t = F.normalize(class_means_t, dim=1)
-
-        return class_ids_t, class_means_t
-
-    def on_validation_epoch_start(self) -> None:
-        if not self.nme_eval_args.get("enable", True):
-            self._cached_val_nme = None
-            return
-
-        dm: HFDataModule = self.trainer.datamodule
-        include_new_tmp = bool(self.nme_eval_args.get("dynamic_new", True))
-        self._cached_val_nme = self._build_eval_nme_state(
-            dm,
-            include_new_tmp=include_new_tmp,
-        )
-
-    def on_validation_epoch_end(self) -> None:
-        self._cached_val_nme = None
-
-    def on_test_epoch_start(self) -> None:
-        if not self.nme_eval_args.get("enable", True):
-            self._cached_test_nme = None
-            return
-
-        dm: HFDataModule = self.trainer.datamodule
-        self._cached_test_nme = self._build_eval_nme_state(
-            dm,
-            include_new_tmp=False,
-        )
-
-    def on_test_epoch_end(self) -> None:
-        self._cached_test_nme = None
-
-    @torch.no_grad()
-    def _predict_nme_rank(
-            self,
-            x: torch.Tensor,
-            class_ids: torch.Tensor,
-            class_means: torch.Tensor,
-            topk: int = 1,
-    ) -> torch.Tensor:
-        feats = F.normalize(self.feature_extractor(x), dim=1)
-        means = F.normalize(class_means.to(feats.device), dim=1)
-        class_ids = class_ids.to(feats.device)
-
-        dists = torch.cdist(feats, means, p=2).pow(2)
-        rank = torch.argsort(dists, dim=1)[:, :topk]
-        return class_ids[rank]
-
-    @staticmethod
-    def _rank_top1_acc(rank_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        return (rank_pred[:, 0] == y_true).float().mean()
-
-    def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-        x, y = self.unpack_batch(batch)
-
-        logits: torch.Tensor = self(x)
-        acc1 = accuracy(logits, y)
-
-        dm = self.trainer.datamodule
-        name = getattr(dm, "_val_loader_names", None)
-        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-
-        self.log(
-            name=f"val_{suffix}",
-            value=acc1,
-            prog_bar=False,
-            sync_dist=True,
-            add_dataloader_idx=False,
-        )
-
-        if self._cached_val_nme is not None:
-            topk = int(self.nme_eval_args.get("topk", 1))
-            class_ids, class_means = self._cached_val_nme
-            rank_pred = self._predict_nme_rank(x, class_ids, class_means, topk=topk)
-            nme_acc1 = self._rank_top1_acc(rank_pred, y)
-
-            self.log(
-                name=f"val_nme_{suffix}",
-                value=nme_acc1,
-                prog_bar=False,
-                sync_dist=True,
-                add_dataloader_idx=False,
-            )
-
-    def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-        x, y = self.unpack_batch(batch)
-
-        logits: torch.Tensor = self(x)
-        acc1 = accuracy(logits, y)
-
-        dm = self.trainer.datamodule
-        name = getattr(dm, "_test_loader_names", None)
-        suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-
-        self.log(
-            name=f"test_{suffix}",
-            value=acc1,
-            prog_bar=False,
-            sync_dist=True,
-            add_dataloader_idx=False,
-        )
-
-        if self._cached_test_nme is not None:
-            topk = int(self.nme_eval_args.get("topk", 1))
-            class_ids, class_means = self._cached_test_nme
-            rank_pred = self._predict_nme_rank(x, class_ids, class_means, topk=topk)
-            nme_acc1 = self._rank_top1_acc(rank_pred, y)
-
-            self.log(
-                name=f"test_nme_{suffix}",
-                value=nme_acc1,
-                prog_bar=False,
-                sync_dist=True,
-                add_dataloader_idx=False,
-            )
