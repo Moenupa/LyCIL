@@ -105,11 +105,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,
-        nme_eval_args={
-            "enable": True,
-            "topk": 1,
-            "dynamic_old": True,
-            "dynamic_new": True,
+        buffer_args={
             "selection": "random",
             "seed": 42,
             "loader_kwargs": {
@@ -117,7 +113,13 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "shuffle": False,
                 "num_workers": 8,
             },
-        },
+            "nme_eval": {
+                "enable": True,
+                "topk": 1,
+                "dynamic_old": True,
+                "dynamic_new": True,
+            },
+        }
     )
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
