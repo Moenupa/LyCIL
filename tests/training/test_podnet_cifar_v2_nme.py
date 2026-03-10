@@ -34,33 +34,111 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     # task 1+: 只在 buffer 微调阶段结束后 snapshot
     return use_buffer
 
+# from lightning.pytorch.utilities.rank_zero import rank_zero_only
+# @rank_zero_only
+# def log_acc_to_wandb(trainer, statistics_summary):
+#     for metric_prefix, log_key, title in [
+#         ("test_cum", "statistics/acc", "Final Acc"),
+#         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
+#     ]:
+#         data_i = []
+#         for task_idx, test_outputs in sorted(statistics_summary.items()):
+#             target_key = f"{metric_prefix}/task{task_idx}"
+#             for out in test_outputs:
+#                 if target_key in out:
+#                     acc = round(float(out[target_key]) * 100, 2)
+#                     data_i.append([int(task_idx), acc])
+#                     break
+#         table = wandb.Table(
+#             data=data_i,
+#             columns=["task", "acc"],
+#         )
+#         trainer.logger.experiment.log({
+#             log_key: wandb.plot.line(
+#                 table=table,
+#                 x="task",
+#                 y="acc",
+#                 title=title,
+#             )
+#         })
+
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
+import wandb
+
+
+def compute_forgetting_table(statistics_summary, metric_prefix):
+    stage_ids = sorted(statistics_summary.keys())
+    if len(stage_ids) <= 1:
+        return [], 0.0
+
+    data = []
+    for task_idx in stage_ids[:-1]:
+        history = []
+        target_key = f"{metric_prefix}/task{task_idx}"
+
+        for stage_idx in stage_ids:
+            if stage_idx < task_idx:
+                continue
+            for out in statistics_summary[stage_idx]:
+                if target_key in out:
+                    history.append(float(out[target_key]))
+                    break
+
+        if history:
+            forgetting = (max(history) - history[-1]) * 100
+            data.append([int(task_idx), round(forgetting, 2)])
+
+    avg_forgetting = round(sum(v for _, v in data) / len(data), 2) if data else 0.0
+    return data, avg_forgetting
+
+
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
-    for metric_prefix, log_key, title in [
-        ("test_cum", "statistics/acc", "Final Acc"),
-        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
-    ]:
-        data_i = []
+    exp = trainer.logger.experiment
+
+    metric_configs = [
+        ("test_cum",     "statistics/acc",            "Final Acc",
+                         "statistics/forgetting",     "Forgetting",
+                         "statistics/avg_forgetting"),
+        ("test_nme_cum", "statistics/acc_nme",        "Final Acc NME",
+                         "statistics/forgetting_nme", "Forgetting NME",
+                         "statistics/avg_forgetting_nme"),
+    ]
+
+    for metric_prefix, acc_key, acc_title, fg_key, fg_title, avg_fg_key in metric_configs:
+        # acc: 对角线
+        acc_data = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
             for out in test_outputs:
                 if target_key in out:
-                    acc = round(float(out[target_key]) * 100, 2)
-                    data_i.append([int(task_idx), acc])
+                    acc_data.append([int(task_idx), round(float(out[target_key]) * 100, 2)])
                     break
-        table = wandb.Table(
-            data=data_i,
-            columns=["task", "acc"],
-        )
-        trainer.logger.experiment.log({
-            log_key: wandb.plot.line(
-                table=table,
-                x="task",
-                y="acc",
-                title=title,
-            )
-        })
+
+        if acc_data:
+            acc_table = wandb.Table(data=acc_data, columns=["task", "acc"])
+            exp.log({
+                acc_key: wandb.plot.line(
+                    table=acc_table,
+                    x="task",
+                    y="acc",
+                    title=acc_title,
+                )
+            })
+
+        # forgetting
+        fg_data, avg_fg = compute_forgetting_table(statistics_summary, metric_prefix)
+        if fg_data:
+            fg_table = wandb.Table(data=fg_data, columns=["task", "forgetting"])
+            exp.log({
+                fg_key: wandb.plot.line(
+                    table=fg_table,
+                    x="task",
+                    y="forgetting",
+                    title=fg_title,
+                ),
+                avg_fg_key: avg_fg,
+            })
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
@@ -77,8 +155,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
-        EPOCHS_PER_TASK_MEMORY = 20
+        EPOCHS_PER_TASK = 5
+        EPOCHS_PER_TASK_MEMORY = 5
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
     if not osp.exists(DATAPATH):
