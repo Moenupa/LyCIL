@@ -123,47 +123,28 @@ def test_podnet_cifar100(is_dummy_training: bool):
         }
     )
 
-    statistics = {"acc": {}}  # 每个 task 结束后的 acc cum
-    acc_cum_list = []  # 也保留一个 list 版本
-
-    def collect_acc_cum(test_outputs, cur_task_idx: int):
-        acc_cum = []
-        for out in test_outputs[: cur_task_idx + 1]:
-            acc = next(
-                float(v) for k, v in out.items()
-                if k.startswith("test_") and not k.startswith("test_nme_")
-            )
-            acc_cum.append(acc)
-        return acc_cum
-
     from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-    # @rank_zero_only
-    # def log_acc_to_wandb(logger, acc_cum: list[float]):
-    #     run = logger.experiment
-    #     run.define_metric("statistics/task")
-    #     run.define_metric("statistics/acc", step_metric="statistics/task")
-    #
-    #     for i, acc in enumerate(acc_cum, start=1):
-    #         logger.log_metrics({
-    #             "statistics/task": i,
-    #             "statistics/acc": float(acc),
-    #         })
-
     @rank_zero_only
-    def log_acc_to_wandb(logger, cur_task_idx: int, acc_cum: list[float]):
-        table = wandb.Table(
-            data=[[100 * acc, i + 1] for i, acc in enumerate(acc_cum)],
-            columns=["acc", "task"],
-        )
-        logger.experiment.log({
-            "statistics/acc": wandb.plot.line(
-                table=table,
-                x="task",
-                y="acc",
-                title=f"Final Acc Cum",
-            )
-        })
+    def log_acc_to_wandb(logger, final_test_outputs):
+        exp = logger.experiment
+
+        # 只需定义一次横轴
+        if not getattr(log_acc_to_wandb, "_defined", False):
+            exp.define_metric("task")
+            exp.define_metric("statistics/acc", step_metric="task")
+            log_acc_to_wandb._defined = True
+
+        for out in final_test_outputs:
+            for k, v in out.items():
+                if k.startswith("test_cum/task"):
+                    task_idx = int(k.split("task")[-1])
+                    exp.log({
+                        "task": task_idx,
+                        "statistics/acc": float(v) * 100,  # 如果你想显示百分比
+                    })
+
+
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
@@ -242,14 +223,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             verbose=False,
             ckpt_path=None,
         )
-        import pdb; pdb.set_trace()
 
-        cur_acc_cum = collect_acc_cum(final_test_outputs, task_idx)
-
-        statistics["acc"][task_idx] = cur_acc_cum.copy()
-        acc_cum_list.append(cur_acc_cum.copy())
-
-        log_acc_to_wandb(final_trainer.logger, task_idx, cur_acc_cum)
+        log_acc_to_wandb(final_trainer.logger, final_test_outputs)
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
