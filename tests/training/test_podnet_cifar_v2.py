@@ -108,7 +108,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         nme_eval_args={
             "enable": True,
             "topk": 1,
-            "dynamic_old": False,
+            "dynamic_old": True,
             "dynamic_new": False,
             "selection": "random",
             "seed": 42,
