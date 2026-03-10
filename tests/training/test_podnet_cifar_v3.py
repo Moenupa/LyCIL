@@ -154,7 +154,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
     @rank_zero_only
     def log_acc_to_wandb(logger, cur_task_idx: int, acc_cum: list[float]):
         table = wandb.Table(
-            data=[[i + 1, acc] for i, acc in enumerate(acc_cum)],
+            data=[[i + 1, 100*acc] for i, acc in enumerate(acc_cum)],
             columns=["task", "acc"],
         )
         logger.experiment.log({
