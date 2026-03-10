@@ -72,6 +72,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         # Use an adaptive total-memory budget so early tasks can temporarily
         # occupy the slots of unseen future classes.
         buffer_kwargs={"mem_size": total_buffer_size},
+
     )
     model = PODNet(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
@@ -104,6 +105,19 @@ def test_podnet_cifar100(is_dummy_training: bool):
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,
+        nme_eval_args={
+            "enable": True,
+            "topk": 1,
+            "dynamic_old": True,
+            "dynamic_new": True,
+            "selection": "herding",
+            "seed": 42,
+            "loader_kwargs": {
+                "batch_size": 128,
+                "shuffle": False,
+                "num_workers": 8,
+            },
+        },
     )
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
