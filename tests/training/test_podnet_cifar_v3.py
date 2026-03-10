@@ -231,10 +231,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             ckpt_path=None,
         )
         statistics_summary[task_idx] = test_outputs
-
         log_acc_to_wandb(final_trainer, statistics_summary)
 
-        # trainer.validate(model, datamodule=dm)
         wandb.finish()
 
 
