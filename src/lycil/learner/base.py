@@ -825,7 +825,7 @@ class BaseLearner(L.LightningModule):
             nme_acc1 = self._rank_top1_acc(rank_pred, y)
 
             self.log(
-                name=f"val_{suffix}_nme",
+                name=f"val_nme_{suffix}",
                 value=nme_acc1,
                 prog_bar=False,
                 sync_dist=True,
@@ -857,7 +857,7 @@ class BaseLearner(L.LightningModule):
             nme_acc1 = self._rank_top1_acc(rank_pred, y)
 
             self.log(
-                name=f"test_{suffix}_nme",
+                name=f"test_nme_{suffix}",
                 value=nme_acc1,
                 prog_bar=False,
                 sync_dist=True,
