@@ -44,20 +44,23 @@ def log_acc_to_wandb(trainer, statistics_summary):
         ("test_cum", "statistics/acc", "Final Acc"),
         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
     ]:
-        data_i = []
-
+        tasks = []
+        accs = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
-            acc = None
-            for out in test_outputs:
-                if target_key in out:
-                    acc = round(float(out[target_key]) * 100, 2)
-                    break
-            data_i.append([int(task_idx), acc])
+            acc = next(
+                (
+                    round(float(out[target_key]) * 100, 2)
+                    for out in test_outputs
+                    if target_key in out
+                ),
+                None,
+            )
+            tasks.append(int(task_idx))
+            accs.append(acc)
 
-        data_i = list(map(list, zip(*data_i)))
         table = wandb.Table(
-            data=data_i,
+            data=[tasks, accs],
             rows=["task", "acc"],
         )
 
