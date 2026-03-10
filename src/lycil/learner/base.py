@@ -710,17 +710,72 @@ class BaseLearner(L.LightningModule):
             for sample_idx, y in enumerate(task_labels):
                 class_to_indices[int(y)].append(sample_idx)
 
-            for class_idx in tqdm(
-                    range(self.num_old_classes, self.num_seen_classes),
-                    desc=f"Building TMP exemplars task {dm.get_current_task()} for NME evaluation",
-            ):
+            # for class_idx in tqdm(
+            #         range(self.num_old_classes, self.num_seen_classes),
+            #         desc=f"Building TMP exemplars task {dm.get_current_task()} for NME evaluation",
+            # ):
+            #     class_indices = class_to_indices.get(class_idx, [])
+            #     if len(class_indices) == 0:
+            #         continue
+            #
+            #     class_dataset_raw = task_train_dataset_raw.select(class_indices)
+            #     class_dataset_feat = task_train_dataset_feat.select(class_indices)
+            #
+            #     m = min(per_class_quota, len(class_dataset_raw))
+            #     selected_idx = self._select_exemplar_indices(
+            #         class_dataset_feat=class_dataset_feat,
+            #         m=m,
+            #         loader_kwargs=loader_kwargs,
+            #         exemplar_selection=exemplar_selection,
+            #         exemplar_seed=exemplar_seed,
+            #         class_idx=class_idx,
+            #     )
+            #
+            #     tmp_dataset = class_dataset_raw.select(selected_idx)
+            #     tmp_dataset.reset_format()
+            #     apply_dataset_transform(tmp_dataset, transform=feature_tfm)
+            #
+            #     loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
+            #     mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+            #     per_class_means[class_idx] = F.normalize(
+            #         mean.unsqueeze(0), dim=1
+            #     ).squeeze(0).cpu()
+
+            import time
+            import torch
+            import torch.nn.functional as F
+            from tqdm import tqdm
+
+            time_stats = []
+
+            pbar = tqdm(
+                range(self.num_old_classes, self.num_seen_classes),
+                desc=f"Building TMP exemplars task {dm.get_current_task()} for NME evaluation",
+            )
+
+            for class_idx in pbar:
+                class_time = {"class_idx": class_idx}
+
+                t0_total = time.perf_counter()
+
+                # 1. class_indices
+                t0 = time.perf_counter()
                 class_indices = class_to_indices.get(class_idx, [])
+                class_time["get_indices"] = time.perf_counter() - t0
+
                 if len(class_indices) == 0:
+                    class_time["total"] = time.perf_counter() - t0_total
+                    time_stats.append(class_time)
                     continue
 
+                # 2. select dataset
+                t0 = time.perf_counter()
                 class_dataset_raw = task_train_dataset_raw.select(class_indices)
                 class_dataset_feat = task_train_dataset_feat.select(class_indices)
+                class_time["select_dataset"] = time.perf_counter() - t0
 
+                # 3. exemplar selection
+                t0 = time.perf_counter()
                 m = min(per_class_quota, len(class_dataset_raw))
                 selected_idx = self._select_exemplar_indices(
                     class_dataset_feat=class_dataset_feat,
@@ -730,16 +785,56 @@ class BaseLearner(L.LightningModule):
                     exemplar_seed=exemplar_seed,
                     class_idx=class_idx,
                 )
+                class_time["select_exemplar_indices"] = time.perf_counter() - t0
 
+                # 4. tmp dataset + transform
+                t0 = time.perf_counter()
                 tmp_dataset = class_dataset_raw.select(selected_idx)
                 tmp_dataset.reset_format()
                 apply_dataset_transform(tmp_dataset, transform=feature_tfm)
+                class_time["build_tmp_dataset"] = time.perf_counter() - t0
 
+                # 5. dataloader
+                t0 = time.perf_counter()
                 loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
+                class_time["build_dataloader"] = time.perf_counter() - t0
+
+                # 6. compute_nme
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                t0 = time.perf_counter()
+
                 mean, _ = compute_nme(loader, self.feature_extractor, self.device)
+
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                class_time["compute_nme"] = time.perf_counter() - t0
+
+                # 7. normalize + save
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                t0 = time.perf_counter()
+
                 per_class_means[class_idx] = F.normalize(
                     mean.unsqueeze(0), dim=1
                 ).squeeze(0).cpu()
+
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                class_time["normalize_and_store"] = time.perf_counter() - t0
+
+                class_time["total"] = time.perf_counter() - t0_total
+                time_stats.append(class_time)
+
+                pbar.set_postfix({
+                    "class": class_idx,
+                    "total": f"{class_time['total']:.3f}s",
+                    "nme": f"{class_time['compute_nme']:.3f}s",
+                })
+
+            # 打印汇总
+            for item in time_stats:
+                print(item)
 
 
         if len(per_class_means) == 0:
