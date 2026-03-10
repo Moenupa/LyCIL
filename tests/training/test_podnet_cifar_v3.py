@@ -139,17 +139,32 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
     from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-    @rank_zero_only
-    def log_acc_to_wandb(logger, acc_cum: list[float]):
-        run = logger.experiment
-        run.define_metric("statistics/task")
-        run.define_metric("statistics/acc", step_metric="statistics/task")
+    # @rank_zero_only
+    # def log_acc_to_wandb(logger, acc_cum: list[float]):
+    #     run = logger.experiment
+    #     run.define_metric("statistics/task")
+    #     run.define_metric("statistics/acc", step_metric="statistics/task")
+    #
+    #     for i, acc in enumerate(acc_cum, start=1):
+    #         logger.log_metrics({
+    #             "statistics/task": i,
+    #             "statistics/acc": float(acc),
+    #         })
 
-        for i, acc in enumerate(acc_cum, start=1):
-            logger.log_metrics({
-                "statistics/task": i,
-                "statistics/acc": float(acc),
-            })
+    @rank_zero_only
+    def log_acc_to_wandb(logger, cur_task_idx: int, acc_cum: list[float]):
+        table = wandb.Table(
+            data=[[i + 1, acc] for i, acc in enumerate(acc_cum)],
+            columns=["task", "acc"],
+        )
+        logger.experiment.log({
+            "statistics/acc": wandb.plot.line(
+                table,
+                "task",
+                "acc",
+                title=f"Final Acc Cum @ Task {cur_task_idx + 1}",
+            )
+        })
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
