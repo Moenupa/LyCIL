@@ -41,29 +41,18 @@ def log_acc_to_wandb(trainer, statistics_summary):
         ("test_cum", "statistics/acc", "Final Acc"),
         ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
     ]:
-        tasks = []
-        accs = []
+        data_i = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
-            acc = next(
-                (
-                    out[target_key]
-                    for out in test_outputs
-                    if target_key in out
-                ),
-                None,
-            )
-            tasks.append(int(task_idx))
-            accs.append(round(float(acc) * 100, 2))
-
+            for out in test_outputs:
+                if target_key in out:
+                    acc = round(float(out[target_key]) * 100, 2)
+                    data_i.append([int(task_idx), acc])
+                    break
         table = wandb.Table(
-            columns=["metric"] + [f"task{t}" for t in tasks],
-            data=[
-                ["task", *tasks],
-                ["acc", *accs],
-            ],
+            data=data_i,
+            columns=["task", "acc"],
         )
-
         trainer.logger.experiment.log({
             log_key: wandb.plot.line(
                 table=table,
