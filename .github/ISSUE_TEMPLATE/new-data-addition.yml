@@ -1,0 +1,30 @@
+name: "\U0001F31F New data addition"
+description: Submit a proposal/request to support a new data
+labels: [ "New data" ]
+
+body:
+  - type: textarea
+    id: description-request
+    validations:
+      required: true
+    attributes:
+      label: Data description
+      description: |
+        Put any and all important information relative to the data
+
+  - type: checkboxes
+    id: information-tasks
+    attributes:
+      label: Open source status
+      description: |
+          Please note that if the data source isn't available, we are less likely to support it in `LyCIL`.
+      options:
+        - label: "The data source is available"
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Provide useful links for the dataset
+      description: |
+        Please provide information regarding the dataset, the license, and the authors.
+        Please mention the authors by @gh-username if you're aware of their usernames.
