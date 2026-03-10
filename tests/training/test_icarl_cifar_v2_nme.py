@@ -24,32 +24,113 @@ from lycil.backbone import ConvNetArgs
 
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
+
+def compute_avg_forgetting_curve(statistics_summary, metric_prefix):
+    """
+    计算每个阶段 i 的平均遗忘率（百分数）:
+        F_i = mean_j( max_{t in [j, i]} acc(t, j) - acc(i, j) )
+
+    其中 j 是到阶段 i 为止已经学过的旧任务，默认不包含当前任务 i 自己。
+    所以:
+        - stage 0 的 forgetting = 0
+        - stage i (i>0) 的平均 forgetting 是对任务 0 ~ i-1 求平均
+
+    返回:
+        data: [[stage_idx, avg_forgetting_percent], ...]
+    """
+    stage_ids = sorted(statistics_summary.keys())
+    data = []
+
+    for cur_stage in stage_ids:
+        # 第一个任务没有 forgetting
+        if cur_stage == 0:
+            data.append([0, 0.0])
+            continue
+
+        forgetting_list = []
+
+        # 只统计旧任务 0 ~ cur_stage-1
+        for old_task in stage_ids:
+            if old_task >= cur_stage:
+                break
+
+            target_key = f"{metric_prefix}/task{old_task}"
+            history = []
+
+            # 收集 old_task 从学完自己开始，到当前阶段 cur_stage 为止的 acc 轨迹
+            for past_stage in stage_ids:
+                if past_stage < old_task:
+                    continue
+                if past_stage > cur_stage:
+                    break
+
+                for out in statistics_summary[past_stage]:
+                    if target_key in out:
+                        history.append(float(out[target_key]))
+                        break
+
+            if not history:
+                continue
+
+            cur_acc = history[-1]
+            best_acc = max(history)
+            forgetting = (best_acc - cur_acc) * 100.0
+            forgetting_list.append(forgetting)
+
+        avg_forgetting = (
+            round(sum(forgetting_list) / len(forgetting_list), 2)
+            if forgetting_list else 0.0
+        )
+        data.append([int(cur_stage), avg_forgetting])
+
+    return data
+
+
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
-    for metric_prefix, log_key, title in [
-        ("test_cum", "statistics/acc", "Final Acc"),
-        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME"),
-    ]:
-        data_i = []
+    exp = trainer.logger.experiment
+
+    metric_configs = [
+        ("test_cum", "statistics/acc", "Final Acc",
+         "statistics/avg_forgetting", "Avg Forgetting"),
+        ("test_nme_cum", "statistics/acc_nme", "Final Acc NME",
+         "statistics/avg_forgetting_nme", "Avg Forgetting NME"),
+    ]
+
+    for metric_prefix, acc_key, acc_title, fg_key, fg_title in metric_configs:
+        # 1) 每个阶段的 last acc（对角线）
+        acc_data = []
         for task_idx, test_outputs in sorted(statistics_summary.items()):
             target_key = f"{metric_prefix}/task{task_idx}"
             for out in test_outputs:
                 if target_key in out:
                     acc = round(float(out[target_key]) * 100, 2)
-                    data_i.append([int(task_idx), acc])
+                    acc_data.append([int(task_idx), acc])
                     break
-        table = wandb.Table(
-            data=data_i,
-            columns=["task", "acc"],
-        )
-        trainer.logger.experiment.log({
-            log_key: wandb.plot.line(
-                table=table,
-                x="task",
-                y="acc",
-                title=title,
-            )
-        })
+
+        if acc_data:
+            acc_table = wandb.Table(data=acc_data, columns=["task", "acc"])
+            exp.log({
+                acc_key: wandb.plot.line(
+                    table=acc_table,
+                    x="task",
+                    y="acc",
+                    title=acc_title,
+                )
+            })
+
+        # 2) 每个阶段的平均 forgetting
+        fg_data = compute_avg_forgetting_curve(statistics_summary, metric_prefix)
+        if fg_data:
+            fg_table = wandb.Table(data=fg_data, columns=["task", "forgetting"])
+            exp.log({
+                fg_key: wandb.plot.line(
+                    table=fg_table,
+                    x="task",
+                    y="forgetting",
+                    title=fg_title,
+                )
+            })
 
 
 
