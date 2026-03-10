@@ -131,6 +131,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
 
     )
 
+    statistics_summary={}
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
 
@@ -152,7 +153,14 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer.fit(model, datamodule=dm)
-        # trainer.validate(model, datamodule=dm)
+        test_outputs = trainer.test(
+            model=model,
+            datamodule=dm,
+            verbose=False,
+            ckpt_path=None,
+        )
+        statistics_summary[task_idx] = test_outputs
+        log_acc_to_wandb(trainer, statistics_summary)
 
         wandb.finish()
 
