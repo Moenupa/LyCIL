@@ -162,7 +162,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 table,
                 "task",
                 "acc",
-                title=f"Final Acc Cum @ Task {cur_task_idx + 1}",
+                title=f"Final Acc Cum",
             )
         })
 
