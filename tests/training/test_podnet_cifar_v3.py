@@ -10,63 +10,6 @@ from lycil.learner.podnet import PODNet
 from lycil.backbone import ConvNetArgs
 
 
-import re
-
-
-def extract_task_accs(test_results):
-    """
-    从 trainer.test() 的返回结果里提取:
-    - task_accs: 当前 task 结束后，各已见任务上的 acc
-    - acc_cum: task_accs 的平均值
-    """
-    if isinstance(test_results, list) and len(test_results) > 0:
-        merged = {}
-        for x in test_results:
-            merged.update(x)
-    else:
-        merged = test_results or {}
-
-    # 只取 test_ 开头、但排除 test_nme_
-    acc_items = []
-    for k, v in merged.items():
-        if k.startswith("test_") and not k.startswith("test_nme_"):
-            m = re.search(r"(\d+)$", k)
-            idx = int(m.group(1)) if m else 10**9
-            if hasattr(v, "item"):
-                v = v.item()
-            acc_items.append((idx, float(v)))
-
-    acc_items.sort(key=lambda x: x[0])
-    task_accs = [v for _, v in acc_items]
-    acc_cum = sum(task_accs) / len(task_accs) if len(task_accs) > 0 else None
-    return task_accs, acc_cum
-
-
-def log_summary_to_wandb(logger, task_idx, task_accs, acc_cum, acc_cum_history):
-    run = logger.experiment
-    run_name = getattr(logger, "_name", None) or getattr(logger, "name", None) or "run"
-
-    summary_text = "\n".join([
-        f"after task {task_idx}",
-        f"task_accs: {[round(x, 4) for x in task_accs]}",
-        f"acc_cum: {round(acc_cum, 4) if acc_cum is not None else None}",
-        f"acc_cum_history: {[round(x, 4) for x in acc_cum_history]}",
-    ])
-
-    # 写到 wandb summary
-    run.summary[f"{run_name} summary"] = summary_text
-    run.summary[f"{run_name}/last_task_accs"] = [round(x, 4) for x in task_accs]
-    run.summary[f"{run_name}/acc_cum_history"] = [round(x, 4) for x in acc_cum_history]
-
-    # 也顺手 log 一下标量，方便看曲线
-    log_dict = {
-        f"{run_name}/final_acc_cum": acc_cum,
-    }
-    for i, acc in enumerate(task_accs):
-        log_dict[f"{run_name}/task_{i}_acc"] = acc
-
-    run.log(log_dict)
-
 class OffsetWandbLogger(WandbLogger):
     def __init__(self, step_offset: int = 0, epoch_offset: int = 0, **kwargs):
         super().__init__(**kwargs)
@@ -180,8 +123,32 @@ def test_podnet_cifar100(is_dummy_training: bool):
         }
     )
 
-    final_task_accs = {}  # {task_idx: [acc_task0, acc_task1, ...]}
-    acc_cum_history = []  # [task0后的acc_cum, task1后的acc_cum, ...]
+    statistics = {"acc": {}}   # 每个 task 结束后的 acc cum
+    acc_cum_list = []          # 也保留一个 list 版本
+
+    def collect_acc_cum(test_outputs, cur_task_idx: int):
+        acc_cum = []
+        for out in test_outputs[: cur_task_idx + 1]:
+            acc = next(
+                float(v) for k, v in out.items()
+                if k.startswith("test_") and not k.startswith("test_nme_")
+            )
+            acc_cum.append(acc)
+        return acc_cum
+
+    def log_acc_to_wandb(logger, cur_task_idx: int, acc_cum: list[float]):
+        table = wandb.Table(
+            data=[[i + 1, acc] for i, acc in enumerate(acc_cum)],
+            columns=["task", "acc"],
+        )
+        logger.experiment.log({
+            "statistics/acc": wandb.plot.line(
+                table,
+                "task",
+                "acc",
+                title=f"Final Acc Cum @ Task {cur_task_idx + 1}",
+            )
+        })
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
@@ -213,7 +180,6 @@ def test_podnet_cifar100(is_dummy_training: bool):
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer1.fit(model, datamodule=dm)
-        final_logger = logger1
         final_trainer = trainer1
 
         if task_idx > 0:
@@ -221,8 +187,11 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.buffer_training = True
             model.need_snapshot_old = True
 
+            #
+
             # model.backbone.eval()
             # model.backbone.requires_grad_(False)
+            # model.classifier.requires_grad_(True)
             dm.use_buffer = True
             dm.buffer_only_new = False
             dm.train_filter_fn = lambda e: False
@@ -249,25 +218,25 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
             trainer2.fit(model, datamodule=dm)
-            final_logger = logger2
             final_trainer = trainer2
             # model.backbone.requires_grad_(True)
 
-        # ===== 每个 task 训练完成后的最终 eval =====
-        test_results = final_trainer.test(model, datamodule=dm, verbose=False)
-        task_accs, acc_cum = extract_task_accs(test_results)
 
-        final_task_accs[task_idx] = task_accs
-        if acc_cum is not None:
-            acc_cum_history.append(acc_cum)
+            final_test_outputs = final_trainer.test(
+                model=model,
+                datamodule=dm,
+                verbose=False,
+                ckpt_path=None,
+            )
 
-        log_summary_to_wandb(
-            logger=final_logger,
-            task_idx=task_idx,
-            task_accs=task_accs,
-            acc_cum=acc_cum,
-            acc_cum_history=acc_cum_history,
-        )
+            cur_acc_cum = collect_acc_cum(final_test_outputs, task_idx)
+
+            statistics["acc"][task_idx] = cur_acc_cum.copy()
+            acc_cum_list.append(cur_acc_cum.copy())
+
+            log_acc_to_wandb(final_trainer.logger, task_idx, cur_acc_cum)
+
+            wandb.finish()
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
