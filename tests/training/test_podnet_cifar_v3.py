@@ -33,33 +33,24 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     # task 1+: 只在 buffer 微调阶段结束后 snapshot
     return use_buffer
 
+
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 
-from lightning_utilities.core.rank_zero import rank_zero_only
-import wandb
 
 
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
     data = []
-
+    acc = None
     for task_idx, test_outputs in sorted(statistics_summary.items()):
         target_key = f"test_cum/task{task_idx}"
-        acc = None
-
         for out in test_outputs:
             if target_key in out:
                 acc = round(float(out[target_key]) * 100, 2)
                 break
 
-        if acc is None:
-            continue
-
-        data.append([task_idx + 1, acc])
-
-    if not data:
-        return
+        data.append([int(task_idx + 1), acc])
 
     table = wandb.Table(
         data=data,
@@ -74,6 +65,7 @@ def log_acc_to_wandb(trainer, statistics_summary):
             title="Final Acc Cum",
         )
     })
+
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
@@ -164,8 +156,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         }
     )
 
-
-    statistics_summary={}
+    statistics_summary = {}
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
@@ -254,4 +245,3 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
 if __name__ == "__main__":
     test_podnet_cifar100(is_dummy_training=False)
-
