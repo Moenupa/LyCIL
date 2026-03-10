@@ -159,6 +159,8 @@ class HFDataModule(L.LightningDataModule):
 
     def prepare_data(self):
         #TODO: fixbug
+        # load_dataset(self.path)
+        # ./data/cifar100
         load_dataset("cifar100", cache_dir=self.path)
 
     def setup(self, stage: str | None = None):
