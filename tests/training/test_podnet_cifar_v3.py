@@ -38,7 +38,7 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 
 @rank_zero_only
-def log_acc_to_wandb(logger, final_test_outputs):
+def log_acc_to_wandb(trainer, final_test_outputs):
     acc_col = []
     task_col = []
 
@@ -61,7 +61,7 @@ def log_acc_to_wandb(logger, final_test_outputs):
         columns=["acc", "task"],
     )
 
-    logger.experiment.log({
+    trainer.logger.experiment.log({
         "statistics/acc": wandb.plot.line(
             table=table,
             x="task",
