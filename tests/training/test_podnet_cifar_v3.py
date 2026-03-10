@@ -35,24 +35,33 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
 
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
+
+
 @rank_zero_only
-def log_acc_to_wandb(trainer, final_test_outputs):
-    data = sorted(
-        [
-            [round(float(v) * 100, 2), int(k.split("task")[-1]) + 1]
-            for out in final_test_outputs
-            for k, v in out.items()
-            if k.startswith("test_cum/task")
-        ],
-        key=lambda x: x[1],
-    )
+def log_acc_to_wandb(logger, final_test_outputs):
+    acc_col = []
+    task_col = []
+
+    for out in final_test_outputs:
+        for k, v in out.items():
+            if not k.startswith("test_cum/task"):
+                continue
+
+            task_idx = int(k.split("task")[-1]) + 1
+            acc = round(float(v) * 100, 2)
+
+            acc_col.append(acc)
+            task_col.append(task_idx)
+
+    # 先按 task 排序
+    rows = sorted(zip(acc_col, task_col), key=lambda x: x[1])
 
     table = wandb.Table(
-        data=data,
-        rows=["acc", "task"],
+        data=rows,
+        columns=["acc", "task"],
     )
 
-    trainer.logger.experiment.log({
+    logger.experiment.log({
         "statistics/acc": wandb.plot.line(
             table=table,
             x="task",
@@ -60,7 +69,6 @@ def log_acc_to_wandb(trainer, final_test_outputs):
             title="Final Acc Cum",
         )
     })
-
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
