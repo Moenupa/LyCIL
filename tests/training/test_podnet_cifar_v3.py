@@ -59,7 +59,7 @@ def log_acc_to_wandb(trainer, statistics_summary):
         table = wandb.Table(
             columns=["metric"] + [f"task{t}" for t in tasks],
             data=[
-                ["task", *tasks],
+                # ["task", *tasks],
                 ["acc", *accs],
             ],
         )
