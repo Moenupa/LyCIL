@@ -128,12 +128,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
     @rank_zero_only
     def log_acc_to_wandb(logger, final_test_outputs):
         exp = logger.experiment
-
-        # 只需定义一次横轴
-        if not getattr(log_acc_to_wandb, "_defined", False):
-            exp.define_metric("task")
-            exp.define_metric("statistics/acc", step_metric="task")
-            log_acc_to_wandb._defined = True
+        exp.define_metric("task")
+        exp.define_metric("statistics/acc", step_metric="task")
 
         for out in final_test_outputs:
             for k, v in out.items():
@@ -141,7 +137,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                     task_idx = int(k.split("task")[-1])
                     exp.log({
                         "task": task_idx,
-                        "statistics/acc": float(v) * 100,  # 如果你想显示百分比
+                        "statistics/acc": round(float(v) * 100, 2),
                     })
 
 
