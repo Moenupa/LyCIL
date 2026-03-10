@@ -612,11 +612,12 @@ class BaseLearner(L.LightningModule):
             loader, self.feature_extractor, self.device
         )
 
-        class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0).cpu()
-        feats = per_sample_features.cpu()
+        # 不再转 CPU
+        class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0)
+        feats = per_sample_features
 
         selected_idx = []
-        selected_mask = torch.zeros(n_samples, dtype=torch.bool)
+        selected_mask = torch.zeros(n_samples, dtype=torch.bool, device=feats.device)
         running_sum = torch.zeros_like(class_mean)
 
         for k in range(1, min(m, n_samples) + 1):
