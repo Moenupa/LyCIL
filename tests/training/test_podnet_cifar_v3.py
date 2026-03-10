@@ -50,7 +50,7 @@ def log_acc_to_wandb(trainer, statistics_summary):
                 acc = round(float(out[target_key]) * 100, 2)
                 break
 
-        data.append([int(task_idx + 1), acc])
+        data.append([int(task_idx), acc])
 
     table = wandb.Table(
         data=data,
