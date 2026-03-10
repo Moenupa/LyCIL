@@ -134,7 +134,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         lambda_spatial=5.0,
         lambda_flat=1.0,
         buffer_args={
-            "selection": "random",
+            "selection": "herding",
             "seed": 42,
             "loader_kwargs": {
                 "batch_size": 128,

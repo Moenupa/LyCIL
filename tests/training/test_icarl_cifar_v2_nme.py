@@ -4,10 +4,11 @@ import lightning as L
 import pytest
 from lightning.pytorch.loggers import WandbLogger
 
+
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
-from lycil.learner.lwf import LWF
+from lycil.learner.icarl import ICaRL
 
 from tests.training.constants import (
     CIFAR10_LABEL_COL,
@@ -51,10 +52,11 @@ def log_acc_to_wandb(trainer, statistics_summary):
         })
 
 
+
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 @pytest.mark.xdist_group("training")
-def test_lwf_cifar100(device: str, is_dummy_training: bool):
+def test_icarl_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [1, 1]
@@ -71,8 +73,8 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         return
 
     L.seed_everything(42)
-    total_buffer_size = BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)
 
+    total_buffer_size = BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)
     dm = HFDataModule(
         DATAPATH,
         transform_name=osp.basename(DATAPATH),
@@ -88,7 +90,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         buffer_kwargs={"mem_size": total_buffer_size},
         # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
-    model = LWF(
+    model = ICaRL(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="linear",
         per_task_optim_args={
@@ -126,9 +128,9 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
                 "every_n_epochs": 10,  # 新增：每隔多少个 epoch 做一次 val nme
             },
         },
+
     )
 
-    statistics_summary={}
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
 
@@ -140,27 +142,20 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"nme_warmup_hparms_wd_5e4_lwf_cifar100_task{task_idx}",
+                name=f"warmup_hparms_wd_5e4_icarl_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
-                tags=["lwf", "cifar100"],
+                tags=["icarl", "cifar100"],
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer.fit(model, datamodule=dm)
-        test_outputs = trainer.test(
-            model=model,
-            datamodule=dm,
-            verbose=False,
-            ckpt_path=None,
-        )
-        statistics_summary[task_idx] = test_outputs
-        log_acc_to_wandb(trainer, statistics_summary)
+        # trainer.validate(model, datamodule=dm)
 
         wandb.finish()
 
 
 if __name__ == "__main__":
-    test_lwf_cifar100(device="cuda", is_dummy_training=False)
+    test_icarl_cifar100(device="cuda", is_dummy_training=False)
