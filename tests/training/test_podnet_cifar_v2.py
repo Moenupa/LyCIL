@@ -106,10 +106,10 @@ def test_podnet_cifar100(is_dummy_training: bool):
         lambda_spatial=5.0,
         lambda_flat=1.0,
         nme_eval_args={
-            "enable": False,
+            "enable": True,
             "topk": 1,
-            "dynamic_old": True,
-            "dynamic_new": True,
+            "dynamic_old": False,
+            "dynamic_new": False,
             "selection": "random",
             "seed": 42,
             "loader_kwargs": {
