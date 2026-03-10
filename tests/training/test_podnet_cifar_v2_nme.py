@@ -189,8 +189,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 5
-        EPOCHS_PER_TASK_MEMORY = 5
+        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
     if not osp.exists(DATAPATH):
@@ -258,7 +258,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
-                "every_n_epochs": 10,  # 新增：每隔多少个 epoch 做一次 val nme
+                "every_n_epochs": 200,  # 新增：每隔多少个 epoch 做一次 val nme
             },
         }
     )
