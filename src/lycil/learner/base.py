@@ -638,7 +638,7 @@ class BaseLearner(L.LightningModule):
     @torch.no_grad()
     def _build_eval_nme_state(
             self,
-            dm: "HFDataModule",
+            dm: HFDataModule,
             include_new_tmp: bool,
     ) -> tuple[torch.Tensor, torch.Tensor] | None:
         if dm.buffer is None:
