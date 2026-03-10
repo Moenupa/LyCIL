@@ -34,7 +34,7 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
     # task 1+: 只在 buffer 微调阶段结束后 snapshot
     return use_buffer
 
-
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
 @rank_zero_only
 def log_acc_to_wandb(trainer, statistics_summary):
     for metric_prefix, log_key, title in [
