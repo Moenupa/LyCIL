@@ -36,24 +36,34 @@ def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 
+from lightning_utilities.core.rank_zero import rank_zero_only
+import wandb
+
 
 @rank_zero_only
-def log_acc_to_wandb(trainer, final_test_outputs):
+def log_acc_to_wandb(trainer, statistics_summary):
     data = []
-    for out in final_test_outputs:
-        for k, v in out.items():
-            if not k.startswith("test_cum/task"):
-                continue
 
-            task_idx = int(k.split("task")[-1]) + 1
-            acc = round(float(v) * 100, 2)
-            data.append([acc, task_idx])
+    for task_idx, test_outputs in sorted(statistics_summary.items()):
+        target_key = f"test_cum/task{task_idx}"
+        acc = None
 
-    data.sort(key=lambda x: x[1])
+        for out in test_outputs:
+            if target_key in out:
+                acc = round(float(out[target_key]) * 100, 2)
+                break
+
+        if acc is None:
+            continue
+
+        data.append([task_idx + 1, acc])
+
+    if not data:
+        return
 
     table = wandb.Table(
         data=data,
-        columns=["acc", "task"],
+        columns=["task", "acc"],
     )
 
     trainer.logger.experiment.log({
@@ -155,7 +165,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
     )
 
 
-
+    statistics_summary={}
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
@@ -228,14 +238,15 @@ def test_podnet_cifar100(is_dummy_training: bool):
             final_trainer = trainer2
             # model.backbone.requires_grad_(True)
 
-        final_test_outputs = final_trainer.test(
+        test_outputs = final_trainer.test(
             model=model,
             datamodule=dm,
             verbose=False,
             ckpt_path=None,
         )
+        statistics_summary[task_idx] = test_outputs
 
-        log_acc_to_wandb(final_trainer, final_test_outputs)
+        log_acc_to_wandb(final_trainer, statistics_summary)
 
         # trainer.validate(model, datamodule=dm)
         wandb.finish()
@@ -243,3 +254,4 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
 if __name__ == "__main__":
     test_podnet_cifar100(is_dummy_training=False)
+
