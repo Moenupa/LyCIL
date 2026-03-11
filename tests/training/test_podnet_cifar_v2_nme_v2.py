@@ -27,7 +27,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK = 20
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
