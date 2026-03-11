@@ -89,14 +89,14 @@ def test_podnet_cifar100(is_dummy_training: bool):
             "loader_kwargs": {
                 "batch_size": 128,
                 "shuffle": False,
-                "num_workers": 8,
+                "num_workers": 10,
             },
             "nme_eval": {
                 "enable": True,
                 "topk": 1,
                 "dynamic_old": True,
                 "dynamic_new": True,
-                "every_n_epochs": 200,  # 新增：每隔多少个 epoch 做一次 val nme
+                "every_n_epochs": EPOCHS_PER_TASK,
             },
         }
     )
@@ -113,7 +113,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
 
         logger1 = OffsetWandbLogger(
             resume="allow",
-            name=f"statistic_nme_main_adpmem_nopretrain_20_herding_select_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
