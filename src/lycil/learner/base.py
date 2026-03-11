@@ -365,39 +365,6 @@ class BaseLearner(L.LightningModule):
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         ...
 
-    # def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-    #     x, y = self.unpack_batch(batch)
-    #     logits: torch.Tensor = self(x)
-    #     acc1 = accuracy(logits, y)
-    #
-    #     dm = self.trainer.datamodule  # HFDataModule
-    #     name = getattr(dm, "_val_loader_names", None)
-    #     suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-    #
-    #     self.log(
-    #         name=f"val_{suffix}",
-    #         value=acc1,
-    #         prog_bar=False,
-    #         sync_dist=True,
-    #         add_dataloader_idx=False,
-    #     )
-    #
-    # def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
-    #     x, y = self.unpack_batch(batch)
-    #     logits: torch.Tensor = self(x)
-    #     acc1 = accuracy(logits, y)
-    #
-    #     dm = self.trainer.datamodule
-    #     name = getattr(dm, "_test_loader_names", None)
-    #     suffix = name[dataloader_idx] if name is not None else f"dl{dataloader_idx}"
-    #
-    #     self.log(
-    #         name=f"test_{suffix}",
-    #         value=acc1,
-    #         prog_bar=False,
-    #         sync_dist=True,
-    #         add_dataloader_idx=False,
-    #     )
 
     @torch.no_grad()
     def update_memory(self, dm: HFDataModule, **kwargs) -> None:
@@ -455,13 +422,6 @@ class BaseLearner(L.LightningModule):
         - 自适应总内存模式下，应当在调用本函数前先把旧类 exemplar 裁剪到新的配额；
         - 固定每类样本数模式下，可以直接调用本函数，对旧类重算 mean，并为新类构建 exemplar。
         """
-        # exemplar 构建时使用的 dataloader 配置
-        # 这里固定不用 shuffle，避免 exemplar 选择过程不稳定
-        # loader_kwargs = dict(
-        #     batch_size=128,
-        #     shuffle=False,
-        #     num_workers=8,
-        # )
 
         assert dm.buffer is not None
 
