@@ -122,7 +122,7 @@ def log_statistics_to_wandb(trainer, statistics_summary):
 
         results[metric_prefix] = {
             "acc_data": acc_data,
-            "fg_data": fg_data,
+            "forgetting_data": fg_data,
             "avg_acc": avg_acc,
             "avg_forgetting": avg_forgetting,
         }
