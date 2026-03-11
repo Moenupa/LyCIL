@@ -161,11 +161,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
-        # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
-        # Use an adaptive total-memory budget so early tasks can temporarily
-        # occupy the slots of unseen future classes.
-        buffer_kwargs={"mem_size": total_buffer_size},
-        # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
+        buffer_kwargs=None,
     )
     model = EWC(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
@@ -193,24 +189,9 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
                 "max_epochs": EPOCHS_PER_TASK,
             }
         },
-        lambda_ewc=1000,
+        lambda_ewc=1e4,
         fisher_max=0.0001,
-        buffer_args={
-            "selection": "herding",
-            "seed": 42,
-            "loader_kwargs": {
-                "batch_size": 128,
-                "shuffle": False,
-                "num_workers": 8,
-            },
-            "nme_eval": {
-                "enable": True,
-                "topk": 1,
-                "dynamic_old": True,
-                "dynamic_new": True,
-                "every_n_epochs": 200,  # 新增：每隔多少个 epoch 做一次 val nme
-            },
-        },
+        buffer_args=None,
 
     )
     statistics_summary={}
@@ -225,7 +206,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"nme_warmup_hparms_wd_5e4_ewc_cifar100_task{task_idx}",
+                name=f"lambda1e4_nme_warmup_hparms_wd_5e4_ewc_cifar100_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["ewc", "cifar100"],

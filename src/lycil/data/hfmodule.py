@@ -128,8 +128,6 @@ class HFDataModule(L.LightningDataModule):
         self.buffer: BaseExemplarBuffer | None = (
             BaseExemplarBuffer(**buffer_kwargs) if buffer_kwargs is not None else None
         )
-        self.use_buffer: bool = True
-        self.buffer_only_new = False
         self.train_filter_fn: Callable[[dict], bool] | None = None
 
         self._cur_task_id: int = 0
@@ -264,7 +262,7 @@ class HFDataModule(L.LightningDataModule):
             split: str,
             filter_fn: Callable[[dict], bool],
             transform: Callable | None = None,
-            use_buffer: bool = False,
+            use_buffer: bool = True,
             buffer_only_new: bool = False,
     ) -> Dataset:
         subset = self.dataset[split].filter(filter_fn)
@@ -287,7 +285,7 @@ class HFDataModule(L.LightningDataModule):
             filter_fn: Callable[[dict], bool],
             transform: Callable | None,
             loader_kwargs: dict,
-            use_buffer: bool = False,
+            use_buffer: bool = True,
             buffer_only_new: bool = False,
     ) -> DataLoader:
         """Build a dataloader from a filtered split with optional buffer mixing.
@@ -299,7 +297,7 @@ class HFDataModule(L.LightningDataModule):
             loader_kwargs (dict): Extra arguments for
                 :class:`~torch.utils.data.DataLoader`.
             use_buffer (bool, optional): Whether to append buffer exemplars.
-                Defaults to ``False``.
+                Defaults to ``True``.
             buffer_only_new (bool, optional): Whether to use only new exemplars
                 from the buffer when ``use_buffer`` is enabled. Defaults to
                 ``False``.
@@ -322,8 +320,6 @@ class HFDataModule(L.LightningDataModule):
             filter_fn=self.train_filter_fn or self.is_label_in_cur_task,
             transform=self.get_effective_transform("train"),
             loader_kwargs=self.train_loader_kwargs,
-            use_buffer=self.use_buffer,
-            buffer_only_new=self.buffer_only_new,
         )
 
     # ---------- eval helpers (cached) ----------

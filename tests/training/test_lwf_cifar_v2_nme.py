@@ -166,8 +166,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
         # Use an adaptive total-memory budget so early tasks can temporarily
         # occupy the slots of unseen future classes.
-        buffer_kwargs={"mem_size": total_buffer_size},
-        # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
+        buffer_kwargs=None,
     )
     model = LWF(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
@@ -191,22 +190,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
         },
         distill_T=1.0,
         distill_lambda=1.0,
-        buffer_args={
-            "selection": "herding",
-            "seed": 42,
-            "loader_kwargs": {
-                "batch_size": 128,
-                "shuffle": False,
-                "num_workers": 8,
-            },
-            "nme_eval": {
-                "enable": True,
-                "topk": 1,
-                "dynamic_old": True,
-                "dynamic_new": True,
-                "every_n_epochs": 200,  # 新增：每隔多少个 epoch 做一次 val nme
-            },
-        },
+        buffer_args=None,
     )
 
     statistics_summary={}
