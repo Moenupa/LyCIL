@@ -44,7 +44,6 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         return
 
     L.seed_everything(42)
-
     total_buffer_size = BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)
     dm = HFDataModule(
         DATAPATH,
