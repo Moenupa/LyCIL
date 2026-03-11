@@ -130,8 +130,8 @@ class EWC(BaseLearner):
             if n not in self.fisher_dict:
                 continue
 
-            old_p = self.mean_dict[n]
-            f = self.fisher_dict[n]
+            old_p = self.mean_dict[n].to(self.device)
+            f = self.fisher_dict[n].to(self.device)
             _loss = torch.sum(f * (p[: len(old_p)] - old_p).pow(2)) / 2
 
             loss_ewc = loss_ewc + _loss
