@@ -137,10 +137,15 @@ class EWC(BaseLearner):
             loss_ewc = loss_ewc + _loss
         return loss_ewc
 
+    def on_train_start(self):
+        # 缓存本次 fit 真正使用的 loader，别在 train_end 再向 dm 重新要
+        self._fisher_loader = self.trainer.train_dataloader
+
     def on_train_end(self) -> None:
         """Refresh Fisher and parameter-mean statistics after training."""
         dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
         self.update_fisher_and_mean(dm)
+
 
     @torch.no_grad()
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
@@ -165,7 +170,8 @@ class EWC(BaseLearner):
 
         self.train()
         with torch.enable_grad():
-            train_loader = dm.train_dataloader()
+            # train_loader = dm.train_dataloader()
+            train_loader = self._fisher_loader
             for batch in train_loader:
                 self.zero_grad()
                 x, y = self.unpack_batch(batch, self.device)
