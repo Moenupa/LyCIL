@@ -34,7 +34,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 20
+        EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
