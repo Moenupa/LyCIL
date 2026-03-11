@@ -1,37 +1,15 @@
 import os.path as osp
 import lightning as L
 import pytest
-from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.podnet import PODNet
 from lycil.backbone import ConvNetArgs
+from tests.training.log_utils import log_statistics_to_wandb,OffsetWandbLogger
 
 
-class OffsetWandbLogger(WandbLogger):
-    def __init__(self, step_offset: int = 0, epoch_offset: int = 0, **kwargs):
-        super().__init__(**kwargs)
-        self.step_offset = step_offset
-        self.epoch_offset = epoch_offset
-
-    def log_metrics(self, metrics, step=None):
-        if step is not None:
-            step += self.step_offset
-
-        if "epoch" in metrics and metrics["epoch"] is not None:
-            metrics["epoch"] += self.epoch_offset
-
-        return super().log_metrics(metrics, step=step)
-
-
-def need_snapshot_old(task_idx: int, use_buffer: bool) -> bool:
-    # task 0: 没有 buffer 阶段，主训练结束后直接 snapshot
-    if task_idx == 0:
-        return not use_buffer
-    # task 1+: 只在 buffer 微调阶段结束后 snapshot
-    return use_buffer
 
 
 @pytest.mark.slow
@@ -49,7 +27,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK = 20
         EPOCHS_PER_TASK_MEMORY = 20
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
@@ -72,6 +50,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         # Use an adaptive total-memory budget so early tasks can temporarily
         # occupy the slots of unseen future classes.
         buffer_kwargs={"mem_size": total_buffer_size},
+
     )
     model = PODNet(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
@@ -104,7 +83,25 @@ def test_podnet_cifar100(is_dummy_training: bool):
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,
+        buffer_args={
+            "selection": "herding",
+            "seed": 42,
+            "loader_kwargs": {
+                "batch_size": 128,
+                "shuffle": False,
+                "num_workers": 10,
+            },
+            "nme_eval": {
+                "enable": True,
+                "topk": 1,
+                "dynamic_old": True,
+                "dynamic_new": True,
+                "every_n_epochs": EPOCHS_PER_TASK,
+            },
+        }
     )
+
+    statistics_summary = {}
 
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         model.train()
@@ -112,17 +109,11 @@ def test_podnet_cifar100(is_dummy_training: bool):
         model.need_snapshot_old = task_idx == 0
         model.buffer_training = False
         dm.set_current_task(task_idx)
-        # use training data, with buffer
-        dm.use_buffer = True
-        dm.buffer_only_new = False
         dm.train_filter_fn = None
 
         logger1 = OffsetWandbLogger(
             resume="allow",
-            # name=f"force_reset_unfixed_b_mask_distill_b_w_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_onlynew_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            # name=f"nopretrain_sgd_momentum_v2_snapold_160_t_test_herding_select_buffer_ft_allfc_mask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
-            name=f"main_adpmem_nopretrain_sgd_momentum_160_t_test_herding_select_buffer_ft_all_nomask_wo_warmup_podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
+            name=f"podnet_cifar100_{'pretrained_' if USE_PRETRAIN_WEIGHTS else ''}task{task_idx}",
             project="lycil",
             log_model=False,
             tags=["podnet", "cifar100"] + ["pretrained" if USE_PRETRAIN_WEIGHTS else "random_init"],
@@ -139,19 +130,15 @@ def test_podnet_cifar100(is_dummy_training: bool):
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
         )
         trainer1.fit(model, datamodule=dm)
+        final_trainer = trainer1
 
         if task_idx > 0:
             model.using_distill = True
             model.buffer_training = True
             model.need_snapshot_old = True
 
-            #
-
             # model.backbone.eval()
             # model.backbone.requires_grad_(False)
-            # model.classifier.requires_grad_(True)
-            dm.use_buffer = True
-            dm.buffer_only_new = False
             dm.train_filter_fn = lambda e: False
 
             logger2 = OffsetWandbLogger(
@@ -176,12 +163,20 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
             )
             trainer2.fit(model, datamodule=dm)
+            final_trainer = trainer2
             # model.backbone.requires_grad_(True)
 
-        # trainer.validate(model, datamodule=dm)
+        test_outputs = final_trainer.test(
+            model=model,
+            datamodule=dm,
+            verbose=False,
+            ckpt_path=None,
+        )
+        statistics_summary[task_idx] = test_outputs
+        log_statistics_to_wandb(final_trainer, statistics_summary)
+
         wandb.finish()
 
 
 if __name__ == "__main__":
     test_podnet_cifar100(is_dummy_training=False)
-
