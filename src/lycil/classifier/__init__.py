@@ -4,7 +4,7 @@ import torch.nn as nn
 from .linears import CosineLinear, SimpleLinear, SplitCosineLinear
 
 __all__ = [
-    "CosineClassifier",
+    "CosineLinear",
     "SimpleLinear",
     "SplitCosineLinear",
     "expand_head",
@@ -89,4 +89,3 @@ def expand_head(module: nn.Module, out_delta: int, in_delta: int = 0) -> nn.Modu
         return new_linear
 
     raise NotImplementedError(f"Classifier not expandable: {type(module)}.")
-
