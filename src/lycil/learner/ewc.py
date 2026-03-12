@@ -143,6 +143,7 @@ class EWC(BaseLearner):
         self.update_fisher_and_mean(dm)
 
     @torch.no_grad()
+    # TODO: whether to use no grad
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
         """Estimate diagonal Fisher information and store current parameter means.
 
