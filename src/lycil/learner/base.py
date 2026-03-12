@@ -193,23 +193,27 @@ class BaseLearner(L.LightningModule):
         return x, y
 
     @torch.no_grad()
-    def expand_head(self, num_new: int) -> None:
+    def expand_head(self, out_delta: int, in_delta: int = 0) -> None:
         """Initialize or expand the classifier head to accommodate new classes.
 
-        On the first call (when ``self.classifier`` is ``None``), creates a
-        fresh head with ``num_new`` outputs. On subsequent calls, delegates to
-        :func:`~lycil.classifier.expand_head` to grow the existing head.
-
         Args:
-            num_new (int): Number of new output classes to add.
+            out_delta (int):
+                Number of new classes (i.e. out features).
+            in_delta (int, optional):
+                Number of new input features, only used for DERNet-like structure. (default: 0)
+
         """
         if self.classifier is None:
             self.classifier = make_head(
-                self.feature_dim, num_new, head_type=self.head_type
+                self.feature_dim, out_delta, head_type=self.head_type
             )
             return
 
-        self.classifier = expand_head(self.classifier, num_new)
+        # usually, expand number of new classes (i.e. out_delta)
+        # infeatures dont have to expand unless dernet-like structure is defined
+        self.classifier = expand_head(
+            self.classifier, out_delta=out_delta, in_delta=in_delta
+        )
         return
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
