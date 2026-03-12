@@ -72,14 +72,25 @@ def test_podnet_cifar100(is_dummy_training: bool):
             },
         },
         per_task_sched_args={
+            # "default": {
+            #     "type": "cosine_annealing",
+            #     "T_max": EPOCHS_PER_TASK,
+            # },
+            # "buffer": {
+            #     "type": "cosine_annealing",
+            #     "T_max": EPOCHS_PER_TASK_MEMORY,
+            # },
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
             "buffer": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK_MEMORY,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK_MEMORY,
             },
+
         },
         lambda_spatial=5.0,
         lambda_flat=1.0,

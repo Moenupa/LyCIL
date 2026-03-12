@@ -73,9 +73,14 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
+            # "default": {
+            #     "type": "cosine_annealing",
+            #     "T_max": EPOCHS_PER_TASK,
+            # },
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
         },
         lambda_lf=5.0,
