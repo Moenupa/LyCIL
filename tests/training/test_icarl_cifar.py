@@ -50,7 +50,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -67,7 +67,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.1,
+                "lr": 0.5,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
