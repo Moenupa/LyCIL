@@ -142,6 +142,7 @@ class EWC(BaseLearner):
         dm = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
         self.update_fisher_and_mean(dm)
 
+    @torch.no_grad()
     def update_fisher_and_mean(self, dm: "HFDataModule") -> None:
         """Estimate diagonal Fisher information and store current parameter means.
 
