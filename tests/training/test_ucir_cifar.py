@@ -34,7 +34,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
+        N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -112,7 +112,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"ucir_cifar100_task{task_idx}",
+                name=f"ucir_cifar100_T={len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["ucir", "cifar100"],
