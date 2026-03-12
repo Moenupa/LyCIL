@@ -4,12 +4,10 @@ import lightning as L
 import pytest
 from lightning.pytorch.loggers import WandbLogger
 
-
 import wandb
 from lycil.constants import _EXP_NAME
 from lycil.data.hfmodule import HFDataModule
-from lycil.learner.ucir import UCIR
-
+from lycil.learner.der import DER
 
 from tests.training.constants import (
     CIFAR10_LABEL_COL,
@@ -22,19 +20,20 @@ from tests.training.constants import (
 )
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lycil.backbone import ConvNetArgs
-
 from tests.training.log_utils import log_statistics_to_wandb
+
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
-def test_ucir_cifar100(device: str, is_dummy_training: bool):
+@pytest.mark.xdist_group("training")
+def test_der_cifar100(device: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
-        N_CLASS_PER_TASK = [2, 2]
+        N_CLASS_PER_TASK = [1, 1]
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -54,14 +53,15 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
+
         # Use an adaptive total-memory budget so early tasks can temporarily
         # occupy the slots of unseen future classes.
         buffer_kwargs={"mem_size": total_buffer_size},
         # buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
     )
-    model = UCIR(
+    model = DER(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
-        head="cosine",
+        head="linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
@@ -74,13 +74,11 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
         },
-        lambda_lf=5.0,
-        K=2,
-        margin=0.5,
         buffer_args={
             "selection": "herding",
             "seed": 42,
@@ -111,10 +109,10 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"ucir_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
-                project="lycil",
+                name=f"der_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                project="lycil_cifar100",
                 log_model=False,
-                tags=["ucir", "cifar100"],
+                tags=["der", "cifar100"],
                 group=_EXP_NAME,
             ),
             check_val_every_n_epoch=1,
@@ -134,4 +132,4 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
 
 
 if __name__ == "__main__":
-    test_ucir_cifar100(device="cuda", is_dummy_training=False)
+    test_der_cifar100(device="cuda", is_dummy_training=False)
