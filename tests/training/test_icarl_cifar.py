@@ -34,7 +34,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -50,7 +50,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 10},
+        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -88,7 +88,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             "loader_kwargs": {
                 "batch_size": 128,
                 "shuffle": False,
-                "num_workers": 10,
+                "num_workers": 8,
             },
             "nme_eval": {
                 "enable": True,
