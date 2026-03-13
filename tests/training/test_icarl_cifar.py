@@ -39,7 +39,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 200
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
-        BATCH_SIZE = 64
+        BATCH_SIZE = 128
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
