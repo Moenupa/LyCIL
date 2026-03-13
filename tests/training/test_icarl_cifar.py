@@ -36,7 +36,7 @@ def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
     USE_PRETRAIN_WEIGHTS = False
     BUFFER_SIZE_PER_CLASS = 20
     BATCH_SIZE = 128
-    BASE_LR = 0.08
+    BASE_LR = 0.1
     DEVICES = "auto"
 
     L.seed_everything(42)
