@@ -127,6 +127,15 @@ def expand_head(module: nn.Module, out_delta: int, in_delta: int = 0) -> nn.Modu
             "Input feature expansion not implemented for this head type."
         )
 
+    if isinstance(module, CosineLinear):
+        new_linear = SplitCosineLinear.from_cosine_linear(module, out_delta)
+        new_linear.old_head.requires_grad_(False)
+        return new_linear
+
+    if isinstance(module, SplitCosineLinear):
+        new_linear = SplitCosineLinear.from_split_cosine_linear(module, out_delta)
+        new_linear.old_head.requires_grad_(False)
+        return new_linear
 
     if isinstance(module, Linear):
         new_linear = SplitLinear.from_linear(module, out_delta)
@@ -138,14 +147,5 @@ def expand_head(module: nn.Module, out_delta: int, in_delta: int = 0) -> nn.Modu
         new_linear.old_head.requires_grad_(False)
         return new_linear
 
-    if isinstance(module, CosineLinear):
-        new_linear = SplitCosineLinear.from_cosine_linear(module, out_delta)
-        new_linear.old_head.requires_grad_(False)
-        return new_linear
-
-    if isinstance(module, SplitCosineLinear):
-        new_linear = SplitCosineLinear.from_split_cosine_linear(module, out_delta)
-        new_linear.old_head.requires_grad_(False)
-        return new_linear
 
     raise NotImplementedError(f"Classifier not expandable: {type(module)}.")
