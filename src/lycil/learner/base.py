@@ -483,7 +483,7 @@ class BaseLearner(L.LightningModule):
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
+            mean = F.normalize(mean, dim=0)
             per_class_means[class_idx] = mean.cpu()
 
         # 2) 先一次性筛出当前 task 的训练子集：
@@ -551,7 +551,7 @@ class BaseLearner(L.LightningModule):
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            mean = F.normalize(mean.unsqueeze(0), dim=1).squeeze(0)
+            mean = F.normalize(mean, dim=0)
             per_class_means[class_idx] = mean.cpu()
 
         # 保存所有类别的类中心，供 NME 推理使用
