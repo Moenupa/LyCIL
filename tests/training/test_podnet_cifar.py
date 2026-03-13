@@ -139,6 +139,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             logger=logger1,
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
+            gradient_clip_val=1.5
         )
         trainer1.fit(model, datamodule=dm)
         final_trainer = trainer1
@@ -172,6 +173,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
                 logger=logger2,
                 check_val_every_n_epoch=1,
                 callbacks=[LearningRateMonitor(logging_interval="epoch")],
+                gradient_clip_val=1.5
             )
             trainer2.fit(model, datamodule=dm)
             final_trainer = trainer2
