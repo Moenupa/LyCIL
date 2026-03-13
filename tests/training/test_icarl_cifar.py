@@ -67,23 +67,23 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.1,
+                "lr": 0.05,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            # "default": {
-            #     "type": "linear_warmup_cosine_annealing",
-            #     "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-            #     "max_epochs": EPOCHS_PER_TASK,
-            # },
             "default": {
-                "type": "multi_step_lr",
-                "milestones": [60, 120, 170],
-                "gamma": 0.1,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
+            # "default": {
+            #     "type": "multi_step_lr",
+            #     "milestones": [60, 120, 170],
+            #     "gamma": 0.1,
+            # },
 
         },
         distill_T=1.0,
