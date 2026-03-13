@@ -120,7 +120,7 @@ def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            gradient_clip_val=1.5
+            gradient_clip_val=1.0
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
