@@ -69,7 +69,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
                 "type": "sgd",
                 "lr": 0.5,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
-                "weight_decay": 5e-4,
+                "weight_decay": 2e-5,
             },
         },
         per_task_sched_args={
