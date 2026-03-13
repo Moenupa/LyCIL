@@ -4,7 +4,7 @@ import torch.nn as nn
 from .linears import CosineLinear, SimpleLinear, SplitCosineLinear
 
 __all__ = [
-    "CosineClassifier",
+    "CosineLinear",
     "SimpleLinear",
     "SplitCosineLinear",
     "expand_head",

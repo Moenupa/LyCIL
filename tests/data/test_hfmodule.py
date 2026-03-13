@@ -76,6 +76,8 @@ def test_setup_w_custom_labelset(cifar10_path: str | None):
             assert label.item() in {6, 7}
 
     test_loader = cifar10_hfmodule.test_dataloader()
+    if isinstance(test_loader, list):
+        test_loader = test_loader[-2]
     seen_labels = set()
     for batch in test_loader:
         assert "img" in batch and "label" in batch

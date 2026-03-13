@@ -1,8 +1,9 @@
 import copy
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import torch
 from datasets import Dataset, DatasetDict, concatenate_datasets
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from ..constants import _X_COLUMN_NAME
@@ -35,8 +36,6 @@ def compute_nme(
             - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features).
 
     """
-    from torch.nn import functional as F
-
     feature_list = []
     for batch in dataloader:
         if isinstance(batch, dict):
@@ -46,7 +45,7 @@ def compute_nme(
         else:
             raise TypeError(f"batch must be dict or Tensor, got {type(batch)}")
 
-        features = F.normalize(feature_extractor(x), dim=1).cpu()
+        features = F.normalize(feature_extractor(x), dim=1)
         feature_list.append(features)
 
     # shaped (n_samples, n_features)
@@ -166,6 +165,10 @@ class BaseExemplarBuffer(DatasetDict):
             return self.mem_size_per_class
 
         # otherwise, adaptive because mem_size must not be None
+        # Example: if final target is 100 classes and we want 20 exemplars/class
+        # at convergence, set mem_size=2000. Then task 0 with 20 seen classes gets
+        # 2000 // 20 = 100 exemplars/class, and later tasks will shrink this quota
+        # as more classes are introduced.
         assert self.mem_size is not None
         if not isinstance(target_num_classes, int) or target_num_classes <= 0:
             raise ValueError("`target_num_classes` must be a positive integer.")
@@ -174,10 +177,17 @@ class BaseExemplarBuffer(DatasetDict):
 
         return self.mem_size // target_num_classes
 
+    @staticmethod
+    def _trim_dataset(dataset: Dataset, quota: int) -> Dataset:
+        if len(dataset) <= quota:
+            return dataset
+
+        return dataset.select(range(quota))
+
     def reduce_exemplars(
         self,
         per_class_quota: int,
-        trim_func: Optional["Callable[[Dataset, int], Dataset]"] = None,
+        trim_func: "Callable[[Dataset, int], Dataset] | None" = None,
     ) -> None:
         r"""Reduce exemplars, typically called after new classes arrive.
 
@@ -185,13 +195,10 @@ class BaseExemplarBuffer(DatasetDict):
             per_class_quota (int): Maximum number of exemplars to keep per class.
             trim_func (Callable[[Dataset, int], Dataset] | None, optional):
                 Function to trim exemplars: ``trim_func(dataset, quota) -> trimmed_dataset``
-                If None, get first `quota` samples. (default: None)
+                If None, get first :math:`q` samples. (default: None)
 
         """
-        trim_func = trim_func or (
-            # fallback: get first `quota` samples -> data[:quota]
-            lambda dataset, q: dataset if len(dataset) <= q else dataset[:q]
-        )
+        trim_func = trim_func or self._trim_dataset
 
         for _class_id, _data in self.items():
             self[_class_id] = trim_func(_data, per_class_quota)
@@ -204,6 +211,10 @@ class BaseExemplarBuffer(DatasetDict):
         self, keys: str | list[str] | None = None, transform_name: str | None = None
     ) -> "Dataset":
         """Concatenate exemplar subsets into a single :class:`~datasets.Dataset`.
+
+        Avoid ``transform_name`` unless no datamodule object is available.
+        Prefer ``transform_name`` in datamodule, applies to both data & buffer.
+        Refer to :class:`~lycil.data.hfmodule.HFDataModule` and its ``get_dataloader()``.
 
         Args:
             keys (str | list[str] | None, optional): Class-id string keys to
