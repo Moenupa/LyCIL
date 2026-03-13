@@ -36,9 +36,10 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
+        EPOCHS_PER_TASK = 200
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
+        BATCH_SIZE = 64
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
@@ -50,7 +51,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 256, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": BATCH_SIZE, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
