@@ -29,23 +29,15 @@ import math
 @pytest.mark.runs_on(["cuda"])
 @pytest.mark.xdist_group("training")
 def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
-    if is_dummy_training:
-        DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
-        N_CLASS_PER_TASK = [1, 1]
-        EPOCHS_PER_TASK = 1
-    else:
-        DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [20] * 5
-        LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 160
-        USE_PRETRAIN_WEIGHTS = False
-        BUFFER_SIZE_PER_CLASS = 20
-        BATCH_SIZE = 128
-        BASE_LR = 0.08
-        DEVICES = "auto"
-    if not osp.exists(DATAPATH):
-        pytest.skip("Data path does not exist.")
-        return
+    DATAPATH = "/ppio_net0/datasets/cifar100"
+    N_CLASS_PER_TASK = [20] * 5
+    LABEL_COL = "fine_label"
+    EPOCHS_PER_TASK = 160
+    USE_PRETRAIN_WEIGHTS = False
+    BUFFER_SIZE_PER_CLASS = 20
+    BATCH_SIZE = 128
+    BASE_LR = 0.08
+    DEVICES = "auto"
 
     L.seed_everything(42)
     total_buffer_size = BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)
