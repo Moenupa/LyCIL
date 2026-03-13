@@ -120,3 +120,15 @@ class DER(BaseLearner):
         mean_old = torch.mean(vector_norm(w[: self.num_old_classes, :], ord=2, dim=1))
         gamma = mean_old / (mean_new + 1e-8)
         self.classifier.weight.data[self.num_old_classes :, :] *= gamma
+
+
+    def on_train_epoch_start(self):
+        if len(self.backbone.convnets) == 0:
+            return
+
+        # 最新块训练
+        self.backbone.convnets[-1].train()
+        # 冻结旧块参数 + 切 eval
+        for conv in self.backbone.convnets[:-1]:
+            conv.requires_grad_(False)
+            conv.eval()
