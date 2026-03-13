@@ -123,14 +123,6 @@ class WA(BaseLearner):
 
         self.classifier.weight[-num_new_classes:].mul_(gamma)
 
-        self.log(
-            "train/wa_gamma",
-            gamma.detach(),
-            prog_bar=False,
-            on_epoch=True,
-            on_step=False,
-            sync_dist=True,
-        )
 
     def on_train_end(self):
         """Align new classifier weights, then update exemplar memory."""
