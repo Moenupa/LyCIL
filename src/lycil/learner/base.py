@@ -919,8 +919,7 @@ class BaseLearner(L.LightningModule):
         # 4) 最后一个 epoch 必定评估
         is_last_epoch = (
                 isinstance(max_epochs, int)
-                and max_epochs > 0
-                and epoch_idx >= max_epochs
+                and 0 < max_epochs <= epoch_idx
         )
 
         # 5) 普通情况下每隔 every_n_epochs 评估一次
