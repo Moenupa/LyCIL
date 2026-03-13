@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 
-from .linears import CosineLinear, SimpleLinear, SplitCosineLinear, SplitLinear
+from .linears import CosineLinear, SimpleLinear, SplitCosineLinear, Linear, SplitLinear
 
 __all__ = [
     "CosineLinear",
     "SimpleLinear",
     "SplitCosineLinear",
+    "Linear",
     "SplitLinear",
     "expand_head",
     "make_head",
@@ -125,6 +126,12 @@ def expand_head(module: nn.Module, out_delta: int, in_delta: int = 0) -> nn.Modu
         raise NotImplementedError(
             "Input feature expansion not implemented for this head type."
         )
+
+
+    if isinstance(module, Linear):
+        new_linear = SplitLinear.from_linear(module, out_delta)
+        new_linear.old_head.requires_grad_(False)
+        return new_linear
 
     if isinstance(module, SplitLinear):
         new_linear = SplitLinear.from_split_linear(module, out_delta)

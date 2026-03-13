@@ -316,6 +316,39 @@ def reduce_proxies(logits: torch.Tensor, num_proxy: int) -> torch.Tensor:
 
 
 
+class Linear(nn.Linear):
+    """Linear classification head returning outputs as a dict.
+
+    A thin wrapper around :class:`torch.nn.Linear` whose :meth:`forward`
+    returns ``{"logits": ...}`` for API compatibility with other classifier
+    heads in this library.
+
+    Args:
+        in_features (int): Size of each input sample.
+        out_features (int): Number of output classes.
+        bias (bool, optional): If ``False``, the layer has no additive bias.
+            (default: ``True``)
+        device: Device for parameter allocation.
+        dtype: Data type for parameter allocation.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(
+            in_features, out_features, bias=bias, device=device, dtype=dtype
+        )
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:  # ty: ignore[invalid-method-override]
+        return {"logits": super().forward(x)}
+
+
+
 class SplitLinear(nn.Module):
     """Linear head split into frozen old-class and trainable new-class sub-heads.
 
@@ -349,14 +382,14 @@ class SplitLinear(nn.Module):
         self.old_out_features = old_out_features
         self.new_out_features = new_out_features
 
-        self.old_head = SimpleLinear(
+        self.old_head = Linear(
             in_features=in_features,
             out_features=old_out_features,
             bias=bias,
             device=device,
             dtype=dtype,
         )
-        self.new_head = SimpleLinear(
+        self.new_head = Linear(
             in_features=in_features,
             out_features=new_out_features,
             bias=bias,
