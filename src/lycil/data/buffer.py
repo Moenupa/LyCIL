@@ -213,7 +213,7 @@ class BaseExemplarBuffer(DatasetDict):
         """Concatenate exemplar subsets into a single :class:`~datasets.Dataset`.
 
         Avoid ``transform_name`` unless no datamodule object is available.
-        Prefer ``transform_name`` in datamodule, applies to both data & buffer.
+        Prefer ``transform_name`` in datamodule, which applies to both data & buffer.
         Refer to :class:`~lycil.data.hfmodule.HFDataModule` and its ``get_dataloader()``.
 
         Args:
@@ -237,6 +237,8 @@ class BaseExemplarBuffer(DatasetDict):
         ]
         ret = concatenate_datasets(subsets)
 
+        # modifying ret will not affect self.items(),
+        # because concatenate_datasets creates a new Dataset object.
         if transform_name is not None:
             ret.set_format(transform_name)
         return ret
