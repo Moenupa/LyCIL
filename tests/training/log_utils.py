@@ -164,3 +164,27 @@ class OffsetWandbLogger(WandbLogger):
             metrics["epoch"] += self.epoch_offset
 
         return super().log_metrics(metrics, step=step)
+
+# TODO: NPU support
+from lightning.pytorch.accelerators import CUDAAccelerator
+def resolve_num_devices(accelerator: str, devices) -> int:
+    """Resolve the number of devices used for LR scaling."""
+    if accelerator not in {"cuda", "gpu"}:
+        return 1
+
+    if devices in (None, "auto", -1, "-1"):
+        return CUDAAccelerator.auto_device_count()
+
+    if isinstance(devices, int):
+        return devices
+
+    if isinstance(devices, (list, tuple)):
+        return len(devices)
+
+    if isinstance(devices, str):
+        s = devices.replace(" ", "")
+        if s.isdigit():
+            return int(s)
+        return len([x for x in s.split(",") if x])
+
+    return 1

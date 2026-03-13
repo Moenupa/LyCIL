@@ -22,12 +22,13 @@ from tests.training.constants import (
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lycil.backbone import ConvNetArgs
 
-from tests.training.log_utils import log_statistics_to_wandb
+from tests.training.log_utils import log_statistics_to_wandb,resolve_num_devices
+import math
 
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 @pytest.mark.xdist_group("training")
-def test_icarl_cifar100(device: str, is_dummy_training: bool):
+def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
     if is_dummy_training:
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [1, 1]
@@ -40,12 +41,16 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         USE_PRETRAIN_WEIGHTS = False
         BUFFER_SIZE_PER_CLASS = 20
         BATCH_SIZE = 128
+        BASE_LR = 0.08
+        DEVICES = "auto"
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
 
     L.seed_everything(42)
     total_buffer_size = BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)
+    num_devices = resolve_num_devices(accelerator, DEVICES)
+    scaled_lr = BASE_LR * math.sqrt(num_devices)
     dm = HFDataModule(
         DATAPATH,
         transform_name=osp.basename(DATAPATH),
@@ -68,7 +73,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.08,
+                "lr": scaled_lr,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
@@ -93,7 +98,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             "selection": "herding",
             "seed": 42,
             "loader_kwargs": {
-                "batch_size": 128,
+                "batch_size": BATCH_SIZE,
                 "shuffle": False,
                 "num_workers": 8,
             },
@@ -113,7 +118,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         dm.set_current_task(task_idx)
 
         trainer = L.Trainer(
-            accelerator=device,
+            accelerator=accelerator,
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
             enable_checkpointing=False,
@@ -144,4 +149,4 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
 
 
 if __name__ == "__main__":
-    test_icarl_cifar100(device="cuda", is_dummy_training=False)
+    test_icarl_cifar100(accelerator="cuda", is_dummy_training=False)
