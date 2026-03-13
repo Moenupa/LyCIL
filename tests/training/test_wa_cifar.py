@@ -79,8 +79,7 @@ def test_wa_cifar100(accelerator: str, is_dummy_training: bool):
             },
 
         },
-        distill_T=1.0,
-        distill_lambda=0.1,
+        distill_T=2.0,
         buffer_args={
             "selection": "herding",
             "seed": 42,
