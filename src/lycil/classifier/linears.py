@@ -47,12 +47,15 @@ class SimpleLinear(nn.Linear):
 
     @classmethod
     @torch.no_grad()
-    def from_linear(cls, old_linear: nn.Linear, num_new: int) -> "SimpleLinear":
+    def from_linear(
+        cls, old_linear: nn.Linear, out_delta: int, in_delta: int = 0
+    ) -> "SimpleLinear":
         """Create a SimpleLinear layer by expanding an existing linear layer.
 
         Args:
             old_linear (nn.Linear): The existing linear layer.
-            num_new (int): Number of new output features to add.
+            out_delta (int): Number of new output features to add.
+            in_delta (int): Number of new input features to add. (default: 0)
 
         Returns:
             SimpleLinear: The expanded SimpleLinear layer.
@@ -60,13 +63,15 @@ class SimpleLinear(nn.Linear):
         """
         # head expansion from an existing linear
         new_linear = cls(
-            in_features=old_linear.in_features,
-            out_features=old_linear.out_features + num_new,
+            in_features=old_linear.in_features + in_delta,
+            out_features=old_linear.out_features + out_delta,
             bias=old_linear.bias is not None,
             device=old_linear.weight.device,
             dtype=old_linear.weight.dtype,
         )
-        new_linear.weight[: old_linear.out_features].copy_(old_linear.weight)
+        new_linear.weight[: old_linear.out_features, : old_linear.in_features].copy_(
+            old_linear.weight
+        )
         if old_linear.bias is not None:
             new_linear.bias[: old_linear.out_features].copy_(old_linear.bias)
         return new_linear
