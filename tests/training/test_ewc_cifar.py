@@ -22,6 +22,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor
 from lycil.backbone import ConvNetArgs
 from tests.training.log_utils import log_statistics_to_wandb
 
+
 @pytest.mark.slow
 @pytest.mark.runs_on(["cuda"])
 @pytest.mark.xdist_group("training")
@@ -32,7 +33,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [20] * 5
+        N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -54,7 +55,8 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
     )
     model = EWC(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
-        head="linear",
+        # head="linear",
+        head="split_linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
@@ -77,7 +79,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
         buffer_args=None,
 
     )
-    statistics_summary={}
+    statistics_summary = {}
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
 

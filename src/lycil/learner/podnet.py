@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn.functional as F
 import lightning as L
-from .icarl import ICaRL
+from .base import BaseLearner
 
 from ..data.hfmodule import HFDataModule
 
@@ -141,7 +141,7 @@ def masked_cosine_embedding_loss(
         reduction="mean",
     )
 
-class PODNet(ICaRL):
+class PODNet(BaseLearner):
     r"""`PODNet`_: Pooled Outputs Distillation for Small-Tasks Incremental Learning. (Douillard et al., ECCV 2020).
     - Exemplar memory: herding + NME-based evaluation
     - Loss :math:`L = L_\text{NCA} + \lambda * \alpha_\text{task} * (L_\text{flat} + L_\text{spatial})`.

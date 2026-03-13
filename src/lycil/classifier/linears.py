@@ -313,3 +313,173 @@ def reduce_proxies(logits: torch.Tensor, num_proxy: int) -> torch.Tensor:
     attentions = F.softmax(simi_per_class, dim=-1)
 
     return (attentions * simi_per_class).sum(-1)
+
+
+
+class SplitLinear(nn.Module):
+    """Linear head split into frozen old-class and trainable new-class sub-heads.
+
+    Used in incremental learning to keep old-class weights fixed while training
+    new ones. :meth:`forward` returns per-group linear scores and their
+    concatenation.
+
+    Args:
+        in_features (int): Size of each input feature vector.
+        old_out_features (int): Number of old (already-seen) classes.
+        new_out_features (int): Number of new classes added in the current task.
+        bias (bool, optional): If ``False``, the layer has no additive bias.
+            (default: ``True``)
+        device: Device for parameter allocation.
+        dtype: Data type for parameter allocation.
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        old_out_features: int,
+        new_out_features: int,
+        bias: bool = True,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__()
+
+        self.in_features = in_features
+        self.out_features = old_out_features + new_out_features
+        self.old_out_features = old_out_features
+        self.new_out_features = new_out_features
+
+        self.old_head = SimpleLinear(
+            in_features=in_features,
+            out_features=old_out_features,
+            bias=bias,
+            device=device,
+            dtype=dtype,
+        )
+        self.new_head = SimpleLinear(
+            in_features=in_features,
+            out_features=new_out_features,
+            bias=bias,
+            device=device,
+            dtype=dtype,
+        )
+
+
+    def freeze_old(self) -> None:
+        """Freeze old classifier parameters."""
+        self.old_head.requires_grad_(False)
+
+    def unfreeze_old(self) -> None:
+        """Unfreeze old classifier parameters."""
+        self.old_head.requires_grad_(True)
+
+    @staticmethod
+    @torch.no_grad()
+    def _copy_linear_params(dst: nn.Linear, src: nn.Linear) -> None:
+        """Copy parameters from one linear layer to another."""
+        if dst.in_features != src.in_features or dst.out_features != src.out_features:
+            raise ValueError(
+                f"Shape mismatch: dst=({dst.out_features}, {dst.in_features}), "
+                f"src=({src.out_features}, {src.in_features})"
+            )
+
+        dst.weight.copy_(src.weight)
+        if dst.bias is not None and src.bias is not None:
+            dst.bias.copy_(src.bias)
+        elif (dst.bias is None) != (src.bias is None):
+            raise ValueError("Bias configuration mismatch between dst and src.")
+
+    @classmethod
+    @torch.no_grad()
+    def from_linear(
+        cls,
+        old_linear: nn.Linear,
+        num_new: int,
+    ) -> "SplitLinear":
+        """Head expansion from an existing linear head.
+
+        Args:
+            old_linear (nn.Linear): The existing linear layer.
+            num_new (int): Number of new classes to add.
+            freeze_old (bool, optional): Whether to freeze old classifier.
+                (default: ``True``)
+
+        Returns:
+            SplitLinear: Expanded split linear head.
+        """
+        new_head = cls(
+            in_features=old_linear.in_features,
+            old_out_features=old_linear.out_features,
+            new_out_features=num_new,
+            bias=old_linear.bias is not None,
+            device=old_linear.weight.device,
+            dtype=old_linear.weight.dtype,
+        )
+        cls._copy_linear_params(new_head.old_head, old_linear)
+
+        return new_head
+
+    @classmethod
+    @torch.no_grad()
+    def from_split_linear(
+        cls,
+        old_linear: "SplitLinear",
+        num_new: int,
+    ) -> "SplitLinear":
+        """Head expansion from an existing SplitLinear head.
+
+        Old classes in the new head will be:
+            [old_linear.old_head classes] + [old_linear.new_head classes]
+
+        and the newly added classes are initialized in ``new_head``.
+
+        Args:
+            old_linear (SplitLinear): Existing split linear head.
+            num_new (int): Number of new classes to add.
+            freeze_old (bool, optional): Whether to freeze merged old classifier.
+                (default: ``True``)
+
+        Returns:
+            SplitLinear: Expanded split linear head.
+        """
+        bias = old_linear.old_head.bias is not None
+        new_linear = cls(
+            in_features=old_linear.in_features,
+            old_out_features=old_linear.out_features,
+            new_out_features=num_new,
+            bias=bias,
+            device=old_linear.old_head.weight.device,
+            dtype=old_linear.old_head.weight.dtype,
+        )
+
+        old_n = old_linear.old_head.out_features
+        new_n = old_linear.new_head.out_features
+
+        # 把上一阶段的 old + new 都并到新的 old_head 里
+        new_linear.old_head.weight[:old_n].copy_(old_linear.old_head.weight)
+        new_linear.old_head.weight[old_n : old_n + new_n].copy_(
+            old_linear.new_head.weight
+        )
+
+        if bias:
+            assert new_linear.old_head.bias is not None
+            assert old_linear.old_head.bias is not None
+            assert old_linear.new_head.bias is not None
+
+            new_linear.old_head.bias[:old_n].copy_(old_linear.old_head.bias)
+            new_linear.old_head.bias[old_n : old_n + new_n].copy_(
+                old_linear.new_head.bias
+            )
+
+        return new_linear
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        old_scores = self.old_head(x)["logits"]
+        new_scores = self.new_head(x)["logits"]
+        logits = torch.cat([old_scores, new_scores], dim=1)
+
+        return {
+            "old_scores": old_scores,
+            "new_scores": new_scores,
+            "logits": logits,
+        }
