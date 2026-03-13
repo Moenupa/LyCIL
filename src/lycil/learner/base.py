@@ -589,7 +589,7 @@ class BaseLearner(L.LightningModule):
     #         loader, self.feature_extractor, self.device
     #     )
     #
-    #     class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0)
+    #     class_mean = F.normalize(class_mean, dim=0)
     #     feats = per_sample_features  # [N, D]
     #
     #     # 如果 compute_nme 返回的 per_sample_features 还没归一化，可以打开这一行
@@ -650,7 +650,7 @@ class BaseLearner(L.LightningModule):
             loader, self.feature_extractor, self.device
         )
 
-        class_mean = F.normalize(class_mean.unsqueeze(0), dim=1).squeeze(0)
+        class_mean = F.normalize(class_mean, dim=0)
         feats = per_sample_features
 
         selected_idx = []
@@ -710,9 +710,7 @@ class BaseLearner(L.LightningModule):
 
                 loader = torch.utils.data.DataLoader(old_dataset, **loader_kwargs)
                 mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-                per_class_means[class_idx] = F.normalize(
-                    mean.unsqueeze(0), dim=1
-                ).squeeze(0).cpu()
+                per_class_means[class_idx] = F.normalize(mean, dim=0).cpu()
             else:
                 if class_idx in dm.buffer.per_class_means:
                     per_class_means[class_idx] = dm.buffer.per_class_means[class_idx].cpu()
@@ -768,9 +766,7 @@ class BaseLearner(L.LightningModule):
 
                 loader = torch.utils.data.DataLoader(tmp_dataset, **loader_kwargs)
                 mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-                per_class_means[class_idx] = F.normalize(
-                    mean.unsqueeze(0), dim=1
-                ).squeeze(0).cpu()
+                per_class_means[class_idx] = F.normalize(mean, dim=0).cpu()
 
 
         if len(per_class_means) == 0:
