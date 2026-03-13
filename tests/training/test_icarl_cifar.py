@@ -77,11 +77,6 @@ def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
                 "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
                 "max_epochs": EPOCHS_PER_TASK,
             },
-            # "default": {
-            #     "type": "multi_step_lr",
-            #     "milestones": [60, 120, 170],
-            #     "gamma": 0.1,
-            # },
 
         },
         distill_T=1.0,
