@@ -67,7 +67,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.5,
+                "lr": 0.3,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
