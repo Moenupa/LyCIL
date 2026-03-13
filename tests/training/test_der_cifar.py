@@ -131,6 +131,5 @@ def test_der_cifar100(device: str, is_dummy_training: bool):
 
         wandb.finish()
 
-
 if __name__ == "__main__":
     test_der_cifar100(device="cuda", is_dummy_training=False)
