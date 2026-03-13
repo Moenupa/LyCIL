@@ -69,7 +69,7 @@ class BaseLearner(L.LightningModule):
             buffer_args: dict[str, Any] | None = None,
     ):
         super().__init__()
-
+        self.save_hyperparameters()
         self.backbone = backbone_cls(backbone_args or ConvNetArgs())
         self.head_type = head
         # lazy init by head_type at `expand_head()`
