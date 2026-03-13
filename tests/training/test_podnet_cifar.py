@@ -25,7 +25,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         BUFFER_SIZE_PER_CLASS = 20
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [50] + [5] * 10
+        N_CLASS_PER_TASK = [50] + [10] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         EPOCHS_PER_TASK_MEMORY = 20
@@ -149,8 +149,8 @@ def test_podnet_cifar100(is_dummy_training: bool):
             model.buffer_training = True
             model.need_snapshot_old = True
 
-            # model.backbone.eval()
-            # model.backbone.requires_grad_(False)
+            model.backbone.eval()
+            model.backbone.requires_grad_(False)
             dm.train_filter_fn = lambda e: False
 
             logger2 = OffsetWandbLogger(
@@ -177,7 +177,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             )
             trainer2.fit(model, datamodule=dm)
             final_trainer = trainer2
-            # model.backbone.requires_grad_(True)
+            model.backbone.requires_grad_(True)
 
         test_outputs = final_trainer.test(
             model=model,
