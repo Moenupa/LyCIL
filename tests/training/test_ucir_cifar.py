@@ -34,7 +34,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -66,7 +66,7 @@ def test_ucir_cifar100(device: str, is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.1,
+                "lr": 0.08,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },

@@ -25,7 +25,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
         BUFFER_SIZE_PER_CLASS = 20
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         EPOCHS_PER_TASK_MEMORY = 20
@@ -60,7 +60,7 @@ def test_podnet_cifar100(is_dummy_training: bool):
             # for all tasks, use the same optimizer kwargs
             "default": {
                 "type": "sgd",
-                "lr": 0.1,
+                "lr": 0.08,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
