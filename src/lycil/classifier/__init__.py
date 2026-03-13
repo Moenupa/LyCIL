@@ -15,7 +15,7 @@ __all__ = [
 _CLASSIFIER_HEADS: dict[str, tuple[type[nn.Module], dict]] = {
     # key: (class, {optional kwargs})
     "linear": (SimpleLinear, {}),
-    "split_linear": (SplitLinear, {'freeze_old': True}),
+    "split_linear": (SplitLinear, {}),
     "cosine": (CosineLinear, {"learn_scale": True}),
 }
 

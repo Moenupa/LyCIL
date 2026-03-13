@@ -365,14 +365,6 @@ class SplitLinear(nn.Module):
         )
 
 
-    def freeze_old(self) -> None:
-        """Freeze old classifier parameters."""
-        self.old_head.requires_grad_(False)
-
-    def unfreeze_old(self) -> None:
-        """Unfreeze old classifier parameters."""
-        self.old_head.requires_grad_(True)
-
     @staticmethod
     @torch.no_grad()
     def _copy_linear_params(dst: nn.Linear, src: nn.Linear) -> None:
