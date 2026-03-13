@@ -56,7 +56,7 @@ def test_ewc_cifar100(device: str, is_dummy_training: bool):
     model = EWC(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         # head="linear",
-        head="split_linear",
+        head="linear_frozen",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
