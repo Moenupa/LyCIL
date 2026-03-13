@@ -92,7 +92,7 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             "selection": "herding",
             "seed": 42,
             "loader_kwargs": {
-                "batch_size": 128,
+                "batch_size": 256,
                 "shuffle": False,
                 "num_workers": 8,
             },
