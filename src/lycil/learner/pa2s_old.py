@@ -77,7 +77,7 @@ class PASS(BaseLearner):
                 old_features = old_outputs["features"]
 
             loss_distill = torch.dist(features, old_features, p=2)
-            loss_proto = self.prototype_loss(batch_size=x.shape[0],x_rot_feats=features,y_rot=y_rot)
+            loss_proto = self.prototype_loss(batch_size=x.shape[0])
             loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
 
         self.log_dict(
@@ -119,13 +119,8 @@ class PASS(BaseLearner):
     def _collapse_logits(self, logits: torch.Tensor) -> torch.Tensor:
         return logits[:, :: self.num_rotations]
 
-
-    def prototype_loss(
-            self,
-            batch_size: int,
-            x_rot_feats: torch.Tensor,
-            y_rot: torch.Tensor,
-    ) -> torch.Tensor:
+    # TODO: concate features with proto features
+    def prototype_loss(self, batch_size: int) -> torch.Tensor:
         if self.num_old_classes == 0 or not self._prototypes:
             return torch.zeros((), device=self.device)
 
@@ -137,7 +132,6 @@ class PASS(BaseLearner):
             size=(batch_size,),
             device=self.device,
         )
-
         proto_features = proto_bank[indices]
         if self._radius > 0:
             proto_features = proto_features + torch.randn_like(proto_features) * self._radius
@@ -145,12 +139,11 @@ class PASS(BaseLearner):
         proto_features = proto_features.to(self.device, non_blocking=True)
         proto_targets = (indices * self.num_rotations).to(self.device, non_blocking=True)
 
-        all_features = torch.cat([x_rot_feats, proto_features], dim=0)
-        all_targets = torch.cat([y_rot, proto_targets], dim=0)
-
-        all_logits = self.classifier(all_features)["logits"]
-
-        return F.cross_entropy(all_logits / self.temp, all_targets)
+        proto_logits = self.classifier(proto_features)["logits"]
+        return self.lambda_proto * F.cross_entropy(
+            proto_logits / self.temp,
+            proto_targets,
+        )
 
     @rank_zero_only
     def update_prototypes(self, dm) -> None:
