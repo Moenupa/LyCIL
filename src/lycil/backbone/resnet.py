@@ -29,16 +29,12 @@ class ResNetBackbone(BaseBackbone):
 
 
     def forward_layerwise(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
-        x = self.net.conv1(x)
-        x = self.net.bn1(x)
-        x = self.net.relu(x)
-        x = self.net.maxpool(x)
-        # layer-wised feature
-        x1 = self.net.layer1(x)
-        x2 = self.net.layer2(x1)
-        x3 = self.net.layer3(x2)
-        x4 = self.net.layer4(x3)
-        features = self.net.avgpool(x4).flatten(1)
+        x = self.stem(x)
+        x1 = self.layer1(x)
+        x2 = self.layer2(x1)
+        x3 = self.layer3(x2)
+        x4 = self.layer4(x3)
+        features = self.pool(x4).flatten(1)
         return {"l1": x1, "l2": x2, "l3": x3, "l4": x4, "features": features}
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
