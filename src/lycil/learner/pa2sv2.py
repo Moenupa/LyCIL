@@ -187,3 +187,4 @@ class PASS(BaseLearner):
 
             if self._prototype_radii:
                 self._radius = float(torch.tensor(self._prototype_radii).mean().sqrt())
+        self.train()
