@@ -82,9 +82,6 @@ class BranchConv3x3(nn.Module):
                 out_planes=out_planes,
                 stride=stride,
             )
-            torch.nn.init.zeros_(self.parallel_branch.weight)
-            if self.parallel_branch.bias is not None:
-                torch.nn.init.zeros_(self.parallel_branch.bias)
 
     def reset_branch_params(self) -> None:
         if hasattr(self, "parallel_branch"):
@@ -93,6 +90,13 @@ class BranchConv3x3(nn.Module):
                 mode="fan_out",
                 nonlinearity="relu",
             )
+
+    def zero_branch_params(self) -> None:
+        if hasattr(self, "parallel_branch"):
+            torch.nn.init.zeros_(self.parallel_branch.weight)
+            if self.parallel_branch.bias is not None:
+                torch.nn.init.zeros_(self.parallel_branch.bias)
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = self.main_branch(x)
