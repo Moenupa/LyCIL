@@ -240,6 +240,8 @@ class ResNet(nn.Module):
         self._norm_layer = norm_layer
         self.branch_mode = branch_mode
 
+        import pdb;pdb.set_trace()
+
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
