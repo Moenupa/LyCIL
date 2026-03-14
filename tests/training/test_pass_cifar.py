@@ -59,10 +59,15 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         head="linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
+            # "default": {
+            #     "type": "sgd",
+            #     "lr": 0.1,
+            #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            #     "weight_decay": 5e-4,
+            # },
             "default": {
                 "type": "adam",
                 "lr": 0.1,
-                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
         },
