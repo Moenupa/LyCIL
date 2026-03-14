@@ -76,6 +76,7 @@ class BranchConv3x3(nn.Module):
             dilation=dilation,
         )
 
+        import pdb;pdb.set_trace()
         if branch_mode == "parallel":
             self.parallel_branch = conv1x1(
                 in_planes=in_planes,
