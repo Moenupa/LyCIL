@@ -65,19 +65,19 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
             #     "weight_decay": 5e-4,
             # },
-            "default": {
-                "type": "adamw",
-                "lr": 1e-3,
-                "weight_decay": 5e-4,
-            },
-            # {
-            #     "type": "lars",
-            #     "lr": 0.1,
-            #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            # "default": {
+            #     "type": "adamw",
+            #     "lr": 1e-3,
             #     "weight_decay": 5e-4,
-            #     "trust_coef": 1e-3,
-            #     "eps": 1e-8,
-            # }
+            # },
+            "default":{
+                "type": "lars",
+                "lr": 0.1,
+                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+                "weight_decay": 5e-4,
+                "trust_coef": 1e-3,
+                "eps": 1e-8,
+            }
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
