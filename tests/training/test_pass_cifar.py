@@ -48,7 +48,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 32, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 16, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -67,7 +67,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             # },
             "default": {
                 "type": "adam",
-                "lr": 0.016,
+                "lr": 1e-3,
                 "weight_decay": 5e-4,
             },
         },
