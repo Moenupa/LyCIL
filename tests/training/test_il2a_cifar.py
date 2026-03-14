@@ -33,7 +33,7 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [20] * 5
+        N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -48,7 +48,7 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 32, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -60,18 +60,16 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
-                "type": "sgd",
-                "lr": 0.1,
-                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+                "type": "adam",
+                "lr": 1e-3,
                 "weight_decay": 5e-4,
             },
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "linear_warmup_cosine_annealing",
-                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-                "max_epochs": EPOCHS_PER_TASK,
+                "type": "cosine_annealing",
+                "T_max": EPOCHS_PER_TASK,
             },
         },
         temp = 0.1,
