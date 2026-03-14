@@ -149,7 +149,7 @@ class IL2A(BaseLearner):
             return torch.zeros((), device=self.device)
 
         index = torch.randint(0, self.num_old_classes, (batch_size,), device=self.device)
-        proto_features = torch.stack(self._protos, dim=0)[index].to(self.device, non_blocking=True)
+        proto_features = torch.stack(self._protos, dim=0)[index].to(self.device)
         proto_targets = index
 
         proto_logits = self.classifier(proto_features)["logits"][:, : self.num_seen_classes]
@@ -164,7 +164,7 @@ class IL2A(BaseLearner):
         target_weight = torch.gather(weight, 1, proto_targets[:, None, None].expand(n, c, d))
         delta = weight - target_weight
 
-        cov = torch.stack(self._covs, dim=0)[proto_targets].to(self.device, non_blocking=True)
+        cov = torch.stack(self._covs, dim=0)[proto_targets].to(self.device)
         aug = torch.diagonal(delta @ cov @ delta.transpose(1, 2), dim1=1, dim2=2)
         return proto_logits + self.ratio * aug / 2
 

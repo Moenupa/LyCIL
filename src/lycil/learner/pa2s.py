@@ -137,8 +137,8 @@ class PASS(BaseLearner):
         if self._radius > 0:
             proto_features = proto_features + torch.randn_like(proto_features) * self._radius
 
-        proto_features = proto_features.to(self.device, non_blocking=True)
-        proto_targets = (indices * self.num_rotations).to(self.device, non_blocking=True)
+        proto_features = proto_features.to(self.device)
+        proto_targets = (indices * self.num_rotations).to(self.device)
 
         proto_logits = self.classifier(proto_features)["logits"]
         return F.cross_entropy(
