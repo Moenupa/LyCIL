@@ -1,13 +1,27 @@
 import os
 from datetime import datetime
 
-# static column names in datasets for internal use
+# default column name for dataset features (e.g., 'img' column for image objects)
 _X_COLUMN_NAME = os.getenv("X_COLUMN_NAME", "img")
+
+# internal column names
+# _y for lycil ordered labels (not given by dataset, remapped for randomness)
 _Y_COLUMN_NAME = os.getenv("Y_COLUMN_NAME", "_y")
+# _cl_task_id for lycil task id, used for filtering
 _CLTASK_COLUMN_NAME = os.getenv("CLTASK_COLUMN_NAME", "_cl_task_id")
 
 # experiment identification and grouping
-_EXP_NAME = datetime.now().strftime("exp_%Y%m%d_%H%M%S")
+PROJECT_NAME = os.getenv("PROJECT_NAME", "lycil")
+EXP_NAME = datetime.now().strftime("%m%d-%H%M")
+
+# wandb settings
+os.environ["WANDB_PROJECT"] = PROJECT_NAME
+os.environ["WANDB_DISABLE_CODE"] = "false"
+
+# data loading constants
+NUM_WORKERS = int(os.getenv("NUM_WORKERS", 16))
+TRAIN_LOADER_KWARGS = {"batch_size": 128, "shuffle": True, "num_workers": NUM_WORKERS}
+TEST_LOADER_KWARGS = {"batch_size": 128, "shuffle": False, "num_workers": NUM_WORKERS}
 
 if os.getenv("HF_DATASETS_DISABLE_PROGRESS_BARS") is None:
     # disable datasets progress bars if not explicitly set

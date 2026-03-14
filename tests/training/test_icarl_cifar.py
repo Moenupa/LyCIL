@@ -2,22 +2,21 @@ import os.path as osp
 
 import lightning as L
 import pytest
+from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 
 import wandb
-from lycil.constants import _EXP_NAME
+from lycil.backbone import ConvNetArgs
+from lycil.constants import EXP_NAME
 from lycil.data.hfmodule import HFDataModule
 from lycil.learner.icarl import ICaRL
-
-from .constants import (
+from lycil.test_constants import (
     CIFAR10_LABEL_COL,
     CIFAR10_PATH,
     CIFAR100_LABEL_COL,
     CIFAR100_PATH,
-    CONVNET_ARGS,
-    TEST_LOADER_KWARGS,
-    VAL_LOADER_KWARGS,
 )
+from tests.training.log_utils import log_statistics_to_wandb
 
 BUFFER_SIZE_PER_CLASS = 20
 
@@ -30,10 +29,12 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [1, 1]
         EPOCHS_PER_TASK = 1
+        USE_PRETRAIN_WEIGHTS = True
     else:
         DATAPATH, LABEL_COL = CIFAR100_PATH, CIFAR100_LABEL_COL
         N_CLASS_PER_TASK = [20, 20, 20, 20, 20]
-        EPOCHS_PER_TASK = 80
+        EPOCHS_PER_TASK = 160
+        USE_PRETRAIN_WEIGHTS = False
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
         return
@@ -44,37 +45,38 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 10},
-        val_loader_kwargs=VAL_LOADER_KWARGS,
-        test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "test", "val": "test"}
         if is_dummy_training
         else {"val": "test"},
-        buffer_kwargs={"mem_size_per_class": BUFFER_SIZE_PER_CLASS},
+        buffer_kwargs={"mem_size": BUFFER_SIZE_PER_CLASS * sum(N_CLASS_PER_TASK)},
     )
     model = ICaRL(
-        backbone_args=CONVNET_ARGS[is_dummy_training],
+        backbone_args=ConvNetArgs(
+            name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True
+        ),
         head="linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
-            -1: {
+            "default": {
                 "type": "sgd",
-                "lr": 0.3,
+                "lr": 0.1,
+                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            -1: {
+            "default": {
                 "type": "linear_warmup_cosine_annealing",
                 "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
                 "max_epochs": EPOCHS_PER_TASK,
-            }
+            },
         },
         distill_T=1.0,
         distill_lambda=0.1,
     )
 
+    statistics_summary = {}
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
 
@@ -83,20 +85,26 @@ def test_icarl_cifar100(device: str, is_dummy_training: bool):
             max_epochs=EPOCHS_PER_TASK,
             sync_batchnorm=True,
             enable_checkpointing=False,
-            enable_progress_bar=False,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"icarl_cifar100_task{task_idx}",
-                project="lycil",
-                log_model=False,
-                tags=["icarl", "cifar100"],
-                group=_EXP_NAME,
+                name=f"icarl/task{task_idx}",
+                tags=["icarl", "cifar100", str(N_CLASS_PER_TASK)],
+                group=f"icarl/{EXP_NAME}",
+                offline=is_dummy_training,
             ),
-            check_val_every_n_epoch=10,
-            log_every_n_steps=1000,
+            check_val_every_n_epoch=1,
+            callbacks=[LearningRateMonitor(logging_interval="epoch")],
+            gradient_clip_val=1.0,
         )
         trainer.fit(model, datamodule=dm)
-        trainer.validate(model, datamodule=dm)
+        test_outputs = trainer.test(
+            model=model,
+            datamodule=dm,
+            verbose=False,
+            ckpt_path=None,
+        )
+        statistics_summary[task_idx] = test_outputs
+        log_statistics_to_wandb(trainer, statistics_summary)
 
         wandb.finish()
 
