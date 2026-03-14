@@ -4,6 +4,7 @@ from lightning.pytorch.utilities.rank_zero import rank_zero_only
 from tqdm import tqdm
 from .base import BaseLearner
 from ..data.hfmodule import HFDataModule
+from ..backbone import BranchResNetBackbone
 
 
 class SSRE(BaseLearner):
@@ -15,6 +16,7 @@ class SSRE(BaseLearner):
         lambda_proto: float = 1.0,
         **kwargs,
     ):
+        kwargs["backbone_cls"] = BranchResNetBackbone
         super().__init__(*args, **kwargs)
 
         self.temp = float(temp)
@@ -144,40 +146,76 @@ class SSRE(BaseLearner):
         self.prepare_adapters()
         return super().configure_optimizers()
 
-    def prepare_adapters(self) -> None:
-        if self._adapter_prepared:
+    def prepare_branches(self) -> None:
+        if self._branches_prepared:
             return
-
         convnet = self.convnet
+
         if self.task_id and self.task_id > 0:
             for p in convnet.parameters():
                 p.requires_grad = True
+            convnet.reset_branches_params()
             for name, p in convnet.named_parameters():
-                if "adapter" not in name:
+                if "parallel_branch" not in name:
                     p.requires_grad = False
-            convnet.switch("parallel_adapters")
+            convnet.set_branches_mode("parallel")
+        else:
+            convnet.set_branches_mode(None)
+            for p in convnet.parameters():
+                p.requires_grad = True
+        self._branches_prepared = True
 
-        self._adapter_prepared = True
+    @torch.no_grad()
+    def compress_branches(self) -> None:
+        """Merge parallel branch params into the main conv weights.
 
-    def compress_adapters(self) -> None:
-        if not self.task_id or self.task_id <= 0:
+        After compression:
+        - main conv absorbs branch params
+        - branch params are reset to zero
+        - branch execution is disabled
+        """
+        if self.task_id is None or self.task_id <= 0:
             return
 
-        state_dict = self.state_dict()
-        for name, value in list(state_dict.items()):
-            if "adapter" not in name:
+        convnet = self.convnet
+
+        for module in convnet.modules():
+            if not hasattr(module, "parallel_branch"):
+                continue
+            if not hasattr(module, "conv"):
                 continue
 
-            conv_name = name.replace("adapter", "conv")
-            if conv_name not in state_dict:
+            branch = getattr(module, "parallel_branch", None)
+            main = getattr(module, "conv", None)
+
+            if branch is None or main is None:
                 continue
 
-            if name.endswith("weight"):
-                state_dict[conv_name] = state_dict[conv_name] + F.pad(value, [1, 1, 1, 1], "constant", 0)
-                state_dict[name] = torch.zeros_like(value)
-            elif name.endswith("bias"):
-                state_dict[conv_name] = state_dict[conv_name] + value
-                state_dict[name] = torch.zeros_like(value)
+            # 只处理 Conv2d
+            if not isinstance(branch, torch.nn.Conv2d):
+                continue
+            if not isinstance(main, torch.nn.Conv2d):
+                continue
 
-        self.load_state_dict(state_dict)
-        self.convnet.switch("normal")
+            # 形状一致时直接相加
+            if main.weight.shape == branch.weight.shape:
+                main.weight.data.add_(branch.weight.data)
+            else:
+                raise RuntimeError(
+                    f"Cannot compress branch: weight shape mismatch: "
+                    f"main={tuple(main.weight.shape)}, "
+                    f"branch={tuple(branch.weight.shape)}"
+                )
+
+            if main.bias is not None and branch.bias is not None:
+                main.bias.data.add_(branch.bias.data)
+            elif main.bias is None and branch.bias is not None:
+                raise RuntimeError("Cannot compress branch bias into bias-free main conv.")
+
+            # 清空 branch 参数，避免重复叠加
+            branch.weight.data.zero_()
+            if branch.bias is not None:
+                branch.bias.data.zero_()
+
+        convnet.set_branches_mode(None)
+        self._branches_prepared = False
