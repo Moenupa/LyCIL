@@ -10,7 +10,7 @@ def calc_per_task_forgetting(
 ) -> list[float]:
     forgetting_list = []
 
-    # 只统计旧任务 0 ~ cur_stage-1
+    # Only count old tasks from 0 to cur_stage-1
     for old_task in sorted(statistics_summary.keys()):
         if old_task >= cur_stage:
             break
