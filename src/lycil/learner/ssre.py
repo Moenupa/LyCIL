@@ -13,7 +13,6 @@ class SSRE(BaseLearner):
         temp: float = 1.0,
         lambda_fkd: float = 1.0,
         lambda_proto: float = 1.0,
-        first_task_batch_size: int = 64,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -21,7 +20,6 @@ class SSRE(BaseLearner):
         self.temp = float(temp)
         self.lambda_fkd = float(lambda_fkd)
         self.lambda_proto = float(lambda_proto)
-        self.first_task_batch_size = int(first_task_batch_size)
 
         self.task_size = 0
         self.num_old_classes = 0
@@ -45,20 +43,17 @@ class SSRE(BaseLearner):
             )
 
         self.expand_head(task_size)
-
         self.task_size = task_size
         self.num_old_classes = self.num_seen_classes or 0
         self.num_seen_classes = dm.num_seen_classes
         self._adapter_prepared = False
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.forward_layerwise(x)["logits"][:, : self.num_seen_classes]
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
 
         outs = self.forward_layerwise(x)
-        logits = outs["logits"][:, : self.num_seen_classes]
+        logits = outs["logits"]
         features = outs["features"]
 
         loss_ce = F.cross_entropy(logits / self.temp, y)
@@ -75,9 +70,7 @@ class SSRE(BaseLearner):
             loss_ce = (F.cross_entropy(logits / self.temp, y, reduction="none") * (1.0 - mask)).mean()
             loss_distill = torch.sum(torch.norm(features - old_features, p=2, dim=1) * mask)
             loss_proto = self.prototype_loss(x.shape[0])
-
             loss = loss_ce + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
-            mask_mean = mask.mean()
 
         self.log_dict(
             {
@@ -85,7 +78,7 @@ class SSRE(BaseLearner):
                 "train/ce": loss_ce,
                 "train/loss_distill": loss_distill or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
-                "train/mask_mean": mask_mean or 0.0,
+                "train/mask_mean": mask.mean() or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
             },
@@ -95,6 +88,49 @@ class SSRE(BaseLearner):
             sync_dist=True,
         )
         return loss
+
+    def similarity_mask(self, features: torch.Tensor) -> torch.Tensor:
+        if self.num_old_classes == 0 or not self._protos:
+            return torch.zeros(features.shape[0], device=self.device, dtype=features.dtype)
+
+        protos = torch.stack(self._protos[: self.num_old_classes], dim=0).to(self.device)
+        feat_norm = F.normalize(features, p=2, dim=1, eps=1e-12)
+        proto_norm = F.normalize(protos, p=2, dim=1, eps=1e-12)
+        return (feat_norm @ proto_norm.T).max(dim=1).values.detach()
+
+    def prototype_loss(self, batch_size: int) -> torch.Tensor:
+        if self.num_old_classes == 0 or not self._protos:
+            return torch.zeros((), device=self.device)
+
+        index = torch.randint(0, self.num_old_classes, (batch_size,), device=self.device)
+        proto_features = torch.stack(self._protos[: self.num_old_classes], dim=0)[index]
+        proto_targets = index
+
+        proto_logits = self.classifier(proto_features)["logits"]
+        return F.cross_entropy(proto_logits / self.temp, proto_targets)
+
+    @rank_zero_only
+    def build_protos(self, dm: "HFDataModule"):
+        if self.num_seen_classes <= self.num_old_classes:
+            return
+
+        self.eval()
+        with torch.no_grad():
+            features, targets = [], []
+            for batch in tqdm(dm.train_dataloader(), desc=f"Building prototypes task {dm.get_current_task()}"):
+                x, y = self.unpack_batch(batch)
+                features.append(self.forward_layerwise(x.to(self.device))["features"])
+                targets.append(y.to(self.device))
+
+            features = torch.cat(features, dim=0)
+            targets = torch.cat(targets, dim=0)
+
+            for class_idx in range(self.num_old_classes, self.num_seen_classes):
+                class_features = features[targets == class_idx]
+                if len(class_features) == 0:
+                    continue
+                self._protos.append(class_features.mean(dim=0))
+
 
     def on_fit_start(self) -> None:
         self.prepare_adapters()
@@ -145,45 +181,3 @@ class SSRE(BaseLearner):
 
         self.load_state_dict(state_dict)
         self.convnet.switch("normal")
-
-    def similarity_mask(self, features: torch.Tensor) -> torch.Tensor:
-        if self.num_old_classes == 0 or not self._protos:
-            return torch.zeros(features.shape[0], device=features.device, dtype=features.dtype)
-
-        protos = torch.stack(self._protos[: self.num_old_classes], dim=0).to(features.device, non_blocking=True)
-        feat_norm = F.normalize(features, p=2, dim=1, eps=1e-12)
-        proto_norm = F.normalize(protos, p=2, dim=1, eps=1e-12)
-        return (feat_norm @ proto_norm.T).max(dim=1).values.detach()
-
-    def prototype_loss(self, batch_size: int) -> torch.Tensor:
-        if self.num_old_classes == 0 or not self._protos:
-            return torch.zeros((), device=self.device)
-
-        index = torch.randint(0, self.num_old_classes, (batch_size,), device=self.device)
-        proto_features = torch.stack(self._protos[: self.num_old_classes], dim=0)[index]
-        proto_targets = index
-
-        proto_logits = self.classifier(proto_features)["logits"][:, : self.num_seen_classes]
-        return F.cross_entropy(proto_logits / self.temp, proto_targets)
-
-    @rank_zero_only
-    def build_protos(self, dm: "HFDataModule"):
-        if self.num_seen_classes <= self.num_old_classes:
-            return
-
-        self.eval()
-        with torch.no_grad():
-            features, targets = [], []
-            for batch in tqdm(dm.train_dataloader(), desc=f"Building prototypes task {dm.get_current_task()}"):
-                x, y = self.unpack_batch(batch)
-                features.append(self.forward_layerwise(x.to(self.device))["features"])
-                targets.append(y.to(self.device))
-
-            features = torch.cat(features, dim=0)
-            targets = torch.cat(targets, dim=0)
-
-            for class_idx in range(self.num_old_classes, self.num_seen_classes):
-                class_features = features[targets == class_idx]
-                if len(class_features) == 0:
-                    continue
-                self._protos.append(class_features.mean(dim=0))
