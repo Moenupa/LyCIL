@@ -24,7 +24,9 @@ from ..data.buffer import BaseExemplarBuffer
 from ..data.hfmodule import HFDataModule
 from ..data.transform import apply_dataset_transform
 
-import time
+from ..optimizer import LARS
+
+
 
 
 
@@ -280,6 +282,8 @@ class BaseLearner(L.LightningModule):
                 return torch.optim.Adam(*args, **kwargs)
             case "adamw":
                 return torch.optim.AdamW(*args, **kwargs)
+            case "lars":
+                return LARS(*args, **kwargs)
             case _:
                 raise NotImplementedError(f"Unsupported optimizer: `{opt_type}`")
 
