@@ -59,12 +59,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         head="linear",
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
-            # "default": {
-            #     "type": "sgd",
-            #     "lr": 0.1,
-            #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
-            #     "weight_decay": 5e-4,
-            # },
             "default": {
                 "type": "adam",
                 "lr": 1e-3,
@@ -73,11 +67,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
-            # "default": {
-            #     "type": "linear_warmup_cosine_annealing",
-            #     "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
-            #     "max_epochs": EPOCHS_PER_TASK,
-            # },
             "default": {
                 "type": "cosine_annealing",
                 "T_max": EPOCHS_PER_TASK,
@@ -122,8 +111,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         statistics_summary[task_idx] = test_outputs
         log_statistics_to_wandb(trainer, statistics_summary)
 
-        # wandb.finish()
-        break
+        wandb.finish()
 
 
 if __name__ == "__main__":
