@@ -92,19 +92,19 @@ def get_branch_convnet(args: ConvNetArgs) -> tuple[bnm.ResNet, int]:
         case "resnet18":
             net = bnm.resnet18(
                 weights=bnm.ResNet18_Weights.IMAGENET1K_V1 if args.pretrained else None,
-                branch_mode="parallel",
+                branch_mode=None,
             )
             feat_dim = 512
         case "resnet34":
             net = bnm.resnet34(
                 weights=bnm.ResNet34_Weights.IMAGENET1K_V1 if args.pretrained else None,
-                branch_mode="parallel",
+                branch_mode=None,
             )
             feat_dim = 512
         case "resnet50":
             net = bnm.resnet50(
                 weights=bnm.ResNet50_Weights.IMAGENET1K_V2 if args.pretrained else None,
-                branch_mode="parallel",
+                branch_mode=None,
             )
             feat_dim = 2048
         case _:

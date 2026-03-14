@@ -76,7 +76,6 @@ class BranchConv3x3(nn.Module):
             dilation=dilation,
         )
 
-        import pdb;pdb.set_trace()
         if branch_mode == "parallel":
             self.parallel_branch = conv1x1(
                 in_planes=in_planes,
@@ -130,7 +129,6 @@ class BasicBlock(nn.Module):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         # self.conv1 = conv3x3(inplanes, planes, stride)
-        import pdb;pdb.set_trace()
         self.conv1 = BranchConv3x3(inplanes, planes, stride, branch_mode=branch_mode)
 
         self.bn1 = norm_layer(planes)
@@ -239,8 +237,6 @@ class ResNet(nn.Module):
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
         self.branch_mode = branch_mode
-
-        import pdb;pdb.set_trace()
 
         self.inplanes = 64
         self.dilation = 1
