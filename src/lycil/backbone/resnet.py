@@ -47,3 +47,6 @@ class ResNetBackbone(BaseBackbone):
     @property
     def feature_dim(self) -> int:
         return self.convnet_out_dim
+
+# class BranchResNetBackbone(BaseBackbone):
+#    xxx

@@ -70,6 +70,11 @@ def get_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
 
     return net, feat_dim
 
+# def get_branch_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
+#     xxxx
+#
+#     return net, feat_dim
+
 
 class BaseBackbone(nn.Module):
     """Abstract backbone class, without classifier heads.
