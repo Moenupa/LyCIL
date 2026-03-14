@@ -1,5 +1,6 @@
 import copy
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 
 import torch
 from datasets import Dataset, DatasetDict, concatenate_datasets
@@ -7,6 +8,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from ..constants import _X_COLUMN_NAME
+from .util import deterministic_choice
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -17,22 +19,26 @@ def compute_nme(
     dataloader: "DataLoader",
     feature_extractor: "Callable[[torch.Tensor], torch.Tensor]",
     device: "torch.device",
+    normalize_mean: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    r"""Compute the normalized mean feature vector for a given dataloader.
+    r"""Compute the (normalized) mean feature vector for a given dataloader.
 
     Args:
         dataloader (DataLoader):
             Dataloader, usually only contains samples in a single class.
         feature_extractor (Callable[[torch.Tensor], torch.Tensor]):
             Function to extract features.
-        device (torch.device): device to use for computation.
+        device (torch.device):
+            device to use for computation.
+        normalize_mean (bool, optional):
+            Whether to L2-norm mean feature vector. (default: ``True``)
 
     Raises:
         TypeError: if ``dataloader`` does not yield dict or Tensor
 
     Returns:
         tuple: 2 tensors
-            - 1d tensor, sample-wise mean of feature vector, shaped (n_features),
+            - 1d tensor, (normalized) all-sample feature mean, shaped (n_features),
             - 2d tensor, per-sample feature vectors, shaped (n_samples, n_features).
 
     """
@@ -50,8 +56,125 @@ def compute_nme(
 
     # shaped (n_samples, n_features)
     per_sample_features = torch.cat(feature_list, dim=0)
-    nme = per_sample_features.mean(dim=0)
-    return nme, per_sample_features
+    # shaped (n_features), mean across all samples in the dataloader
+    mean_feature = per_sample_features.mean(dim=0)
+    if normalize_mean:
+        mean_feature = F.normalize(mean_feature, dim=0)
+    return mean_feature, per_sample_features
+
+
+@torch.no_grad()
+def predict_nme_rank(
+    feature_extractor: "Callable[[torch.Tensor], torch.Tensor]",
+    x: torch.Tensor,
+    class_ids: torch.Tensor,
+    class_means: torch.Tensor,
+    topk: int = 1,
+) -> torch.Tensor:
+    feats = F.normalize(feature_extractor(x), dim=1)
+    means = F.normalize(class_means.to(feats.device), dim=1)
+    class_ids = class_ids.to(feats.device)
+
+    dists = torch.cdist(feats, means, p=2).pow(2)
+    rank = torch.argsort(dists, dim=1)[:, :topk]
+    return class_ids[rank]
+
+
+@torch.no_grad()
+def select_exemplar(
+    size: int,
+    dataset_size: int,
+    dataloader: "DataLoader",
+    feature_extractor: "Callable[[torch.Tensor], torch.Tensor]",
+    device: "torch.device",
+    strategy: Literal["random", "herding"] = "herding",
+    seed_offset: int = 0,
+) -> list[int]:
+    if size <= 0 or size > dataset_size:
+        raise ValueError(
+            f"Cannot select exemplars of size {size} from dataset with {dataset_size} samples."
+        )
+
+    if strategy == "random":
+        return deterministic_choice(0, dataset_size, size=size, seed_offset=seed_offset)
+
+    # herding by default, edge cases should be handled by code linting
+    class_mean, per_sample_features = compute_nme(dataloader, feature_extractor, device)
+
+    selected_idx = []
+    selected_mask = torch.zeros(
+        dataset_size, dtype=torch.bool, device=per_sample_features.device
+    )
+    running_sum = torch.zeros_like(class_mean)
+
+    # select topk exemplars iteratively,
+    # each time picking the one that brings the mean closer to the class mean
+    for k in range(size):
+        candidate_idx = (~selected_mask).nonzero(as_tuple=False).squeeze(1)
+        candidate_feats = per_sample_features[candidate_idx]
+
+        mu_p = (running_sum.unsqueeze(0) + candidate_feats) / (k + 1)
+        dist = torch.norm(class_mean.unsqueeze(0) - mu_p, p=2, dim=1)
+        best_rel: int = torch.argmin(dist).item()  # ty: ignore[invalid-assignment]
+        best_abs: int = candidate_idx[best_rel].item()  # ty: ignore[invalid-assignment]
+
+        selected_idx.append(best_abs)
+        selected_mask[best_abs] = True
+        running_sum += per_sample_features[best_abs]
+
+    return selected_idx
+
+
+@dataclass
+class BufferReplayArgs:
+    strategy: Literal["random", "herding"] = field(
+        default="herding",
+        metadata={
+            "help": "Exemplar selection strategy (default: 'herding'): "
+            "1. 'herding' iteratively selects samples bringing closer to the class mean"
+            "2. 'random' seeded by PL_GLOBAL_SEED + seed_offset for reproducibility. (default: 'herding')"
+        },
+    )
+    loader_kwargs: dict = field(
+        default_factory=lambda: {"batch_size": 128, "shuffle": False, "num_workers": 8},
+        metadata={
+            "help": "DataLoader keyword arguments during BufferReplay (Exemplar update)."
+        },
+    )
+    eval: bool = field(
+        default=True,
+        metadata={
+            "help": "Meta-Toggle to enable NME (nearest mean of exemplars) accuracy at the end of each task."
+            " A common metric for exemplar-based CL methods to evaluate quality of exemplars."
+        },
+    )
+    eval_every_n_epochs: int = field(
+        default=20,
+        metadata={"help": "Frequency of NME accuracy evaluation."},
+    )
+    eval_topk: int = field(
+        default=1,
+        metadata={"help": "Top-k accuracy of NME accuracy."},
+    )
+    eval_compute_cur_task: bool = field(
+        default=True,
+        metadata={"help": "Toggle to compute current task during NME evaluation."},
+    )
+    eval_recompute_old_task: bool = field(
+        default=True,
+        metadata={"help": "Toggle to recompute old tasks during NME evaluation."},
+    )
+
+    # validate eval_topk > 0
+    def __post_init__(self):
+        if self.eval_topk <= 0:
+            raise ValueError(
+                f"eval_topk must be a positive integer, got {self.eval_topk}."
+            )
+        if self.eval_every_n_epochs <= 0:
+            raise ValueError(
+                f"eval_every_n_epochs must be a positive integer, got {self.eval_every_n_epochs}."
+            )
 
 
 class BaseExemplarBuffer(DatasetDict):
@@ -68,9 +191,11 @@ class BaseExemplarBuffer(DatasetDict):
     Exactly one of ``mem_size`` or ``mem_size_per_class`` must be provided.
 
     Args:
-        mem_size (int | None, optional): Total exemplar budget across all classes.
+        mem_size (int | None, optional):
+            Total exemplar budget across all classes.
             Mutually exclusive with ``mem_size_per_class``. (default: ``None``)
-        mem_size_per_class (int | None, optional): Fixed per-class exemplar quota.
+        mem_size_per_class (int | None, optional):
+            Fixed per-class exemplar quota.
             Mutually exclusive with ``mem_size``. (default: ``None``)
         args: Positional arguments forwarded to :class:`~datasets.DatasetDict`.
         kwargs: Keyword arguments forwarded to :class:`~datasets.DatasetDict`.
@@ -126,8 +251,6 @@ class BaseExemplarBuffer(DatasetDict):
         self.mem_size = mem_size
         self.mem_size_per_class = mem_size_per_class
 
-        # two dicts keyed by class_id, manual sync required
-        # per_class_data is `self` in DatasetDict format
         self.per_class_means: dict[int, torch.Tensor] = {}
 
     def __getitem__(self, k):

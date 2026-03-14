@@ -5,18 +5,25 @@ from typing import TYPE_CHECKING, Literal
 
 import lightning as L
 import torch
+import torch.nn.functional as F
 from torch.optim import lr_scheduler
 
 from ..backbone import BaseBackbone, ConvNetArgs, ResNetBackbone
 from ..classifier import expand_head, make_head
 from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
-from ..data.buffer import compute_nme
+from ..data.buffer import (
+    BufferReplayArgs,
+    compute_nme,
+    predict_nme_rank,
+    select_exemplar,
+)
 from ..data.hfmodule import filter_by_classid
-from ..metrics.accuracy import accuracy, accuracy_topk
+from ..metrics.accuracy import accuracy
 from ..scheduler import LinearWarmupCosineAnnealingLR
 
 if TYPE_CHECKING:
     import torch.nn as nn
+    from datasets import Dataset
 
     from ..data.buffer import BaseExemplarBuffer
     from ..data.hfmodule import HFDataModule
@@ -57,10 +64,12 @@ class BaseLearner(L.LightningModule):
         backbone_args: ConvNetArgs | None = None,
         head: Literal["linear", "cosine"] = "linear",
         data_column_translate: dict[str, str] | None = None,
-        per_task_optim_args: dict[int, dict] | None = None,
-        per_task_sched_args: dict[int, dict] | None = None,
+        per_task_optim_args: dict[int | str, dict] | None = None,
+        per_task_sched_args: dict[int | str, dict] | None = None,
+        buffer_replay_args: BufferReplayArgs | None = None,
     ):
         super().__init__()
+        self.save_hyperparameters()
 
         self.backbone = backbone_cls(backbone_args or ConvNetArgs())
         self.head_type = head
@@ -79,8 +88,15 @@ class BaseLearner(L.LightningModule):
         # kwargs for optimizer/scheduler per task_id
         # e.g. {0: {"type":"sgd", "lr":0.1}, 1: {"type":"sgd", "lr":0.01}}
         # first task SGD(lr=0.1), second task SGD(lr=0.01)
-        self.per_task_optim_args: dict[int, dict] = per_task_optim_args or {}
-        self.per_task_sched_args: dict[int, dict] = per_task_sched_args or {}
+        self.per_task_optim_args: dict[int | str, dict] = per_task_optim_args or {}
+        self.per_task_sched_args: dict[int | str, dict] = per_task_sched_args or {}
+
+        self.buffer_replay_args: BufferReplayArgs = (
+            buffer_replay_args or BufferReplayArgs()
+        )
+
+        self._cached_val_nme = None
+        self._cached_test_nme = None
 
     @property
     def feature_dim(self) -> int:
@@ -267,19 +283,23 @@ class BaseLearner(L.LightningModule):
     def configure_optimizers(self):
         params = [p for p in self.parameters() if p.requires_grad]
 
-        # a waterfall lookup for optimizer/scheduler kwargs:
-        # per-task specific > default (-1) > empty dict
+        # a waterfall lookup for optimizer/scheduler configs:
+        # per-task specific -> default -> {}
         optim_kwargs = (
             self.per_task_optim_args.get(self.task_id)
-            or self.per_task_optim_args.get(-1)
+            or self.per_task_optim_args.get("default")
             or {}
         )
         sched_kwargs = (
             self.per_task_sched_args.get(self.task_id)
-            or self.per_task_sched_args.get(-1)
+            or self.per_task_sched_args.get("default")
             or {}
         )
         optim = self._get_optimizer(params, **optim_kwargs)
+        # If sched_kwargs is None (or explicitly disabled), return optimizer only
+        if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+            return optim
+
         sched = self._get_scheduler(optim, **sched_kwargs)
 
         return {
@@ -331,36 +351,98 @@ class BaseLearner(L.LightningModule):
     @abstractmethod
     def training_step(self, batch, batch_idx: int) -> torch.Tensor: ...
 
-    def validation_step(self, batch, batch_idx: int) -> None:
-        x, y = self.unpack_batch(batch)
-        logits: torch.Tensor = self(x)
-        acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
-        self.log_dict(
-            {
-                f"val/acc1/task{self.task_id}": acc1,
-                f"val/acc5/task{self.task_id}": acc5,
-            },
-            prog_bar=False,
-            sync_dist=True,
+    def validation_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
+        dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+        name = getattr(dm, "_val_loader_names", None)
+        suffix = (
+            name[dataloader_idx] if name is not None else f"dataloader{dataloader_idx}"
         )
 
-    def test_step(self, batch, batch_idx: int) -> None:
         x, y = self.unpack_batch(batch)
         logits: torch.Tensor = self(x)
         acc1 = accuracy(logits, y)
-        acc5 = accuracy_topk(logits, y, k=min(5, logits.size(1)))
+        dict_to_log = {
+            f"val-acc1/{suffix}": acc1,
+        }
+
+        if self._cached_val_nme is not None:
+            topk = self.buffer_replay_args.eval_topk
+            class_ids, class_means = self._cached_val_nme
+            rank_pred = predict_nme_rank(
+                self.feature_extractor, x, class_ids, class_means, topk=topk
+            )
+            nme_acc1 = rank_pred[:, 0].eq(y).float().mean()
+
+            dict_to_log |= {
+                f"val-nmeacc1/{suffix}": nme_acc1,
+            }
+
         self.log_dict(
-            {
-                f"test/acc1/task{self.task_id}": acc1,
-                f"test/acc5/task{self.task_id}": acc5,
-            },
+            dict_to_log,
             prog_bar=False,
             sync_dist=True,
+            add_dataloader_idx=False,
         )
+
+    def test_step(self, batch, batch_idx: int, dataloader_idx: int = 0) -> None:
+        dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+        name = getattr(dm, "_test_loader_names", None)
+        suffix = (
+            name[dataloader_idx] if name is not None else f"dataloader{dataloader_idx}"
+        )
+
+        x, y = self.unpack_batch(batch)
+        logits: torch.Tensor = self(x)
+        acc1 = accuracy(logits, y)
+        dict_to_log = {
+            f"test-acc1/{suffix}": acc1,
+        }
+
+        if self._cached_test_nme is not None:
+            topk = self.buffer_replay_args.eval_topk
+            class_ids, class_means = self._cached_test_nme
+            rank_pred = predict_nme_rank(
+                self.feature_extractor, x, class_ids, class_means, topk=topk
+            )
+            nme_acc1 = rank_pred[:, 0].eq(y).float().mean()
+
+            dict_to_log |= {
+                f"test-nmeacc1/{suffix}": nme_acc1,
+            }
+
+        self.log_dict(
+            dict_to_log,
+            prog_bar=False,
+            sync_dist=True,
+            add_dataloader_idx=False,
+        )
+
+    def on_validation_epoch_start(self) -> None:
+        if not self._should_run_val_nme_eval:
+            self._cached_val_nme = None
+            return
+
+        self._cached_val_nme = self._prepare_buffer_eval(
+            self.trainer.datamodule,  # ty: ignore[unresolved-attribute]
+        )
+
+    def on_validation_epoch_end(self) -> None:
+        self._cached_val_nme = None
+
+    def on_test_epoch_start(self) -> None:
+        if not self.buffer_replay_args.eval:
+            self._cached_test_nme = None
+            return
+
+        self._cached_test_nme = self._prepare_buffer_eval(
+            self.trainer.datamodule,  # ty: ignore[unresolved-attribute]
+        )
+
+    def on_test_epoch_end(self) -> None:
+        self._cached_test_nme = None
 
     @torch.no_grad()
-    def update_memory(self, dm: "HFDataModule", **kwargs) -> None:
+    def update_memory(self, dm: "HFDataModule") -> None:
         """Update datamodule's exemplar memory (i.e., iCaRL).
 
         To be opted-in after training of each task, e.g. in ``on_train_end()``.
@@ -375,116 +457,218 @@ class BaseLearner(L.LightningModule):
         if dm.buffer is None:
             raise RuntimeError("Buffer is not initialized.")
 
+        per_class_quota = dm.buffer.size_per_class(self.num_seen_classes)
+
         self.eval()
         if dm.buffer.is_adaptive:
-            # vacate exemplars for more classes
-            dm.buffer.reduce_exemplars(dm.buffer.size_per_class(self.num_seen_classes))
-            self._construct_exemplar(dm, **kwargs)
-        else:
-            self._construct_exemplar_unified(dm, **kwargs)
+            # Adaptive memory: reuse the full global budget on the currently
+            # seen classes, then shrink old classes as new ones arrive.
+            dm.buffer.reduce_exemplars(per_class_quota)
+        self._construct_exemplar(
+            dm,
+            dm.get_effective_transform_name("test"),
+            per_class_quota,
+            self.buffer_replay_args.loader_kwargs,
+            self.buffer_replay_args.strategy,
+        )
         self.train()
         return
 
     @torch.no_grad()
-    def _construct_exemplar(self, dm: "HFDataModule", **kwargs) -> None:
-        """Construct class exemplars for adaptive-memory strategies.
+    def _construct_exemplar(
+        self,
+        dm: "HFDataModule",
+        transform_name: str | None,
+        per_class_quota: int,
+        loader_kwargs: dict,
+        strategy: Literal["random", "herding"] = "herding",
+    ) -> None:
+        """Construct class exemplars.
 
         Args:
-            dm (HFDataModule): Data module to update, containing the buffer.
-            kwargs: Additional arguments for exemplar construction.
+            dm (HFDataModule):
+                Data module to update, containing the buffer.
+            transform_name (str | None):
+                HuggingFace formatter name to set on the returned dataset.
+            per_class_quota (int):
+                Number of exemplars to store per class.
+            loader_kwargs (dict):
+                Additional arguments to DataLoader.
+            strategy (Literal["random", "herding"]):
+                Exemplar selection strategy. (default: ``"herding"``)
 
         """
-        raise NotImplementedError
-
         assert dm.buffer is not None
-        # construct exemplar set for current classes
-        for class_idx in range(self.num_old_classes, self.num_seen_classes):
-            pass
-
-    @torch.no_grad()
-    def _construct_exemplar_unified(self, dm: "HFDataModule", **kwargs) -> None:
-        """Construct exemplars when memory size per class is fixed.
-
-        Args:
-            dm (HFDataModule): Data module to update, containing the buffer.
-            kwargs: Additional arguments for exemplar construction.
-
-        """
-        # for dataloader during exemplar construction,
-        # rather conservative because args are hard-coded here
-        loader_kwargs = dict(
-            batch_size=1,
-            shuffle=False,
-            num_workers=8,
-        )
-
-        assert dm.buffer is not None
-        per_class_means = {}
+        old_class_means = {}
 
         # find means of old classes with newly trained network
         for class_idx in range(self.num_old_classes):
+            if f"{class_idx}" not in dm.buffer or len(dm.buffer[f"{class_idx}"]) == 0:
+                continue
+
             loader = dm.buffer.get_dataloader(
                 keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
+                transform_name=transform_name,
                 loader_kwargs=loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
+            old_class_means[class_idx] = mean.cpu()
+
+        cur_task_buffer, cur_class_means = self._construct_exemplar_for_cur_task(
+            dm, transform_name, per_class_quota, loader_kwargs, strategy=strategy
+        )
+
+        dm.buffer.per_class_means = old_class_means | cur_class_means
+        dm.buffer.update(cur_task_buffer)
+        return
+
+    def _construct_exemplar_for_cur_task(
+        self,
+        dm: "HFDataModule",
+        transform_name: str | None,
+        per_class_quota: int,
+        loader_kwargs: dict,
+        strategy: Literal["random", "herding"] = "herding",
+    ) -> "tuple[dict[str, Dataset], dict[int, torch.Tensor]]":
+        """Construct exemplars for current task' classes.
+
+        Args:
+            dm (HFDataModule):
+                Data module to update, containing the buffer.
+            transform_name (str | None):
+                HuggingFace formatter name to set on the returned dataset.
+            per_class_quota (int):
+                Number of exemplars to store per class.
+            loader_kwargs (dict):
+                Additional arguments to DataLoader.
+            strategy (Literal["random", "herding"]):
+                Exemplar selection strategy. (default: ``"herding"``)
+
+        """
+        # narrow down dataset to include only current classes to boost filtering
+        cur_task_subset = dm.get_filtered_dataset(
+            split=dm._split_train,
+            filter_fn=partial(
+                filter_by_classid, _min=self.num_old_classes, _max=self.num_seen_classes
+            ),
+            transform_name=transform_name,
+            use_buffer=False,
+        )
+        class_subset_lookup: dict[int, Dataset] = {
+            class_idx: cur_task_subset.filter(
+                partial(filter_by_classid, _min=class_idx, _max=class_idx + 1)
+            )
+            for class_idx in range(self.num_old_classes, self.num_seen_classes)
+        }
+
+        ret_buffer: dict[str, Dataset] = {}
+        per_class_means: dict[int, torch.Tensor] = {}
 
         # construct exemplar set for current classes
-        for class_idx in range(self.num_old_classes, self.num_seen_classes):
-            # 1. single pass on all data
-            train_loader = dm.get_dataloader(
-                split=dm._split_train,
-                filter_fn=partial(filter_by_classid, class_idx=class_idx),
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
+        for class_idx, class_subset in class_subset_lookup.items():
+            n_samples = len(class_subset)
+            if n_samples == 0:
+                raise RuntimeError(
+                    f"No samples found for class {class_idx} in current task dataset."
+                )
+
+            # select exemplars by herding
+            selected_idx = select_exemplar(
+                size=per_class_quota,
+                dataset_size=n_samples,
+                dataloader=torch.utils.data.DataLoader(
+                    class_subset,  # ty: ignore[invalid-argument-type]
+                    **loader_kwargs,
+                ),
+                feature_extractor=self.feature_extractor,
+                device=self.device,
+                strategy=strategy,
+                seed_offset=class_idx,
             )
-            mean, per_sample_features = compute_nme(
-                train_loader, self.feature_extractor, self.device
-            )
+            selected_dataset = class_subset.select(selected_idx)
 
-            # 2. select exemplars by herding
-            # for now, use first m samples
-            m = dm.buffer.size_per_class(self.num_seen_classes)
-            selected_idx = list(range(0, m))
-            # TODO: implement full herding
-            # herding implementation from another library is below:
-            # selected_exemplars = []
-            # exemplar_vectors = []
-            # for k in range(1, m + 1):
-            #     S = np.sum(
-            #         exemplar_vectors, axis=0
-            #     )  # [feature_dim] sum of selected exemplars vectors
-            #     mu_p = (vectors + S) / k  # [n, feature_dim] sum to all vectors
-            #     i = np.argmin(np.sqrt(np.sum((class_mean - mu_p) ** 2, axis=1)))
-
-            #     selected_exemplars.append(
-            #         np.array(data[i])
-            #     )  # New object to avoid passing by inference
-            #     exemplar_vectors.append(
-            #         np.array(vectors[i])
-            #     )  # New object to avoid passing by inference
-
-            #     vectors = np.delete(
-            #         vectors, i, axis=0
-            #     )  # Remove it to avoid duplicative selection
-            #     data = np.delete(
-            #         data, i, axis=0
-            #     )  # Remove it to avoid duplicative selection
-            selected_dataset = dm.get_filtered_dataset(
-                split=dm._split_train,
-                filter_fn=partial(filter_by_classid, class_idx=class_idx),
-            ).select(selected_idx)
-            dm.buffer[f"{class_idx}"] = selected_dataset
-
-            # 3. recompute class mean after selection
-            loader = dm.buffer.get_dataloader(
-                keys=[f"{class_idx}"],
-                transform_name=dm.get_effective_transform_name(),
-                loader_kwargs=loader_kwargs,
+            # recompute class mean after selection
+            loader = torch.utils.data.DataLoader(
+                selected_dataset,
+                **loader_kwargs,
             )
             mean, _ = compute_nme(loader, self.feature_extractor, self.device)
-            per_class_means[class_idx] = mean
 
-        dm.buffer.per_class_means = per_class_means
+            # reset format and store in buffer/class_mean
+            selected_dataset.reset_format()
+            ret_buffer[f"{class_idx}"] = selected_dataset
+            per_class_means[class_idx] = mean.cpu()
+
+        return ret_buffer, per_class_means
+
+    @torch.no_grad()
+    def _prepare_buffer_eval(
+        self,
+        dm: "HFDataModule",
+    ) -> tuple[torch.Tensor, torch.Tensor] | None:
+        if dm.buffer is None:
+            return None
+
+        transform_name = dm.get_effective_transform_name("test")
+        per_class_means: dict[int, torch.Tensor] = {}
+
+        # find means of old classes with newly trained network
+        for class_idx in range(self.num_old_classes):
+            key = f"{class_idx}"
+            if key not in dm.buffer or len(dm.buffer[key]) == 0:
+                continue
+
+            if self.buffer_replay_args.eval_recompute_old_task:
+                loader = dm.buffer.get_dataloader(
+                    [key], transform_name, self.buffer_replay_args.loader_kwargs
+                )
+                class_mean, _ = compute_nme(
+                    loader, self.feature_extractor, self.device, normalize_mean=True
+                )
+                per_class_means[class_idx] = class_mean.cpu()
+            elif class_idx in dm.buffer.per_class_means:
+                per_class_means[class_idx] = dm.buffer.per_class_means[class_idx].cpu()
+
+        # construct exemplar set for current classes
+        if (
+            self.buffer_replay_args.eval_compute_cur_task
+            and self.num_seen_classes > self.num_old_classes
+        ):
+            _, cur_class_means = self._construct_exemplar_for_cur_task(
+                dm,
+                transform_name,
+                per_class_quota=dm.buffer.size_per_class(self.num_seen_classes),
+                loader_kwargs=self.buffer_replay_args.loader_kwargs,
+                strategy=self.buffer_replay_args.strategy,
+            )
+            per_class_means |= cur_class_means
+
+        if len(per_class_means) == 0:
+            return None
+
+        class_ids = sorted(per_class_means.keys())
+        class_ids_t = torch.tensor(class_ids, dtype=torch.long)
+        class_means_t = torch.stack([per_class_means[c] for c in class_ids], dim=0)
+        class_means_t = F.normalize(class_means_t, dim=1)
+
+        return class_ids_t, class_means_t
+
+    @property
+    def _should_run_val_nme_eval(self) -> bool:
+        # skip if during sanity check
+        if self.trainer.sanity_checking:
+            return False
+        # skip if NME evaluation is disabled explicitly
+        if not self.buffer_replay_args.eval:
+            return False
+        dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+        if not (dm.buffer is not None and len(dm.buffer) > 0):
+            return False
+
+        epoch_idx = self.trainer.current_epoch + 1
+        max_epochs = self.trainer.max_epochs
+
+        if max_epochs is not None and max_epochs > 0 and epoch_idx >= max_epochs:
+            return True
+
+        return epoch_idx % self.buffer_replay_args.eval_every_n_epochs == 0

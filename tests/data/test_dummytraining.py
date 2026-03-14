@@ -51,7 +51,7 @@ class DummyClassifier(L.LightningModule):
     def validation_step(self, *args, **kwargs):
         pass
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx, dataloader_idx: int = 0):
         x = batch["img"]
         y = batch["label"]
         logits = self(x)

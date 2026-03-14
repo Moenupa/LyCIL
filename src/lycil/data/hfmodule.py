@@ -6,7 +6,12 @@ import lightning as L
 from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from torch.utils.data import DataLoader
 
-from ..constants import _CLTASK_COLUMN_NAME, _Y_COLUMN_NAME
+from ..constants import (
+    _CLTASK_COLUMN_NAME,
+    _Y_COLUMN_NAME,
+    TEST_LOADER_KWARGS,
+    TRAIN_LOADER_KWARGS,
+)
 from .buffer import BaseExemplarBuffer
 from .transform import register_tf_as_formatter
 from .util import (
@@ -51,8 +56,8 @@ def filter_by_task(sample: dict[str, Any], task_id: int) -> bool:
     return sample[_CLTASK_COLUMN_NAME] == task_id
 
 
-def filter_by_classid(sample: dict[str, Any], class_idx: int) -> bool:
-    return sample[_Y_COLUMN_NAME] == class_idx
+def filter_by_classid(sample: dict[str, Any], _min: int, _max: int) -> bool:
+    return _min <= sample[_Y_COLUMN_NAME] < _max
 
 
 class HFDataModule(L.LightningDataModule):
@@ -103,14 +108,15 @@ class HFDataModule(L.LightningDataModule):
         label_map: dict[int, Any] | list[Any] | None = None,
         transform_name: str | None = None,
         # DataLoader kwargs
-        train_loader_kwargs: dict | None = None,
-        val_loader_kwargs: dict | None = None,
-        test_loader_kwargs: dict | None = None,
+        train_loader_kwargs: dict | None = TRAIN_LOADER_KWARGS,
+        val_loader_kwargs: dict | None = TEST_LOADER_KWARGS,
+        test_loader_kwargs: dict | None = TEST_LOADER_KWARGS,
         # train/val/test map in case some dataset uses different split names
         split_map: SplitMapping | None = None,
         buffer_kwargs: dict | None = None,
     ):
         super().__init__()
+        self.save_hyperparameters()
 
         # load_dataset(path, **self.load_kwargs)
         self.path = path

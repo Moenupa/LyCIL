@@ -1,5 +1,7 @@
 from typing import Any, TypedDict
 
+from numpy.random import default_rng
+
 from ..constants import get_seed
 
 
@@ -40,10 +42,17 @@ def deterministic_shuffle(lst: list) -> list:
     Returns:
         list: The shuffled list (same object as input).
     """
-    from numpy.random import default_rng
-
     default_rng(get_seed()).shuffle(lst)
     return lst
+
+
+def deterministic_choice(
+    _min: int, _max: int, size: int = 1, seed_offset: int = 0
+) -> list[int]:
+    seed = get_seed()
+    if seed is not None:
+        seed += seed_offset
+    return default_rng(seed).choice(range(_min, _max), size=size).tolist()
 
 
 def get_num_classes_per_task(
