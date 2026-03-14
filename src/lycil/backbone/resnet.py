@@ -92,7 +92,7 @@ class BranchResNetBackbone(ResNetBackbone):
         import pdb; pdb.set_trace()
         for p in self.net.parameters():
             p.requires_grad = True
-
+        import pdb;pdb.set_trace()
         if freeze_main_branch:
             self.net.reset_branches_params()
             for name, p in self.net.named_parameters():
