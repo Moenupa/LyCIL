@@ -9,12 +9,12 @@ from ..backbone import BranchResNetBackbone
 
 class SSRE(BaseLearner):
     def __init__(
-        self,
-        *args,
-        temp: float = 1.0,
-        lambda_fkd: float = 1.0,
-        lambda_proto: float = 1.0,
-        **kwargs,
+            self,
+            *args,
+            temp: float = 1.0,
+            lambda_fkd: float = 1.0,
+            lambda_proto: float = 1.0,
+            **kwargs,
     ):
         kwargs["backbone_cls"] = BranchResNetBackbone
         super().__init__(*args, **kwargs)
@@ -50,7 +50,6 @@ class SSRE(BaseLearner):
         self.num_seen_classes = dm.num_seen_classes
         self._adapter_prepared = False
 
-
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         x, y = self.unpack_batch(batch)
 
@@ -69,6 +68,7 @@ class SSRE(BaseLearner):
                 old_features = self.old_self.forward_layerwise(x)["features"]
 
             mask = self.similarity_mask(features)
+            mask_mean = mask.mean()
             loss_ce = (F.cross_entropy(logits / self.temp, y, reduction="none") * (1.0 - mask)).mean()
             loss_distill = torch.sum(torch.norm(features - old_features, p=2, dim=1) * mask)
             loss_proto = self.prototype_loss(x.shape[0])
@@ -80,7 +80,7 @@ class SSRE(BaseLearner):
                 "train/ce": loss_ce,
                 "train/loss_distill": loss_distill or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
-                "train/mask_mean": mask.mean() or 0.0,
+                "train/mask_mean": mask_mean or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
             },
@@ -133,7 +133,6 @@ class SSRE(BaseLearner):
                     continue
                 self._protos.append(class_features.mean(dim=0))
 
-
     def setup(self, stage) -> None:
         super().setup(stage)
         if stage == "fit":
@@ -141,8 +140,6 @@ class SSRE(BaseLearner):
             self.sync_with_datamodule(dm)
             self.backbone.prepare_branches(freeze_main_branch=self.task_id > 0)
 
-
     def on_train_end(self):
         self.build_protos(self.trainer.datamodule)
         self.backbone.compress_branches()
-
