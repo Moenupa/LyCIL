@@ -6,6 +6,8 @@ import torch
 import torchvision.models as tvm
 from torch import nn
 
+from . import branchnet as bnm
+
 
 @dataclass
 class ConvNetArgs:
@@ -25,6 +27,18 @@ class ConvNetArgs:
     cifar: bool = False
 
 
+
+def _apply_cifar_mods(net: nn.Module) -> None:
+    """Convert ImageNet-style ResNet stem into a CIFAR-style stem."""
+    if hasattr(net, 'conv1'):
+        net.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+    if hasattr(net, 'maxpool'):
+        net.maxpool = nn.Identity()
+    if hasattr(net, 'fc'):
+        net.fc = nn.Identity()
+
+
+
 def get_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
     """Initialize a convnet according to given ``args``.
 
@@ -40,8 +54,6 @@ def get_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
     Raises:
         ValueError: If ``args.name`` is not a recognized ResNet variant.
     """
-    # match-case introduced in python 3.10, we specified >=3.10 in pyproject.toml
-    # double-check the env if you have issues with this.
     match args.name:
         case "resnet18":
             net = tvm.resnet18(
@@ -58,22 +70,50 @@ def get_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
                 weights=tvm.ResNet50_Weights.IMAGENET1K_V2 if args.pretrained else None
             )
             feat_dim = 2048
-            if args.cifar:
-                net.conv1 = nn.Conv2d(
-                    3, 64, kernel_size=3, stride=1, padding=2, bias=False
-                )
-                net.maxpool = nn.Identity()
-                net.fc = nn.Identity()
-            # net.load_state_dict(state, strict=False)
         case _:
             raise ValueError(f"Unknown ResNet variant: {args.name}")
 
+    if args.cifar:
+        _apply_cifar_mods(net)
+
     return net, feat_dim
 
-# def get_branch_convnet(args: ConvNetArgs) -> tuple[tvm.resnet.ResNet, int]:
-#     xxxx
-#
-#     return net, feat_dim
+
+
+def get_branch_convnet(args: ConvNetArgs) -> tuple[bnm.ResNet, int]:
+    """Initialize a branch-enabled ResNet.
+
+    Notes:
+        - Branch modules are created in ``parallel`` mode so the auxiliary branch
+          weights exist in the model graph.
+        - The caller can later toggle them on/off via ``set_branches_mode``.
+    """
+    match args.name:
+        case "resnet18":
+            net = bnm.resnet18(
+                weights=bnm.ResNet18_Weights.IMAGENET1K_V1 if args.pretrained else None,
+                branch_mode="parallel",
+            )
+            feat_dim = 512
+        case "resnet34":
+            net = bnm.resnet34(
+                weights=bnm.ResNet34_Weights.IMAGENET1K_V1 if args.pretrained else None,
+                branch_mode="parallel",
+            )
+            feat_dim = 512
+        case "resnet50":
+            net = bnm.resnet50(
+                weights=bnm.ResNet50_Weights.IMAGENET1K_V2 if args.pretrained else None,
+                branch_mode="parallel",
+            )
+            feat_dim = 2048
+        case _:
+            raise ValueError(f"Unknown ResNet variant: {args.name}")
+
+    if args.cifar:
+        _apply_cifar_mods(net)
+
+    return net, feat_dim
 
 
 class BaseBackbone(nn.Module):

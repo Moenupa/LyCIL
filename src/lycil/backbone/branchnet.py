@@ -111,6 +111,7 @@ class BasicBlock(nn.Module):
             base_width: int = 64,
             dilation: int = 1,
             norm_layer: Optional[Callable[..., nn.Module]] = None,
+            branch_mode: str | None = None,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -121,12 +122,12 @@ class BasicBlock(nn.Module):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         # self.conv1 = conv3x3(inplanes, planes, stride)
-        self.conv1 = BranchConv3x3(inplanes, planes, stride)
+        self.conv1 = BranchConv3x3(inplanes, planes, stride, branch_mode=branch_mode)
 
         self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=True)
         # self.conv2 = conv3x3(planes, planes)
-        self.conv2 = BranchConv3x3(planes, planes)
+        self.conv2 = BranchConv3x3(planes, planes, branch_mode=branch_mode)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
         self.stride = stride
@@ -169,6 +170,7 @@ class Bottleneck(nn.Module):
             base_width: int = 64,
             dilation: int = 1,
             norm_layer: Optional[Callable[..., nn.Module]] = None,
+            branch_mode: str | None = None,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -178,7 +180,7 @@ class Bottleneck(nn.Module):
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
         # self.conv2 = conv3x3(width, width, stride, groups, dilation)
-        self.conv2 = BranchConv3x3(width, width, stride, groups, dilation)
+        self.conv2 = BranchConv3x3(width, width, stride, groups, dilation, branch_mode=branch_mode)
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
@@ -303,7 +305,15 @@ class ResNet(nn.Module):
         layers = []
         layers.append(
             block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+                self.inplanes,
+                planes,
+                stride,
+                downsample,
+                self.groups,
+                self.base_width,
+                previous_dilation,
+                norm_layer,
+                branch_mode=self.branch_mode,
             )
         )
         self.inplanes = planes * block.expansion
@@ -316,6 +326,7 @@ class ResNet(nn.Module):
                     base_width=self.base_width,
                     dilation=self.dilation,
                     norm_layer=norm_layer,
+                    branch_mode=self.branch_mode,
                 )
             )
 
