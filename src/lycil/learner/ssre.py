@@ -111,7 +111,7 @@ class SSRE(BaseLearner):
         proto_logits = self.classifier(proto_features)["logits"]
         return F.cross_entropy(proto_logits / self.temp, proto_targets)
 
-    @rank_zero_only
+    # @rank_zero_only
     def build_protos(self, dm: "HFDataModule"):
         if self.num_seen_classes <= self.num_old_classes:
             return
@@ -132,6 +132,7 @@ class SSRE(BaseLearner):
                 if len(class_features) == 0:
                     continue
                 self._protos.append(class_features.mean(dim=0))
+        self.train()
 
     def setup(self, stage) -> None:
         super().setup(stage)
