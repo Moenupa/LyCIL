@@ -198,3 +198,4 @@ class IL2A(BaseLearner):
                     centered = class_features - class_features.mean(dim=0, keepdim=True)
                     cov = centered.T @ centered / (len(class_features) - 1)
                 self._covs.append(cov)
+        self.train()
