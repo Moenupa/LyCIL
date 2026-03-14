@@ -1,7 +1,7 @@
 import copy
 from tqdm import tqdm
 from abc import abstractmethod
-from typing import Literal, Optional, Any
+from typing import Literal, Optional, Any, Union
 
 from datasets import Dataset
 
@@ -64,8 +64,8 @@ class BaseLearner(L.LightningModule):
             backbone_args: ConvNetArgs | None = None,
             head: Literal["linear", "cosine"] = "linear",
             data_column_translate: dict[str, str] | None = None,
-            per_task_optim_args: dict[int, dict] | None = None,
-            per_task_sched_args: dict[int, dict] | None = None,
+            per_task_optim_args: dict[Union[int, str], dict] | None = None,
+            per_task_sched_args: dict[Union[int, str], dict] | None = None,
             buffer_args: dict[str, Any] | None = None,
     ):
         super().__init__()
@@ -87,8 +87,8 @@ class BaseLearner(L.LightningModule):
         # kwargs for optimizer/scheduler per task_id
         # e.g. {0: {"type":"sgd", "lr":0.1}, 1: {"type":"sgd", "lr":0.01}}
         # first task SGD(lr=0.1), second task SGD(lr=0.01)
-        self.per_task_optim_args: dict[int, dict] = per_task_optim_args or {}
-        self.per_task_sched_args: dict[int, dict] = per_task_sched_args or {}
+        self.per_task_optim_args: dict[Union[int, str], dict] = per_task_optim_args or {}
+        self.per_task_sched_args: dict[Union[int, str], dict] = per_task_sched_args or {}
 
         self.buffer_args: dict[str, Any] = {
             "selection": "herding",
