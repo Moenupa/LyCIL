@@ -104,7 +104,60 @@ class BranchResNetBackbone(ResNetBackbone):
             self.net.set_branches_mode(None)
             self.net.train()
 
-    @torch.no_grad()
+    # @torch.no_grad()
+    # def compress_branches(self) -> None:
+    #     """Merge parallel branch params into the main branch weights.
+    #
+    #     Supported cases:
+    #     - branch and main have the same kernel shape, e.g. 3x3 -> 3x3
+    #     - branch is 1x1 and main is 3x3, branch is padded to the center
+    #
+    #     After compression:
+    #     - main_branch absorbs branch params
+    #     - parallel_branch params are reset to zero
+    #     - branch execution is disabled
+    #     """
+    #     for module in self.net.modules():
+    #         if not hasattr(module, "parallel_branch"):
+    #             continue
+    #         if not hasattr(module, "main_branch"):
+    #             continue
+    #
+    #         branch = getattr(module, "parallel_branch", None)
+    #         main = getattr(module, "main_branch", None)
+    #         if branch is None or main is None:
+    #             continue
+    #
+    #         if not isinstance(branch, torch.nn.Conv2d):
+    #             continue
+    #         if not isinstance(main, torch.nn.Conv2d):
+    #             continue
+    #
+    #         bw = branch.weight.data
+    #         mw = main.weight.data
+    #
+    #         if mw.shape == bw.shape:
+    #             main.weight.data.add_(bw)
+    #         elif bw.shape[:2] == mw.shape[:2] and bw.shape[-2:] == (1, 1) and mw.shape[-2:] == (3, 3):
+    #             main.weight.data.add_(F.pad(bw, [1, 1, 1, 1], "constant", 0))
+    #         else:
+    #             raise RuntimeError(
+    #                 "Cannot compress branch due to incompatible weight shapes: "
+    #                 f"main={tuple(mw.shape)}, branch={tuple(bw.shape)}"
+    #             )
+    #
+    #         if main.bias is not None and branch.bias is not None:
+    #             main.bias.data.add_(branch.bias.data)
+    #         elif main.bias is None and branch.bias is not None:
+    #             raise RuntimeError(
+    #                 "Cannot compress branch bias into a bias-free main branch."
+    #             )
+    #
+    #         branch.weight.data.zero_()
+    #         if branch.bias is not None:
+    #             branch.bias.data.zero_()
+    #
+    #     self.net.set_branches_mode(None)
     def compress_branches(self) -> None:
         """Merge parallel branch params into the main branch weights.
 
@@ -117,6 +170,7 @@ class BranchResNetBackbone(ResNetBackbone):
         - parallel_branch params are reset to zero
         - branch execution is disabled
         """
+
         for module in self.net.modules():
             if not hasattr(module, "parallel_branch"):
                 continue
@@ -136,25 +190,61 @@ class BranchResNetBackbone(ResNetBackbone):
             bw = branch.weight.data
             mw = main.weight.data
 
+            print(f"  main weight shape   : {tuple(mw.shape)}")
+            print(f"  branch weight shape : {tuple(bw.shape)}")
+
+            print("  before:")
+            print(
+                f"    main   sum={mw.sum().item():.6f}, mean={mw.mean().item():.6f}, absmax={mw.abs().max().item():.6f}")
+            print(
+                f"    branch sum={bw.sum().item():.6f}, mean={bw.mean().item():.6f}, absmax={bw.abs().max().item():.6f}")
+
+            # 打印一个固定位置，方便看是否真的加进去了
+            print(f"    sample main[0,0,...] before:\n{mw[0, 0].detach().cpu()}")
+            print(f"    sample branch[0,0,...] before:\n{bw[0, 0].detach().cpu()}")
+
             if mw.shape == bw.shape:
-                main.weight.data.add_(bw)
+                add_w = bw
+                print("  merge mode: direct add")
             elif bw.shape[:2] == mw.shape[:2] and bw.shape[-2:] == (1, 1) and mw.shape[-2:] == (3, 3):
-                main.weight.data.add_(F.pad(bw, [1, 1, 1, 1], "constant", 0))
+                add_w = F.pad(bw, [1, 1, 1, 1], "constant", 0)
+                print("  merge mode: 1x1 -> 3x3 center pad")
+                print(f"    padded branch[0,0,...]:\n{add_w[0, 0].detach().cpu()}")
             else:
                 raise RuntimeError(
                     "Cannot compress branch due to incompatible weight shapes: "
                     f"main={tuple(mw.shape)}, branch={tuple(bw.shape)}"
                 )
 
+            main.weight.data.add_(add_w)
+
+            print("  after weight merge:")
+            print(
+                f"    main   sum={main.weight.data.sum().item():.6f}, mean={main.weight.data.mean().item():.6f}, absmax={main.weight.data.abs().max().item():.6f}")
+            print(f"    sample main[0,0,...] after:\n{main.weight.data[0, 0].detach().cpu()}")
+
             if main.bias is not None and branch.bias is not None:
+                print("  bias merge: yes")
+                print(f"    main bias before   sum={main.bias.data.sum().item():.6f}")
+                print(f"    branch bias before sum={branch.bias.data.sum().item():.6f}")
+
                 main.bias.data.add_(branch.bias.data)
+
+                print(f"    main bias after    sum={main.bias.data.sum().item():.6f}")
             elif main.bias is None and branch.bias is not None:
                 raise RuntimeError(
                     "Cannot compress branch bias into a bias-free main branch."
                 )
+            else:
+                print("  bias merge: skipped")
 
             branch.weight.data.zero_()
             if branch.bias is not None:
                 branch.bias.data.zero_()
+
+            print("  after zeroing branch:")
+            print(f"    branch weight sum={branch.weight.data.sum().item():.6f}")
+            if branch.bias is not None:
+                print(f"    branch bias sum  ={branch.bias.data.sum().item():.6f}")
 
         self.net.set_branches_mode(None)
