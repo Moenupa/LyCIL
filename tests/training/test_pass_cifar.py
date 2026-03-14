@@ -48,7 +48,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 32, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 16, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -65,19 +65,19 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
             #     "weight_decay": 5e-4,
             # },
-            # "default": {
-            #     "type": "adamw",
-            #     "lr": 1e-3,
-            #     "weight_decay": 5e-4,
-            # },
-            {
-                "type": "lars",
-                "lr": 0.1,
-                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            "default": {
+                "type": "adamw",
+                "lr": 1e-3,
                 "weight_decay": 5e-4,
-                "trust_coef": 1e-3,
-                "eps": 1e-8,
-            }
+            },
+            # {
+            #     "type": "lars",
+            #     "lr": 0.1,
+            #     "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            #     "weight_decay": 5e-4,
+            #     "trust_coef": 1e-3,
+            #     "eps": 1e-8,
+            # }
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
@@ -116,7 +116,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
                 tags=["pass", "cifar100"],
                 group=_EXP_NAME,
             ),
-            check_val_every_n_epoch=1,
+            check_val_every_n_epoch=50,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
             # gradient_clip_val=1.0
         )
@@ -130,7 +130,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         statistics_summary[task_idx] = test_outputs
         log_statistics_to_wandb(trainer, statistics_summary)
 
-        wandb.finish()
+        # wandb.finish()
         break
 
 
