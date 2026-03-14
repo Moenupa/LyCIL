@@ -99,8 +99,10 @@ class BranchResNetBackbone(ResNetBackbone):
                     p.requires_grad = False
 
             self.net.set_branches_mode("parallel")
+            self.net.eval()
         else:
             self.net.set_branches_mode(None)
+            self.net.train()
 
     @torch.no_grad()
     def compress_branches(self) -> None:
@@ -156,3 +158,4 @@ class BranchResNetBackbone(ResNetBackbone):
                 branch.bias.data.zero_()
 
         self.net.set_branches_mode(None)
+        self.net.train()
