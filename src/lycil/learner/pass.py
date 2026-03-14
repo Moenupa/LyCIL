@@ -1,8 +1,8 @@
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
-
 from .base import BaseLearner
 
 
@@ -27,6 +27,35 @@ class PASS(BaseLearner):
         self._prototypes: list[torch.Tensor] = []
         self._prototype_radii: list[float] = []
         self._radius: float = 0.0
+
+    def sync_with_datamodule(self, dm: "HFDataModule"):
+        dm_task_id = dm.get_current_task()
+        if self.task_id is not None and dm_task_id == self.task_id:
+            # in sync, no update
+            return
+
+        self.task_id = dm_task_id
+
+        incoming_expansion = dm.num_seen_classes - (self.num_seen_classes or 0)
+        if incoming_expansion <= 0:
+            raise RuntimeError(
+                f"Expect an incoming expansion, got {incoming_expansion} new classes. "
+                + f"Data has {dm.num_seen_classes} seen classes, "
+                + f"but Model has {self.num_seen_classes} seen classes. "
+                + "Ensure that `sync_with_datamodule()` is called after datamodule updates."
+            )
+
+        # expand head with num_rotations
+        self.expand_head(incoming_expansion * self.num_rotations)
+
+        self.num_old_classes = self.num_seen_classes or 0
+        self.num_seen_classes = dm.num_seen_classes
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Return class-level logits for evaluation/inference."""
+        logits_with_rotate = self.forward_layerwise(x)["logits"]
+        logits = logits_with_rotate[:, :: self.num_rotations]
+        return logits
 
     def training_step(
             self, batch: dict[str, torch.Tensor], batch_idx: int
@@ -71,51 +100,8 @@ class PASS(BaseLearner):
 
     def on_train_end(self):
         """Update rehearsal memory and refresh old-class prototypes."""
-        datamodule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+        datamodule = self.trainer.datamodule
         self.update_prototypes(datamodule)
-
-    @rank_zero_only
-    def update_prototypes(self, datamodule) -> None:
-        """Append task-local class prototypes and update their shared radius."""
-        if self.num_seen_classes <= self.num_old_classes:
-            return
-        new_prototypes: list[torch.Tensor] = []
-        new_radii: list[float] = []
-        self.eval()
-        with torch.no_grad():
-            for class_idx in range(self.num_old_classes, self.num_seen_classes):
-                _, _, dataset = datamodule.get_dataset(
-                    range(class_idx, class_idx + 1),
-                    source="train",
-                    mode="test",
-                    ret_data=True,
-                )
-                loader = DataLoader(
-                    dataset,
-                    batch_size=getattr(datamodule, "batch_size", 128),
-                    shuffle=False,
-                    num_workers=getattr(datamodule, "num_workers", 4),
-                    pin_memory=True,
-                )
-
-                feats = []
-                for batch in loader:
-                    x, _ = self.unpack_batch(batch)
-                    outputs = self.forward_layerwise(x.to(self.device, non_blocking=True))
-                    feats.append(outputs["features"].detach().cpu())
-
-                features = torch.cat(feats, dim=0)
-                new_prototypes.append(features.mean(dim=0))
-                if features.size(0) > 1:
-                    new_radii.append(float(features.var(dim=0, unbiased=True).mean()))
-                else:
-                    new_radii.append(0.0)
-
-        self._prototypes.extend(new_prototypes)
-        self._prototype_radii.extend(new_radii)
-        if self._prototype_radii:
-            radius = torch.tensor(self._prototype_radii, dtype=torch.float32).mean()
-            self._radius = float(radius.sqrt().item())
 
     def rotate_batch(
             self, x: torch.Tensor, y: torch.Tensor
@@ -160,3 +146,39 @@ class PASS(BaseLearner):
             proto_logits / self.temp,
             proto_targets,
         )
+
+    @rank_zero_only
+    def update_prototypes(self, dm) -> None:
+        if self.num_seen_classes <= self.num_old_classes:
+            return
+
+        self.eval()
+        with torch.no_grad():
+            feats, labels = [], []
+            for batch in tqdm(
+                    dm.train_dataloader(),
+                    desc=f"Building prototypes task {dm.get_current_task()}",
+            ):
+                x, y = self.unpack_batch(batch)
+                feats.append(self.forward_layerwise(x.to(self.device))["features"])
+                labels.append(y.to(self.device))
+
+            feats = torch.cat(feats, dim=0)
+            labels = torch.cat(labels, dim=0)
+
+            new_prototypes, new_radii = [], []
+            for class_idx in range(self.num_old_classes, self.num_seen_classes):
+                class_feats = feats[labels == class_idx]
+                if len(class_feats) == 0:
+                    continue
+
+                new_prototypes.append(class_feats.mean(dim=0))
+                new_radii.append(
+                    float(class_feats.var(dim=0, unbiased=True).mean()) if len(class_feats) > 1 else 0.0
+                )
+
+            self._prototypes.extend(new_prototypes)
+            self._prototype_radii.extend(new_radii)
+
+            if self._prototype_radii:
+                self._radius = float(torch.tensor(self._prototype_radii).mean().sqrt())
