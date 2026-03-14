@@ -1,7 +1,6 @@
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 from .base import BaseLearner
 
