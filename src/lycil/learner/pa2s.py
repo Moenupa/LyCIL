@@ -77,7 +77,7 @@ class PASS(BaseLearner):
                 old_features = old_outputs["features"]
 
             loss_distill = torch.dist(features, old_features, p=2)
-            loss_proto = self.prototype_loss(batch_size=x.shape[0],x_rot_feats=features,y_rot=y_rot)
+            loss_proto = self.prototype_loss(num_proto_samples=x_rot.shape[0], x_rot_feats=features, y_rot=y_rot)
             loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
 
         self.log_dict(
@@ -122,7 +122,7 @@ class PASS(BaseLearner):
 
     def prototype_loss(
             self,
-            batch_size: int,
+            num_proto_samples: int,
             x_rot_feats: torch.Tensor,
             y_rot: torch.Tensor,
     ) -> torch.Tensor:
@@ -134,7 +134,7 @@ class PASS(BaseLearner):
         indices = torch.randint(
             low=0,
             high=self.num_old_classes,
-            size=(batch_size,),
+            size=(num_proto_samples,),
             device=self.device,
         )
 
