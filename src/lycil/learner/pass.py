@@ -50,7 +50,7 @@ class PASS(BaseLearner):
 
             loss_distill = torch.dist(features, old_features, p=2)
             loss_proto = self.prototype_loss(batch_size=x.shape[0])
-            loss = loss + self.lambda_fkd * loss_distill + loss_proto
+            loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
 
         self.log_dict(
             {
@@ -110,7 +110,6 @@ class PASS(BaseLearner):
                     new_radii.append(float(features.var(dim=0, unbiased=True).mean()))
                 else:
                     new_radii.append(0.0)
-
 
         self._prototypes.extend(new_prototypes)
         self._prototype_radii.extend(new_radii)
