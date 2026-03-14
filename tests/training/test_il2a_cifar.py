@@ -74,10 +74,12 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
                 "max_epochs": EPOCHS_PER_TASK,
             },
         },
-        temp=0.1,
-        lambda_fkd=10,
-        lambda_proto=10,
-        num_rotations=4,
+        temp = 0.1,
+        lambda_fkd = 10,
+        lambda_proto = 10,
+        ratio = 2.5,
+        alpha = 20.0,
+        mix_time = 4,
         buffer_args=None,
     )
 
