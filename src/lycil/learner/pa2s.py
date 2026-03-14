@@ -99,8 +99,7 @@ class PASS(BaseLearner):
 
     def on_train_end(self):
         """Update rehearsal memory and refresh old-class prototypes."""
-        datamodule = self.trainer.datamodule
-        self.update_prototypes(datamodule)
+        self.update_prototypes(self.trainer.datamodule)
 
     def rotate_batch(
             self, x: torch.Tensor, y: torch.Tensor
