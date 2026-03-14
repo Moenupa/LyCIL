@@ -85,9 +85,12 @@ class EWC(BaseLearner):
                 "train/loss": loss,
                 "train/ce": loss_ce,
                 "train/ewc": loss_ewc or 0.0,
+                "train/x_mean": x.detach().float().mean(),
+                "train/x_var": x.detach().float().var(unbiased=False),
             },
             prog_bar=True,
             on_epoch=True,
+            on_step=False,
             sync_dist=True,
         )
         return loss

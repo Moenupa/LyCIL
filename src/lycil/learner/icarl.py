@@ -63,9 +63,12 @@ class ICaRL(BaseLearner):
                 "train/loss": loss,
                 "train/ce": loss_ce,
                 "train/distill": loss_distill or 0.0,
+                "train/x_mean": x.detach().float().mean(),
+                "train/x_var": x.detach().float().var(unbiased=False),
             },
             prog_bar=True,
             on_epoch=True,
+            on_step=False,
             sync_dist=True,
         )
         return loss
