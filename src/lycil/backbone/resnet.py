@@ -80,22 +80,20 @@ class BranchResNetBackbone(ResNetBackbone):
         features = self.net.avgpool(x4).flatten(1)
         return {"l1": x1, "l2": x2, "l3": x3, "l4": x4, "features": features}
 
+    def prepare_branches(self, freeze_main_branch: bool = False) -> None:
+        """Prepare branch parameters for training.
 
-    def prepare_branches(self, task_id: int | None) -> None:
-        """Prepare branch params for current task.
-
-        - task 0: disable branches, train main path.
-        - task > 0: reset branches, enable parallel branches, train branch only.
+        Args:
+            freeze_main_branch:
+                If False, disable branches and train the main path normally.
+                If True, reset branch params, enable branch mode, freeze the main
+                path, and train only parallel branch parameters.
         """
-        if self._branches_prepared:
-            return
-
         for p in self.net.parameters():
             p.requires_grad = True
 
-        if task_id is not None and task_id > 0:
+        if freeze_main_branch:
             self.net.reset_branches_params()
-
             for name, p in self.net.named_parameters():
                 if "parallel_branch" not in name:
                     p.requires_grad = False
@@ -104,15 +102,17 @@ class BranchResNetBackbone(ResNetBackbone):
         else:
             self.net.set_branches_mode(None)
 
-        self._branches_prepared = True
-
     @torch.no_grad()
     def compress_branches(self) -> None:
-        """Merge parallel branch params into the main conv weights.
+        """Merge parallel branch params into the main branch weights.
+
+        Supported cases:
+        - branch and main have the same kernel shape, e.g. 3x3 -> 3x3
+        - branch is 1x1 and main is 3x3, branch is padded to the center
 
         After compression:
         - main_branch absorbs branch params
-        - branch params are reset to zero
+        - parallel_branch params are reset to zero
         - branch execution is disabled
         """
         for module in self.net.modules():
@@ -126,23 +126,33 @@ class BranchResNetBackbone(ResNetBackbone):
             if branch is None or main is None:
                 continue
 
-            if main.weight.shape == branch.weight.shape:
-                main.weight.data.add_(branch.weight.data)
+            if not isinstance(branch, torch.nn.Conv2d):
+                continue
+            if not isinstance(main, torch.nn.Conv2d):
+                continue
+
+            bw = branch.weight.data
+            mw = main.weight.data
+
+            if mw.shape == bw.shape:
+                main.weight.data.add_(bw)
+            elif bw.shape[:2] == mw.shape[:2] and bw.shape[-2:] == (1, 1) and mw.shape[-2:] == (3, 3):
+                main.weight.data.add_(F.pad(bw, [1, 1, 1, 1], "constant", 0))
             else:
                 raise RuntimeError(
-                    f"Cannot compress branch: weight shape mismatch: "
-                    f"main={tuple(main.weight.shape)}, "
-                    f"branch={tuple(branch.weight.shape)}"
+                    "Cannot compress branch due to incompatible weight shapes: "
+                    f"main={tuple(mw.shape)}, branch={tuple(bw.shape)}"
                 )
 
             if main.bias is not None and branch.bias is not None:
                 main.bias.data.add_(branch.bias.data)
             elif main.bias is None and branch.bias is not None:
-                raise RuntimeError("Cannot compress branch bias into bias-free main conv.")
+                raise RuntimeError(
+                    "Cannot compress branch bias into a bias-free main branch."
+                )
 
             branch.weight.data.zero_()
             if branch.bias is not None:
                 branch.bias.data.zero_()
 
         self.net.set_branches_mode(None)
-        self._branches_prepared = False

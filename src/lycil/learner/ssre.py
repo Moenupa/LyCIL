@@ -134,88 +134,15 @@ class SSRE(BaseLearner):
                 self._protos.append(class_features.mean(dim=0))
 
 
-    def on_fit_start(self) -> None:
-        self.prepare_adapters()
-        return super().on_fit_start()
+    def setup(self, stage) -> None:
+        super().setup(stage)
+        if stage == "fit":
+            dm: HFDataModule = self.trainer.datamodule  # ty: ignore[unresolved-attribute]
+            self.sync_with_datamodule(dm)
+            self.backbone.prepare_branches(freeze_main_branch=self.task_id > 0)
+
 
     def on_train_end(self):
         self.build_protos(self.trainer.datamodule)
-        self.compress_adapters()
+        self.backbone.compress_branches()
 
-    def configure_optimizers(self):
-        self.prepare_adapters()
-        return super().configure_optimizers()
-
-    def prepare_branches(self) -> None:
-        if self._branches_prepared:
-            return
-        convnet = self.convnet
-
-        if self.task_id and self.task_id > 0:
-            for p in convnet.parameters():
-                p.requires_grad = True
-            convnet.reset_branches_params()
-            for name, p in convnet.named_parameters():
-                if "parallel_branch" not in name:
-                    p.requires_grad = False
-            convnet.set_branches_mode("parallel")
-        else:
-            convnet.set_branches_mode(None)
-            for p in convnet.parameters():
-                p.requires_grad = True
-        self._branches_prepared = True
-
-    @torch.no_grad()
-    def compress_branches(self) -> None:
-        """Merge parallel branch params into the main conv weights.
-
-        After compression:
-        - main conv absorbs branch params
-        - branch params are reset to zero
-        - branch execution is disabled
-        """
-        if self.task_id is None or self.task_id <= 0:
-            return
-
-        convnet = self.convnet
-
-        for module in convnet.modules():
-            if not hasattr(module, "parallel_branch"):
-                continue
-            if not hasattr(module, "conv"):
-                continue
-
-            branch = getattr(module, "parallel_branch", None)
-            main = getattr(module, "conv", None)
-
-            if branch is None or main is None:
-                continue
-
-            # 只处理 Conv2d
-            if not isinstance(branch, torch.nn.Conv2d):
-                continue
-            if not isinstance(main, torch.nn.Conv2d):
-                continue
-
-            # 形状一致时直接相加
-            if main.weight.shape == branch.weight.shape:
-                main.weight.data.add_(branch.weight.data)
-            else:
-                raise RuntimeError(
-                    f"Cannot compress branch: weight shape mismatch: "
-                    f"main={tuple(main.weight.shape)}, "
-                    f"branch={tuple(branch.weight.shape)}"
-                )
-
-            if main.bias is not None and branch.bias is not None:
-                main.bias.data.add_(branch.bias.data)
-            elif main.bias is None and branch.bias is not None:
-                raise RuntimeError("Cannot compress branch bias into bias-free main conv.")
-
-            # 清空 branch 参数，避免重复叠加
-            branch.weight.data.zero_()
-            if branch.bias is not None:
-                branch.bias.data.zero_()
-
-        convnet.set_branches_mode(None)
-        self._branches_prepared = False
