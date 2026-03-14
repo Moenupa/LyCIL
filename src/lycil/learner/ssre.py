@@ -144,4 +144,6 @@ class SSRE(BaseLearner):
 
     def on_train_end(self):
         self.build_protos(self.trainer.datamodule)
+        import pdb; pdb.set_trace()
         self.backbone.compress_branches()
+        import pdb;pdb.set_trace()
