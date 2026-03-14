@@ -132,6 +132,7 @@ class SSRE(BaseLearner):
                 if len(class_features) == 0:
                     continue
                 self._protos.append(class_features.mean(dim=0))
+
         self.train()
 
     def setup(self, stage) -> None:

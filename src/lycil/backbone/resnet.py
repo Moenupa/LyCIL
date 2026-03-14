@@ -158,4 +158,3 @@ class BranchResNetBackbone(ResNetBackbone):
                 branch.bias.data.zero_()
 
         self.net.set_branches_mode(None)
-        self.net.train()
