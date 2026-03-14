@@ -122,9 +122,11 @@ class UCIR(BaseLearner):
                 "train/less_forgetting": loss_less_forgetting or 0.0,
                 "train/interclass_separation": loss_interclass_separation or 0.0,
                 "train/task_factor": self.task_factor,
-            },
+            }
+            | self._calc_distribution(x, prefix="train"),
             prog_bar=True,
             on_epoch=True,
+            on_step=False,
             sync_dist=True,
         )
         return loss

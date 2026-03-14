@@ -64,9 +64,11 @@ class DER(BaseLearner):
                 "train/loss": loss,
                 "train/ce": loss_ce,
                 "train/aux": loss_aux or 0.0,
-            },
+            }
+            | self._calc_distribution(x, prefix="train"),
             prog_bar=True,
             on_epoch=True,
+            on_step=False,
             sync_dist=True,
         )
         return loss

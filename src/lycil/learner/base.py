@@ -160,6 +160,15 @@ class BaseLearner(L.LightningModule):
             y = y.to(device)
         return x, y
 
+    @staticmethod
+    def _calc_distribution(
+        x: torch.Tensor, prefix: str = "train"
+    ) -> dict[str, torch.Tensor]:
+        return {
+            f"{prefix}/x/mean": x.detach().float().mean(),
+            f"{prefix}/x/var": x.detach().float().var(unbiased=False),
+        }
+
     @torch.no_grad()
     def expand_head(self, out_delta: int, in_delta: int = 0) -> None:
         """Initialize or expand the classifier head to accommodate new classes.
