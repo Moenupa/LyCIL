@@ -33,7 +33,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         EPOCHS_PER_TASK = 1
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [20] * 5
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -99,7 +99,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
                 tags=["pass", "cifar100"],
                 group=_EXP_NAME,
             ),
-            check_val_every_n_epoch=40,
+            check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
             gradient_clip_val=1.0
         )
