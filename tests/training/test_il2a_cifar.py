@@ -120,3 +120,4 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
 
 if __name__ == "__main__":
     test_il2a_cifar100(device="cuda", is_dummy_training=False)
+
