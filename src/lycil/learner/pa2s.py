@@ -146,7 +146,7 @@ class PASS(BaseLearner):
             proto_targets,
         )
 
-    @rank_zero_only
+    # @rank_zero_only
     def update_prototypes(self, dm) -> None:
         if self.num_seen_classes <= self.num_old_classes:
             return
