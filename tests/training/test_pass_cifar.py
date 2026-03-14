@@ -67,7 +67,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             # },
             "default": {
                 "type": "adam",
-                "lr": 0.1,
+                "lr": 1e-3,
                 "weight_decay": 5e-4,
             },
         },
