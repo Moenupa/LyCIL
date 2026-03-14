@@ -60,7 +60,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
-                "type": "sgd",
+                "type": "adam",
                 "lr": 0.1,
                 "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
@@ -79,7 +79,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             },
         },
         temp=0.1,
-        lambda_fkd=0.,
+        lambda_fkd=10,
         lambda_proto=10,
         num_rotations=4,
         buffer_args=None,

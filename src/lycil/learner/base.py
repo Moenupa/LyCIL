@@ -276,6 +276,8 @@ class BaseLearner(L.LightningModule):
         match opt_type:
             case "sgd":
                 return torch.optim.SGD(*args, **kwargs)
+            case "adam":
+                return torch.optim.Adam(*args, **kwargs)
             case "adamw":
                 return torch.optim.AdamW(*args, **kwargs)
             case _:
