@@ -18,7 +18,7 @@ def calc_per_task_forgetting(
         target_key = f"{metric_prefix}/task{old_task}"
         history = []
 
-        # 收集 old_task 从学完自己开始，到当前阶段 cur_stage 为止的 acc 轨迹
+        # Collect the accuracy trajectory for old_task from its completion to the current stage
         for past_stage in sorted(statistics_summary.keys()):
             if past_stage < old_task:
                 continue
