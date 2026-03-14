@@ -96,7 +96,7 @@ def test_lwf_cifar100(device: str, is_dummy_training: bool):
                 tags=["lwf", "cifar100"],
                 group=_EXP_NAME,
             ),
-            check_val_every_n_epoch=1,
+            check_val_every_n_epoch=40,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
             gradient_clip_val=1.0
         )

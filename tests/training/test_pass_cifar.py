@@ -35,7 +35,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
-        EPOCHS_PER_TASK = 10
+        EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
     if not osp.exists(DATAPATH):
         pytest.skip("Data path does not exist.")
@@ -99,7 +99,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
                 tags=["pass", "cifar100"],
                 group=_EXP_NAME,
             ),
-            check_val_every_n_epoch=1,
+            check_val_every_n_epoch=40,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
             gradient_clip_val=1.0
         )

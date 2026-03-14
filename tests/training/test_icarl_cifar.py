@@ -118,7 +118,7 @@ def test_icarl_cifar100(accelerator: str, is_dummy_training: bool):
                 tags=["icarl", "cifar100"],
                 group=_EXP_NAME,
             ),
-            check_val_every_n_epoch=1,
+            check_val_every_n_epoch=40,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
             gradient_clip_val=1.0
         )
