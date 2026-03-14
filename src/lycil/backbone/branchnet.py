@@ -130,6 +130,7 @@ class BasicBlock(nn.Module):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         # self.conv1 = conv3x3(inplanes, planes, stride)
+        import pdb;pdb.set_trace()
         self.conv1 = BranchConv3x3(inplanes, planes, stride, branch_mode=branch_mode)
 
         self.bn1 = norm_layer(planes)
