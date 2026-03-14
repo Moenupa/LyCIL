@@ -85,8 +85,10 @@ class IL2A(BaseLearner):
             {
                 "train/loss": loss,
                 "train/ce": loss_ce,
-                "train/loss_distill": loss_distill,
-                "train/loss_proto": loss_proto,
+                "train/loss_distill": loss_distill or 0.0,
+                "train/loss_proto": loss_proto or 0.0,
+                "train/x_mean": x.detach().float().mean(),
+                "train/x_var": x.detach().float().var(unbiased=False),
             },
             prog_bar=True,
             on_step=False,
