@@ -55,6 +55,10 @@ def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
+import torch
+import torch.nn as nn
+
+
 class BranchConv3x3(nn.Module):
     def __init__(
         self,
@@ -77,30 +81,30 @@ class BranchConv3x3(nn.Module):
         )
 
         if branch_mode == "parallel":
-            self.parallel_branch = conv1x1(
-                in_planes=in_planes,
-                out_planes=out_planes,
-                stride=stride,
-            )
+            self._build_parallel_branch()
+
+    def _build_parallel_branch(self) -> None:
+        self.parallel_branch = conv1x1(
+            in_planes=self.main_branch.in_channels,
+            out_planes=self.main_branch.out_channels,
+            stride=self.main_branch.stride,
+        )
 
     def reset_branch_params(self) -> None:
-        if hasattr(self, "parallel_branch"):
-            nn.init.kaiming_normal_(
-                self.parallel_branch.weight,
-                mode="fan_out",
-                nonlinearity="relu",
-            )
+        if not hasattr(self, "parallel_branch") or self.parallel_branch is None:
+            self._build_parallel_branch()
 
-    def zero_branch_params(self) -> None:
-        if hasattr(self, "parallel_branch"):
-            torch.nn.init.zeros_(self.parallel_branch.weight)
-            if self.parallel_branch.bias is not None:
-                torch.nn.init.zeros_(self.parallel_branch.bias)
-
+        nn.init.kaiming_normal_(
+            self.parallel_branch.weight,
+            mode="fan_out",
+            nonlinearity="relu",
+        )
+        if self.parallel_branch.bias is not None:
+            nn.init.zeros_(self.parallel_branch.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = self.main_branch(x)
-        if self.branch_mode == "parallel":
+        if self.branch_mode == "parallel" and hasattr(self, "parallel_branch"):
             y = y + self.parallel_branch(x)
         return y
 
