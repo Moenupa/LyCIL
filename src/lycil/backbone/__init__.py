@@ -6,7 +6,6 @@ __all__ = [
     "BaseBackbone",
     "ConvNetArgs",
     "DERNetBackbone",
-
     "ResNetBackbone",
     "get_convnet",
 ]
