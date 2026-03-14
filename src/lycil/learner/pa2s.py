@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 from .base import BaseLearner
+from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 
 
 class PASS(BaseLearner):
@@ -149,7 +150,13 @@ class PASS(BaseLearner):
     def update_prototypes(self, dm) -> None:
         if self.num_seen_classes <= self.num_old_classes:
             return
-
+        # feature_tfm = dm.get_effective_transform(mode="test")
+        # task_train_dataset_feat = dm.get_filtered_dataset(
+        #     split=dm._split_train,
+        #     filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
+        #     transform=feature_tfm,
+        #     use_buffer=False,
+        # )
         self.eval()
         with torch.no_grad():
             feats, labels = [], []
