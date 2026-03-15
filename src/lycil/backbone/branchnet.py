@@ -84,10 +84,14 @@ class BranchConv3x3(nn.Module):
             self._build_parallel_branch()
 
     def _build_parallel_branch(self) -> None:
+        stride = self.main_branch.stride
+        if isinstance(stride, tuple):
+            stride = stride[0]
+
         self.parallel_branch = conv1x1(
             in_planes=self.main_branch.in_channels,
             out_planes=self.main_branch.out_channels,
-            stride=self.main_branch.stride,
+            stride=stride,
         )
 
     def reset_branch_params(self) -> None:
