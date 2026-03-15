@@ -51,6 +51,7 @@ class SSRE(BaseLearner):
         self._adapter_prepared = False
 
     def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        import pdb;pdb.set_trace()
         x, y = self.unpack_batch(batch)
 
         outs = self.forward_layerwise(x)
