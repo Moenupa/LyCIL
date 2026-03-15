@@ -79,6 +79,7 @@ class PASS(BaseLearner):
 
             loss_kd = torch.dist(features, old_features, p=2)
             loss_proto = self.prototype_loss(batch_size=x.shape[0])
+            # loss_proto = self.prototype_loss(num_proto_samples=x_rot.shape[0], x_rot_feats=features, y_rot=y_rot)
             loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
@@ -117,10 +118,41 @@ class PASS(BaseLearner):
         ).flatten()
         return x_rot, y_rot
 
-    def _collapse_logits(self, logits: torch.Tensor) -> torch.Tensor:
-        return logits[:, :: self.num_rotations]
 
-    # TODO: concate features with proto features
+    # # TODO: concate features with proto features
+    # def prototype_loss(
+    #         self,
+    #         num_proto_samples: int,
+    #         x_rot_feats: torch.Tensor,
+    #         y_rot: torch.Tensor,
+    # ) -> torch.Tensor:
+    #     if self.num_old_classes == 0 or not self._prototypes:
+    #         return torch.zeros((), device=self.device)
+    #
+    #     proto_bank = torch.stack(self._prototypes[: self.num_old_classes], dim=0)
+    #
+    #     indices = torch.randint(
+    #         low=0,
+    #         high=self.num_old_classes,
+    #         size=(num_proto_samples,),
+    #         device=self.device,
+    #     )
+    #
+    #     proto_features = proto_bank[indices]
+    #     if self._radius > 0:
+    #         proto_features = proto_features + torch.randn_like(proto_features) * self._radius
+    #
+    #     proto_features = proto_features.to(self.device, non_blocking=True)
+    #     proto_targets = (indices * self.num_rotations).to(self.device, non_blocking=True)
+    #
+    #     all_features = torch.cat([x_rot_feats, proto_features], dim=0)
+    #     all_targets = torch.cat([y_rot, proto_targets], dim=0)
+    #
+    #     all_logits = self.classifier(all_features)["logits"]
+    #
+    #     return F.cross_entropy(all_logits / self.temp, all_targets)
+
+
     def prototype_loss(self, batch_size: int) -> torch.Tensor:
         if self.num_old_classes == 0 or not self._prototypes:
             return torch.zeros((), device=self.device)
