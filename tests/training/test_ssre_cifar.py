@@ -60,7 +60,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
-                "type": "adam",
+                "type": "adamw",
                 "lr": 1e-3,
                 "weight_decay": 5e-4,
             },
