@@ -59,16 +59,19 @@ class PASS(BaseLearner):
     #     return logits
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        num_rot = self.num_rotations
+        B = x.size(0)
+        R = self.num_rotations
+        C = self.num_seen_classes
 
-        rotated_x = torch.cat(
-            [torch.rot90(x, k, dims=(2, 3)) for k in range(num_rot)],
-            dim=0,
-        )
-        logits = self.forward_layerwise(rotated_x)["logits"]
-        logits = logits.view(-1, num_rot, self.num_seen_classes, num_rot)
+        rotated_x = torch.stack(
+            [torch.rot90(x, k, dims=(2, 3)) for k in range(R)],
+            dim=1,
+        ).flatten(0, 1)  # 和 training 的 rotate_batch 保持一致
 
-        fused_logits = logits.diagonal(dim1=1, dim2=3).mean(dim=-1)
+        logits = self.forward_layerwise(rotated_x)["logits"]  # [B*R, C*R]
+        logits = logits.view(B, R, C, R)  # [B, input_rot, class, pred_rot]
+
+        fused_logits = logits.diagonal(dim1=1, dim2=3).mean(dim=-1)  # [B, C]
         return fused_logits
 
     def training_step(
