@@ -78,7 +78,6 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             task_idx, per_task_optim_args["default"]
         )
         gradient_clip_val = 1.0 if current_optim_args["type"].lower() == "sgd" else None
-        print(gradient_clip_val)
 
         trainer = L.Trainer(
             accelerator=device,
