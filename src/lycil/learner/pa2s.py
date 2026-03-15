@@ -51,11 +51,25 @@ class PASS(BaseLearner):
         self.num_old_classes = self.num_seen_classes or 0
         self.num_seen_classes = dm.num_seen_classes
 
+    # def forward(self, x: torch.Tensor) -> torch.Tensor:
+    #     """Return class-level logits for evaluation/inference."""
+    #     logits_with_rotate = self.forward_layerwise(x)["logits"]
+    #     # logits = logits_with_rotate[:, :: self.num_rotations] fusion
+    #     logits = logits_with_rotate[:, :: self.num_rotations]
+    #     return logits
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Return class-level logits for evaluation/inference."""
-        logits_with_rotate = self.forward_layerwise(x)["logits"]
-        logits = logits_with_rotate[:, :: self.num_rotations]
-        return logits
+        num_rot = self.num_rotations
+
+        rotated_x = torch.cat(
+            [torch.rot90(x, k, dims=(2, 3)) for k in range(num_rot)],
+            dim=0,
+        )
+        logits = self.forward_layerwise(rotated_x)["logits"]
+        logits = logits.view(-1, num_rot, self.num_seen_classes, num_rot)
+
+        fused_logits = logits.diagonal(dim1=1, dim2=3).mean(dim=-1)
+        return fused_logits
 
     def training_step(
             self, batch: dict[str, torch.Tensor], batch_idx: int
