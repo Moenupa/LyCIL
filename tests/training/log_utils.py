@@ -220,11 +220,11 @@ def build_per_task_optim_sched_args(
             "weight_decay": 5e-4,
         }
         per_task_sched_args[task_idx] = {
-            # "type": "cosine_annealing",
-            # "T_max": epochs_per_task,
-            "type": "linear_warmup_cosine_annealing",
-            "warmup_epochs": 0 if epochs_per_task == 1 else 10,
-            "max_epochs": epochs_per_task,
+            "type": "cosine_annealing",
+            "T_max": epochs_per_task,
+            # "type": "linear_warmup_cosine_annealing",
+            # "warmup_epochs": 0 if epochs_per_task == 1 else 10,
+            # "max_epochs": epochs_per_task,
         }
 
     return per_task_optim_args, per_task_sched_args
