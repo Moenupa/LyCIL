@@ -50,7 +50,7 @@ class ResNetBackbone(BaseBackbone):
         return self.convnet_out_dim
 
 
-class BranchResNetBackbone(ResNetBackbone):
+class BranchResNetBackbone(BaseBackbone):
     """Branch-enabled ResNet backbone.
 
     Main points:
@@ -79,6 +79,18 @@ class BranchResNetBackbone(ResNetBackbone):
         x4 = self.net.layer4(x3)
         features = self.net.avgpool(x4).flatten(1)
         return {"l1": x1, "l2": x2, "l3": x3, "l4": x4, "features": features}
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        feats = self.forward_layerwise(x)["features"]
+        return feats
+
+    @property
+    def out_dim(self) -> int:
+        return self.convnet_out_dim
+
+    @property
+    def feature_dim(self) -> int:
+        return self.convnet_out_dim
 
     def prepare_branches(self, freeze_main_branch: bool = False) -> None:
         """Prepare branch parameters for training.
