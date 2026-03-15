@@ -31,6 +31,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
         N_CLASS_PER_TASK = [1, 1]
         EPOCHS_PER_TASK = 1
+        USE_PRETRAIN_WEIGHTS = False
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
         N_CLASS_PER_TASK = [10] * 10
@@ -114,7 +115,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         log_statistics_to_wandb(trainer, statistics_summary)
 
         wandb.finish()
-        break
 
 
 if __name__ == "__main__":
