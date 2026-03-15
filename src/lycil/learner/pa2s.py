@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 from .base import BaseLearner
-from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 
 
 class PASS(BaseLearner):
@@ -78,7 +77,7 @@ class PASS(BaseLearner):
                 old_features = old_outputs["features"]
 
             loss_distill = torch.dist(features, old_features, p=2)
-            loss_proto = self.prototype_loss(batch_size=x.shape[0])
+            loss_proto = self.prototype_loss(num_proto_samples=x_rot.shape[0], x_rot_feats=features, y_rot=y_rot)
             loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
 
         self.log_dict(
@@ -120,8 +119,13 @@ class PASS(BaseLearner):
     def _collapse_logits(self, logits: torch.Tensor) -> torch.Tensor:
         return logits[:, :: self.num_rotations]
 
-    # TODO: concate features with proto features
-    def prototype_loss(self, batch_size: int) -> torch.Tensor:
+
+    def prototype_loss(
+            self,
+            num_proto_samples: int,
+            x_rot_feats: torch.Tensor,
+            y_rot: torch.Tensor,
+    ) -> torch.Tensor:
         if self.num_old_classes == 0 or not self._prototypes:
             return torch.zeros((), device=self.device)
 
@@ -130,33 +134,29 @@ class PASS(BaseLearner):
         indices = torch.randint(
             low=0,
             high=self.num_old_classes,
-            size=(batch_size,),
+            size=(num_proto_samples,),
             device=self.device,
         )
+
         proto_features = proto_bank[indices]
         if self._radius > 0:
             proto_features = proto_features + torch.randn_like(proto_features) * self._radius
 
-        proto_features = proto_features.to(self.device)
-        proto_targets = (indices * self.num_rotations).to(self.device)
+        proto_features = proto_features.to(self.device, non_blocking=True)
+        proto_targets = (indices * self.num_rotations).to(self.device, non_blocking=True)
 
-        proto_logits = self.classifier(proto_features)["logits"]
-        return F.cross_entropy(
-            proto_logits / self.temp,
-            proto_targets,
-        )
+        all_features = torch.cat([x_rot_feats, proto_features], dim=0)
+        all_targets = torch.cat([y_rot, proto_targets], dim=0)
 
-    # @rank_zero_only
+        all_logits = self.classifier(all_features)["logits"]
+
+        return F.cross_entropy(all_logits / self.temp, all_targets)
+
+    @rank_zero_only
     def update_prototypes(self, dm) -> None:
         if self.num_seen_classes <= self.num_old_classes:
             return
-        # feature_tfm = dm.get_effective_transform(mode="test")
-        # task_train_dataset_feat = dm.get_filtered_dataset(
-        #     split=dm._split_train,
-        #     filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
-        #     transform=feature_tfm,
-        #     use_buffer=False,
-        # )
+
         self.eval()
         with torch.no_grad():
             feats, labels = [], []
