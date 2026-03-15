@@ -30,7 +30,7 @@ import math
 @pytest.mark.xdist_group("training")
 def test_wa_cifar100(accelerator: str, is_dummy_training: bool):
     DATAPATH = "/ppio_net0/datasets/cifar100"
-    N_CLASS_PER_TASK = [20] * 5
+    N_CLASS_PER_TASK = [50] + [10] * 5
     LABEL_COL = "fine_label"
     EPOCHS_PER_TASK = 160
     USE_PRETRAIN_WEIGHTS = False
