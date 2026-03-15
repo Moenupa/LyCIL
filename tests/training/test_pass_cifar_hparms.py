@@ -75,7 +75,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             },
         },
         temp=0.1,
-        lambda_fkd=0.1,
+        lambda_fkd=10,
         lambda_proto=10,
         num_rotations=4,
         buffer_args=None,
