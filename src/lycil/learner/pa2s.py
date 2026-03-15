@@ -12,7 +12,7 @@ class PASS(BaseLearner):
             self,
             *args,
             temp: float = 1.0,
-            lambda_fkd: float = 1.0,
+            lambda_kd: float = 1.0,
             lambda_proto: float = 1.0,
             num_rotations: int = 4,
             **kwargs,
@@ -20,7 +20,7 @@ class PASS(BaseLearner):
         super().__init__(*args, **kwargs)
 
         self.temp = float(temp)
-        self.lambda_fkd = float(lambda_fkd)
+        self.lambda_kd = float(lambda_kd)
         self.lambda_proto = float(lambda_proto)
         self.num_rotations = int(num_rotations)
 
@@ -69,7 +69,7 @@ class PASS(BaseLearner):
         loss_ce = F.cross_entropy(logits / self.temp, y_rot)
         loss = loss_ce
 
-        loss_distill = None
+        loss_kd = None
         loss_proto = None
 
         if self.task_id > 0:
@@ -77,15 +77,15 @@ class PASS(BaseLearner):
                 old_outputs = self.old_self.forward_layerwise(x_rot)
                 old_features = old_outputs["features"]
 
-            loss_distill = torch.dist(features, old_features, p=2)
+            loss_kd = torch.dist(features, old_features, p=2)
             loss_proto = self.prototype_loss(batch_size=x.shape[0])
-            loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
+            loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
             {
                 "train/loss": loss,
                 "train/ce": loss_ce,
-                "train/loss_distill": loss_distill or 0.0,
+                "train/loss_kd": loss_kd or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
                 "train/proto_radius": float(self._radius),
                 "train/x_mean": x.detach().float().mean(),
