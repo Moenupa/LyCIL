@@ -48,7 +48,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -60,16 +60,18 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
-                "type": "adam",
-                "lr": 1e-3,
+                "type": "sgd",
+                "lr": 0.1,
+                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
                 "weight_decay": 5e-4,
             },
         },
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
+                "type": "linear_warmup_cosine_annealing",
+                "warmup_epochs": 0 if EPOCHS_PER_TASK == 1 else 10,
+                "max_epochs": EPOCHS_PER_TASK,
             },
         },
         temp= 1.0,
@@ -98,7 +100,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            # gradient_clip_val=1.0
+            gradient_clip_val=1.0
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
