@@ -118,7 +118,6 @@ class PASS(BaseLearner):
         ).flatten()
         return x_rot, y_rot
 
-
     # # TODO: concate features with proto features
     # def prototype_loss(
     #         self,
@@ -151,7 +150,6 @@ class PASS(BaseLearner):
     #     all_logits = self.classifier(all_features)["logits"]
     #
     #     return F.cross_entropy(all_logits / self.temp, all_targets)
-
 
     def prototype_loss(self, batch_size: int) -> torch.Tensor:
         if self.num_old_classes == 0 or not self._prototypes:
@@ -219,4 +217,5 @@ class PASS(BaseLearner):
 
             if self._prototype_radii:
                 self._radius = float(torch.tensor(self._prototype_radii).mean().sqrt())
+            self._radius *= 2
         self.train()
