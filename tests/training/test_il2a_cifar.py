@@ -101,7 +101,7 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            gradient_clip_val=1.0
+            # gradient_clip_val=1.0
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
