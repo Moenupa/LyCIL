@@ -20,7 +20,7 @@ from tests.training.constants import (
 )
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lycil.backbone import ConvNetArgs
-from tests.training.log_utils import log_statistics_to_wandb
+from tests.training.log_utils import log_statistics_to_wandb, build_per_task_optim_sched_args
 
 
 @pytest.mark.slow
@@ -55,24 +55,16 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         split_map={"train": "train", "val": "test", "test": "test"},
         buffer_kwargs=None,
     )
+    per_task_optim_args, per_task_sched_args = build_per_task_optim_sched_args(
+        num_tasks=len(N_CLASS_PER_TASK),
+        epochs_per_task=EPOCHS_PER_TASK,
+        use_pretrain_weights=USE_PRETRAIN_WEIGHTS,
+    )
     model = PASS(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="linear",
-        per_task_optim_args={
-            # for all tasks, use the same optimizer kwargs
-            "default": {
-                "type": "adam",
-                "lr": 1e-3,
-                "weight_decay": 5e-4,
-            },
-        },
-        per_task_sched_args={
-            # for all tasks, use the same scheduler kwargs
-            "default": {
-                "type": "cosine_annealing",
-                "T_max": EPOCHS_PER_TASK,
-            },
-        },
+        per_task_optim_args=per_task_optim_args,
+        per_task_sched_args=per_task_sched_args,
         temp=0.1,
         lambda_kd=10,
         lambda_proto=10,
@@ -83,6 +75,10 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
     statistics_summary = {}
     for task_idx, _ in enumerate(N_CLASS_PER_TASK):
         dm.set_current_task(task_idx)
+        current_optim_args = per_task_optim_args.get(
+            task_idx, per_task_optim_args["default"]
+        )
+        gradient_clip_val = 1.0 if current_optim_args["type"].lower() == "sgd" else None
 
         trainer = L.Trainer(
             accelerator=device,
@@ -100,7 +96,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            # gradient_clip_val=1.0
+            gradient_clip_val=gradient_clip_val
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
