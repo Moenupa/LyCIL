@@ -50,19 +50,19 @@ class ICaRL(BaseLearner):
             # mask to only allow old classes in
             p = F.log_softmax(logits[:, : self.num_old_classes] / T, dim=1)
             q = F.softmax(old_logits[:, : self.num_old_classes] / T, dim=1)
-            loss_distill = F.kl_div(p, q, reduction="batchmean") * (T * T)
+            loss_kd = F.kl_div(p, q, reduction="batchmean") * (T * T)
 
-            loss = loss_ce + self.distill_lambda * loss_distill
+            loss = loss_ce + self.distill_lambda * loss_kd
         else:
             # first task, no distill
-            loss_distill = None
+            loss_kd = None
             loss = loss_ce
 
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/distill": loss_distill or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_kd": loss_kd or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
             },

@@ -59,7 +59,7 @@ class WA(BaseLearner):
 
         loss_ce = F.cross_entropy(logits, y)
         loss = loss_ce
-        loss_distill = None
+        loss_kd = None
 
         if self.task_id > 0:
             old_logits = self.old_self.forward_no_grad(x)
@@ -67,16 +67,16 @@ class WA(BaseLearner):
 
             p = F.log_softmax(logits[:, : self.num_old_classes] / T, dim=1)
             q = F.softmax(old_logits[:, : self.num_old_classes] / T, dim=1)
-            loss_distill = F.kl_div(p, q, reduction="batchmean") * (T * T)
+            loss_kd = F.kl_div(p, q, reduction="batchmean") * (T * T)
 
             alpha = self.distill_balance
-            loss = (1.0 - alpha) * loss_ce + alpha * loss_distill
+            loss = (1.0 - alpha) * loss_ce + alpha * loss_kd
 
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/distill": loss_distill or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_kd": loss_kd or 0.0,
                 "train/distill_balance": self.distill_balance,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),

@@ -73,7 +73,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             },
         },
         temp= 1.0,
-        lambda_fkd = 1.0,
+        lambda_kd = 1.0,
         lambda_proto = 10,
         buffer_args=None,
     )

@@ -118,10 +118,11 @@ class UCIR(BaseLearner):
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/less_forgetting": loss_less_forgetting or 0.0,
-                "train/interclass_separation": loss_interclass_separation or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_forget": loss_less_forgetting or 0.0,
+                "train/loss_separation": loss_interclass_separation or 0.0,
                 "train/task_factor": self.task_factor,
+                "train/classifier_sigma": self.classifier.sigma or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
             },

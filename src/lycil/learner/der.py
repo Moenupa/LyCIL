@@ -62,8 +62,8 @@ class DER(BaseLearner):
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/aux": loss_aux or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_aux": loss_aux or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
             },

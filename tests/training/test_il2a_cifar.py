@@ -73,7 +73,7 @@ def test_il2a_cifar100(device: str, is_dummy_training: bool):
             },
         },
         temp = 0.1,
-        lambda_fkd = 10,
+        lambda_kd = 10,
         lambda_proto = 10,
         ratio = 2.5,
         alpha = 20.0,

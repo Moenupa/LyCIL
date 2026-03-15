@@ -11,7 +11,7 @@ class IL2A(BaseLearner):
         self,
         *args,
         temp: float = 1.0,
-        lambda_fkd: float = 1.0,
+        lambda_kd: float = 1.0,
         lambda_proto: float = 1.0,
         ratio: float = 1.0,
         alpha: float = 20.0,
@@ -21,7 +21,7 @@ class IL2A(BaseLearner):
         super().__init__(*args, **kwargs)
 
         self.temp = float(temp)
-        self.lambda_fkd = float(lambda_fkd)
+        self.lambda_kd = float(lambda_kd)
         self.lambda_proto = float(lambda_proto)
         self.ratio = float(ratio)
         self.alpha = float(alpha)
@@ -70,22 +70,22 @@ class IL2A(BaseLearner):
 
         loss_ce = F.cross_entropy(logits / self.temp, y)
         loss = loss_ce
-        loss_distill = None
+        loss_kd = None
         loss_proto = None
 
         if self.task_id > 0:
             with torch.no_grad():
                 old_features = self.old_self.forward_layerwise(x)["features"]
 
-            loss_distill = torch.dist(features, old_features, p=2)
+            loss_kd = torch.dist(features, old_features, p=2)
             loss_proto = self.prototype_loss(x.shape[0])
-            loss = loss + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
+            loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/loss_distill": loss_distill or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_kd": loss_kd or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),

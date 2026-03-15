@@ -12,7 +12,7 @@ class SSRE(BaseLearner):
             self,
             *args,
             temp: float = 1.0,
-            lambda_fkd: float = 1.0,
+            lambda_kd: float = 1.0,
             lambda_proto: float = 1.0,
             **kwargs,
     ):
@@ -20,7 +20,7 @@ class SSRE(BaseLearner):
         super().__init__(*args, **kwargs)
 
         self.temp = float(temp)
-        self.lambda_fkd = float(lambda_fkd)
+        self.lambda_kd = float(lambda_kd)
         self.lambda_proto = float(lambda_proto)
 
         self.task_size = 0
@@ -59,7 +59,7 @@ class SSRE(BaseLearner):
 
         loss_ce = F.cross_entropy(logits / self.temp, y)
         loss = loss_ce
-        loss_distill = None
+        loss_kd = None
         loss_proto = None
         mask_mean = None
 
@@ -70,15 +70,15 @@ class SSRE(BaseLearner):
             mask = self.similarity_mask(features)
             mask_mean = mask.mean()
             loss_ce = (F.cross_entropy(logits / self.temp, y, reduction="none") * (1.0 - mask)).mean()
-            loss_distill = torch.sum(torch.norm(features - old_features, p=2, dim=1) * mask)
+            loss_kd = torch.sum(torch.norm(features - old_features, p=2, dim=1) * mask)
             loss_proto = self.prototype_loss(x.shape[0])
-            loss = loss_ce + self.lambda_fkd * loss_distill + self.lambda_proto * loss_proto
+            loss = loss_ce + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
-                "train/loss_distill": loss_distill or 0.0,
+                "train/loss_ce": loss_ce,
+                "train/loss_kd": loss_kd or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
                 "train/mask_mean": mask_mean or 0.0,
                 "train/x_mean": x.detach().float().mean(),

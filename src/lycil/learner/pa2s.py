@@ -85,7 +85,7 @@ class PASS(BaseLearner):
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/ce": loss_ce,
+                "train/loss_ce": loss_ce,
                 "train/loss_kd": loss_kd or 0.0,
                 "train/loss_proto": loss_proto or 0.0,
                 "train/proto_radius": float(self._radius),

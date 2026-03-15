@@ -264,9 +264,9 @@ class PODNet(BaseLearner):
         self.log_dict(
             {
                 "train/loss": loss,
-                "train/lsc": loss_lsc,
-                "train/flat": loss_flat or 0.0,
-                "train/spatial": loss_spatial or 0.0,
+                "train/loss_lsc": loss_lsc,
+                "train/loss_flat": loss_flat or 0.0,
+                "train/loss_spatial": loss_spatial or 0.0,
                 "train/classifier_sigma": self.classifier.sigma or 0.0,
                 "train/x_mean": x.detach().float().mean(),
                 "train/x_var": x.detach().float().var(unbiased=False),
