@@ -34,7 +34,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         USE_PRETRAIN_WEIGHTS = False
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [50] + [5] * 10
+        N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
