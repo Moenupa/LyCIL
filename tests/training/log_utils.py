@@ -225,3 +225,42 @@ def build_per_task_optim_sched_args(
         }
 
     return per_task_optim_args, per_task_sched_args
+
+
+
+
+def build_per_task_optim_sched_args_pass(
+    num_tasks: int,
+    epochs_per_task: int,
+    use_pretrain_weights: bool,
+):
+    per_task_optim_args = {
+        "default": {
+            "type": "sgd",
+            "lr": 0.1,
+            "momentum": 0 if use_pretrain_weights else 0.9,
+            "weight_decay": 5e-4,
+        },
+    }
+
+    per_task_sched_args = {
+        "default": {
+            "type": "linear_warmup_cosine_annealing",
+            "warmup_epochs": 0 if epochs_per_task == 1 else 10,
+            "max_epochs": epochs_per_task,
+        },
+    }
+
+    # 从第 1 个任务开始覆盖 default
+    for task_idx in range(1, num_tasks):
+        per_task_optim_args[task_idx] = {
+            "type": "adam",
+            "lr": 1e-4,
+            "weight_decay": 5e-4,
+        }
+        per_task_sched_args[task_idx] = {
+            "type": "cosine_annealing",
+            "T_max": epochs_per_task,
+        }
+
+    return per_task_optim_args, per_task_sched_args

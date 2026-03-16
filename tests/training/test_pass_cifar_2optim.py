@@ -20,7 +20,7 @@ from tests.training.constants import (
 )
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lycil.backbone import ConvNetArgs
-from tests.training.log_utils import log_statistics_to_wandb, build_per_task_optim_sched_args
+from tests.training.log_utils import log_statistics_to_wandb, build_per_task_optim_sched_args_pass
 
 
 @pytest.mark.slow
@@ -34,7 +34,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         USE_PRETRAIN_WEIGHTS = False
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [50] + [20] * 5
+        N_CLASS_PER_TASK = [10] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -55,7 +55,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         split_map={"train": "train", "val": "test", "test": "test"},
         buffer_kwargs=None,
     )
-    per_task_optim_args, per_task_sched_args = build_per_task_optim_sched_args(
+    per_task_optim_args, per_task_sched_args = build_per_task_optim_sched_args_pass(
         num_tasks=len(N_CLASS_PER_TASK),
         epochs_per_task=EPOCHS_PER_TASK,
         use_pretrain_weights=USE_PRETRAIN_WEIGHTS,
