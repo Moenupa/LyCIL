@@ -339,12 +339,13 @@ class BaseLearner(L.LightningModule):
         for name, p in self.named_parameters():
             if not p.requires_grad:
                 continue
-            n = name.lower()
-            if name.endswith(".bias") or ".bn" in n or "bn." in n or "norm" in n:
-                no_decay.append(p)
-                no_decay_names.append(name)
-            else:
-                decay.append(p)
+            # n = name.lower()
+            # if name.endswith(".bias") or ".bn" in n or "bn." in n or "norm" in n:
+            #     no_decay.append(p)
+            #     no_decay_names.append(name)
+            # else:
+            #     decay.append(p)
+            decay.append(p)
         total = sum(p.numel() for p in self.parameters() if p.requires_grad)
         grouped = sum(p.numel() for p in decay) + sum(p.numel() for p in no_decay)
         assert total == grouped, f"Param mismatch: total={total}, grouped={grouped}"
