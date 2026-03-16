@@ -61,9 +61,9 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
-                "type": "adamw",
+                "type": "adam",
                 "lr": 1e-3,
-                "weight_decay": 2e-5,
+                "weight_decay": 4e-5,
             },
         },
         per_task_sched_args={
