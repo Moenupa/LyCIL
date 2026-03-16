@@ -68,7 +68,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         # },
         per_task_optim_args = {
         "default": {
-            "name": "adamsgd",
+            "type": "adamsgd",
             "switch_step": 800,
             "transfer_momentum": False,
             "adamw": {
