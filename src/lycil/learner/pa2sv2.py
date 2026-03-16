@@ -59,15 +59,38 @@ class PASS(BaseLearner):
         logits = logits_with_rotate[:, rot_id::self.num_rotations]  # [B, C]
         return logits
 
+    # def forward(self, x: torch.Tensor) -> torch.Tensor:
+    #     logits_list = []
+    #
+    #     for k in range(self.num_rotations):
+    #         x_k = torch.rot90(x, k, dims=(2, 3))
+    #         logits_k = self.forward_single_rotation(x_k, rot_id=k)
+    #         logits_list.append(logits_k)
+    #
+    #     fused_logits = torch.stack(logits_list, dim=0).mean(dim=0)
+    #     return fused_logits
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        logits_list = []
+        """Fuse base logits with averaged rotated logits (excluding 0°)."""
+        # 非旋转 logits
+        logits_with_rotate = self.forward_layerwise(x)["logits"]  # [B, C * R]
+        base_logits = logits_with_rotate[:, :: self.num_rotations]  # [B, C]
 
-        for k in range(self.num_rotations):
+        # 只取旋转方向，不取正方向
+        rot_logits_list = []
+        for k in range(1, self.num_rotations):
             x_k = torch.rot90(x, k, dims=(2, 3))
-            logits_k = self.forward_single_rotation(x_k, rot_id=k)
-            logits_list.append(logits_k)
+            logits_with_rotate_k = self.forward_layerwise(x_k)["logits"]  # [B, C * R]
+            logits_k = logits_with_rotate_k[:, k::self.num_rotations]  # [B, C]
+            rot_logits_list.append(logits_k)
 
-        fused_logits = torch.stack(logits_list, dim=0).mean(dim=0)
+        # 融合
+        if rot_logits_list:
+            rot_logits_mean = torch.stack(rot_logits_list, dim=0).mean(dim=0)  # [B, C]
+            fused_logits = 0.5 * (base_logits + rot_logits_mean)
+        else:
+            fused_logits = base_logits
+
         return fused_logits
 
     def training_step(
@@ -91,7 +114,7 @@ class PASS(BaseLearner):
                 old_features = old_outputs["features"]
 
             loss_kd = torch.dist(features, old_features, p=2)
-            loss_proto = self.prototype_loss(batch_size=x.shape[0])
+            loss_proto = self.prototype_loss(batch_size=x_rot.shape[0])
             loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
