@@ -78,7 +78,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
                 "weight_decay": 5e-4,
             },
             "sgd": {
-                "lr": 0.1,
+                "lr": 1e-3,
                 "momentum": 0.9,
                 "nesterov": True,
                 "weight_decay": 5e-4,
