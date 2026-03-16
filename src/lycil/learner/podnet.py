@@ -175,27 +175,24 @@ class PODNet(BaseLearner):
         self.need_snapshot_old = need_snapshot_old
 
     def configure_optimizers(self):
-        params = [p for p in self.parameters() if p.requires_grad]
-
-        # Select stage-specific key for optimizer/scheduler configs.
-        # If buffer_training is True, prefer "buffer" configs; otherwise use task_id configs.
         stage_key = "buffer" if self.buffer_training else self.task_id
 
+        optim_kwargs = dict(
+            self.per_task_optim_args.get(stage_key)
+            or self.per_task_optim_args.get("default")
+            or {}
+        )
+        sched_kwargs = dict(
+            self.per_task_sched_args.get(stage_key)
+            or self.per_task_sched_args.get("default")
+            or {}
+        )
 
-        # Waterfall lookup: stage_key -> default -> {}
-        optim_kwargs = (
-                self.per_task_optim_args.get(stage_key)
-                or self.per_task_optim_args.get("default")
-                or {}
-        )
-        sched_kwargs = (
-                self.per_task_sched_args.get(stage_key)
-                or self.per_task_sched_args.get("default")
-                or {}
-        )
+        weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
+        params = self._build_param_groups(weight_decay)
 
         optim = self._get_optimizer(params, **optim_kwargs)
-        # If sched_kwargs is None (or explicitly disabled), return optimizer only
+
         if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
             return optim
 

@@ -302,24 +302,78 @@ class BaseLearner(L.LightningModule):
             case _:
                 raise NotImplementedError(f"Unsupported scheduler: `{sched_type}`")
 
+    # def configure_optimizers(self):
+    #     params = [p for p in self.parameters() if p.requires_grad]
+    #
+    #     # Select stage-specific key for optimizer/scheduler configs.
+    #
+    #     # Waterfall lookup: stage_key -> default -> {}
+    #     optim_kwargs = (
+    #             self.per_task_optim_args.get(self.task_id)
+    #             or self.per_task_optim_args.get("default")
+    #             or {}
+    #     )
+    #     sched_kwargs = (
+    #             self.per_task_sched_args.get(self.task_id)
+    #             or self.per_task_sched_args.get("default")
+    #             or {}
+    #     )
+    #
+    #     optim = self._get_optimizer(params, **optim_kwargs)
+    #     # If sched_kwargs is None (or explicitly disabled), return optimizer only
+    #     if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+    #         return optim
+    #
+    #     sched = self._get_scheduler(optim, **sched_kwargs)
+    #     return {
+    #         "optimizer": optim,
+    #         "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+    #     }
+
+    def _build_param_groups(self, weight_decay: float):
+        decay, no_decay, no_decay_names = [], [], []
+
+        for name, p in self.named_parameters():
+            if not p.requires_grad:
+                continue
+            n = name.lower()
+            if name.endswith(".bias") or ".bn" in n or "bn." in n or "norm" in n:
+                no_decay.append(p)
+                no_decay_names.append(name)
+            else:
+                decay.append(p)
+        total = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        grouped = sum(p.numel() for p in decay) + sum(p.numel() for p in no_decay)
+        assert total == grouped, f"Param mismatch: total={total}, grouped={grouped}"
+
+        print("[No Weight Decay Params]")
+        print("\n".join(no_decay_names))
+
+        return [
+            {"params": decay, "weight_decay": weight_decay},
+            {"params": no_decay, "weight_decay": 0.0},
+        ]
+
     def configure_optimizers(self):
-        params = [p for p in self.parameters() if p.requires_grad]
-
-        # Select stage-specific key for optimizer/scheduler configs.
-
         # Waterfall lookup: stage_key -> default -> {}
-        optim_kwargs = (
-                self.per_task_optim_args.get(self.task_id)
-                or self.per_task_optim_args.get("default")
-                or {}
+        optim_kwargs = dict(
+            self.per_task_optim_args.get(self.task_id)
+            or self.per_task_optim_args.get("default")
+            or {}
         )
-        sched_kwargs = (
-                self.per_task_sched_args.get(self.task_id)
-                or self.per_task_sched_args.get("default")
-                or {}
+        sched_kwargs = dict(
+            self.per_task_sched_args.get(self.task_id)
+            or self.per_task_sched_args.get("default")
+            or {}
         )
+
+        # 从 optim_kwargs 中取出全局 weight_decay，交给 param groups 控制
+        weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
+
+        params = self._build_param_groups(weight_decay)
 
         optim = self._get_optimizer(params, **optim_kwargs)
+
         # If sched_kwargs is None (or explicitly disabled), return optimizer only
         if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
             return optim
