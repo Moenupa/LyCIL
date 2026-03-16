@@ -111,7 +111,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         )
         statistics_summary[task_idx] = test_outputs
         log_statistics_to_wandb(trainer, statistics_summary)
-
         wandb.finish()
 
 if __name__ == "__main__":
