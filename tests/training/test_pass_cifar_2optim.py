@@ -34,7 +34,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         USE_PRETRAIN_WEIGHTS = False
     else:
         DATAPATH = "/ppio_net0/datasets/cifar100"
-        N_CLASS_PER_TASK = [10] * 10
+        N_CLASS_PER_TASK = [50] + [5] * 10
         LABEL_COL = "fine_label"
         EPOCHS_PER_TASK = 160
         USE_PRETRAIN_WEIGHTS = False
@@ -49,7 +49,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -88,7 +88,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"v2_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"2optim_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["pass", "cifar100"],
