@@ -49,7 +49,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         transform_name=osp.basename(DATAPATH),
         num_classes_per_task=N_CLASS_PER_TASK,
         label_column_name=LABEL_COL,  # 100 classes
-        train_loader_kwargs={"batch_size": 64, "shuffle": True, "num_workers": 8},
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 8},
         val_loader_kwargs=VAL_LOADER_KWARGS,
         test_loader_kwargs=TEST_LOADER_KWARGS,
         split_map={"train": "train", "val": "test", "test": "test"},
@@ -87,7 +87,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"v2_ssre_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"2optim_ssre_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["ssre", "cifar100"],
