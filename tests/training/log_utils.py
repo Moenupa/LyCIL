@@ -255,7 +255,7 @@ def build_per_task_optim_sched_args_pass(
     for task_idx in range(1, num_tasks):
         per_task_optim_args[task_idx] = {
             "type": "adam",
-            "lr": 1e-5,
+            "lr": 5e-3,
             "weight_decay": 5e-4,
         }
         per_task_sched_args[task_idx] = {
