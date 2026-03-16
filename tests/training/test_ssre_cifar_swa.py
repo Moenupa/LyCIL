@@ -112,8 +112,8 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             check_val_every_n_epoch=1,
             callbacks=[
                 LearningRateMonitor(logging_interval="epoch"),
-                # EMAWeightAveraging(),
-                StochasticWeightAveraging(swa_epoch_start=EPOCHS_PER_TASK-15, swa_lrs=0.001)
+                EMAWeightAveraging(),
+                # StochasticWeightAveraging(swa_epoch_start=EPOCHS_PER_TASK-15, swa_lrs=0.001)
             ],
             num_sanity_val_steps=-1,
 
