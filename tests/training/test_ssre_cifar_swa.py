@@ -101,7 +101,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             sync_batchnorm=True,
             enable_checkpointing=False,
             enable_progress_bar=True,
-            precision="16-mixed",
+            precision="32-true",
             logger=WandbLogger(
                 name=f"swa_ssre_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
