@@ -58,20 +58,31 @@ class PASS(BaseLearner):
     #     logits = logits_with_rotate[:, :: self.num_rotations]
     #     return logits
 
+    def forward_single_rotation(self, x: torch.Tensor, rot_id: int) -> torch.Tensor:
+        """
+        对已经旋转好的输入做一次“非融合推理”，返回 class-level logits
+        x: [B, C, H, W]
+        rot_id: 当前输入对应的旋转编号
+        """
+        logits_with_rotate = self.forward_layerwise(x)["logits"]  # [B, num_seen_classes * R]
+        logits = logits_with_rotate[:, rot_id::self.num_rotations]  # [B, num_seen_classes]
+        return logits
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B = x.size(0)
-        R = self.num_rotations
-        C = self.num_seen_classes
+        """
+        融合推理：
+        1. 将输入旋转 R 次
+        2. 每个旋转分别做非融合推理
+        3. 对 class-level logits 做平均融合
+        """
+        logits_list = []
 
-        rotated_x = torch.stack(
-            [torch.rot90(x, k, dims=(2, 3)) for k in range(R)],
-            dim=1,
-        ).flatten(0, 1)  # 和 training 的 rotate_batch 保持一致
+        for k in range(self.num_rotations):
+            x_k = torch.rot90(x, k, dims=(2, 3))
+            logits_k = self.forward_single_rotation(x_k, rot_id=k)  # [B, C]
+            logits_list.append(logits_k)
 
-        logits = self.forward_layerwise(rotated_x)["logits"]  # [B*R, C*R]
-        logits = logits.view(B, R, C, R)  # [B, input_rot, class, pred_rot]
-
-        fused_logits = logits.diagonal(dim1=1, dim2=3).mean(dim=-1)  # [B, C]
+        fused_logits = torch.stack(logits_list, dim=0).mean(dim=0)  # [B, C]
         return fused_logits
 
     def training_step(
