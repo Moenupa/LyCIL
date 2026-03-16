@@ -115,5 +115,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         wandb.finish()
 
 
+
 if __name__ == "__main__":
     test_pass_cifar100(device="cuda", is_dummy_training=False)
