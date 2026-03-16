@@ -18,46 +18,41 @@ def _clone_param_spec(params):
     return list(params)
 
 
-def _as_scalar(x):
-    return x.item() if isinstance(x, torch.Tensor) else x
-
-
 class AdamThenSGD(Optimizer):
     """
-    适配 Lightning configure_optimizers() 的包装优化器：
-
-    - 内部用原生 torch.optim.Adam 和 torch.optim.SGD
-    - 外部只暴露一个 optimizer，方便挂同一个 scheduler
-    - scheduler 维护 outer param_groups 的 lr
-    - 每次 step 前，把 outer lr 同步到内部两个 optimizer：
-        adam_lr = outer_lr
-        sgd_lr  = outer_lr * (sgd_init_lr / adam_init_lr)
-
-    这样就实现了：
-    - Adam 和 SGD 各有自己的初始 lr
-    - 但两者共享同一条 scheduler 曲线（倍率不同）
+    - 外部只维护一个统一 lr
+    - Adam / SGD 都共用这个 lr
+    - scheduler 挂在外层 optimizer 上即可
     """
 
     def __init__(
         self,
         params,
         *,
+        lr: float,
         adam: dict,
         sgd: dict,
         switch_step: int,
         transfer_momentum: bool = False,
     ):
-        if "lr" not in adam or "lr" not in sgd:
-            raise ValueError("Both `adam` and `sgd` must provide `lr`.")
-
         outer_params = _clone_param_spec(params)
         adam_params = _clone_param_spec(params)
         sgd_params = _clone_param_spec(params)
 
-        super().__init__(outer_params, defaults={"lr": adam["lr"]})
+        adam_cfg = dict(adam)
+        sgd_cfg = dict(sgd)
 
-        self.adam = torch.optim.Adam(adam_params, **adam)
-        self.sgd = torch.optim.SGD(sgd_params, **sgd)
+        # 不允许在内部配置里再单独传 lr
+        if "lr" in adam_cfg or "lr" in sgd_cfg:
+            raise ValueError("Do not pass `lr` inside `adam` or `sgd`; use outer `lr`.")
+
+        adam_cfg["lr"] = lr
+        sgd_cfg["lr"] = lr
+
+        super().__init__(outer_params, defaults={"lr": lr})
+
+        self.adam = torch.optim.Adam(adam_params, **adam_cfg)
+        self.sgd = torch.optim.SGD(sgd_params, **sgd_cfg)
 
         if not (
             len(self.param_groups)
@@ -71,28 +66,15 @@ class AdamThenSGD(Optimizer):
         self.global_step = 0
         self.switched = False
 
-        for outer_g, adam_g, sgd_g in zip(
-            self.param_groups, self.adam.param_groups, self.sgd.param_groups
-        ):
-            adam_lr = _as_scalar(adam_g["lr"])
-            sgd_lr = _as_scalar(sgd_g["lr"])
-
-            if adam_lr == 0 and sgd_lr != 0:
-                raise ValueError("adam lr cannot be 0 when sgd lr is non-zero.")
-
-            outer_g["lr"] = adam_g["lr"]
-            outer_g["adam_lr_scale"] = 1.0
-            outer_g["sgd_lr_scale"] = 1.0 if adam_lr == 0 else sgd_lr / adam_lr
-
         self._sync_lrs()
 
     def _sync_lrs(self):
         for outer_g, adam_g, sgd_g in zip(
             self.param_groups, self.adam.param_groups, self.sgd.param_groups
         ):
-            base_lr = outer_g["lr"]
-            adam_g["lr"] = base_lr * outer_g.get("adam_lr_scale", 1.0)
-            sgd_g["lr"] = base_lr * outer_g.get("sgd_lr_scale", 1.0)
+            shared_lr = outer_g["lr"]
+            adam_g["lr"] = shared_lr
+            sgd_g["lr"] = shared_lr
 
     def _maybe_switch(self):
         if self.switched or self.global_step < self.switch_step:

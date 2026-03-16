@@ -71,16 +71,12 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             "type": "adamsgd",
             "switch_step": 5000,
             "transfer_momentum": False,
+            "lr": 1e-3,
             "adam": {
-                "lr": 1e-3,
-                "betas": (0.9, 0.999),
-                "eps": 1e-8,
                 "weight_decay": 5e-4,
             },
             "sgd": {
-                "lr": 1e-3,
                 "momentum": 0.9,
-                "nesterov": True,
                 "weight_decay": 5e-4,
             },
         }
