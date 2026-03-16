@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 from .base import BaseLearner
+from ..constants import _X_COLUMN_NAME, _Y_COLUMN_NAME
 
 
 class PASS(BaseLearner):
@@ -23,19 +24,14 @@ class PASS(BaseLearner):
         self.lambda_proto = float(lambda_proto)
         self.num_rotations = int(num_rotations)
 
-        # 每个元素对应一个类:
-        # self._prototypes[class_idx] -> [num_rotations, feat_dim]
         self._prototypes: list[torch.Tensor] = []
-
-        # 每个元素对应一个类:
-        # self._prototype_radii[class_idx] -> [num_rotations]
-        self._prototype_radii: list[torch.Tensor] = []
-
+        self._prototype_radii: list[float] = []
         self._radius: float = 0.0
 
     def sync_with_datamodule(self, dm: "HFDataModule"):
         dm_task_id = dm.get_current_task()
         if self.task_id is not None and dm_task_id == self.task_id:
+            # in sync, no update
             return
 
         self.task_id = dm_task_id
@@ -49,25 +45,44 @@ class PASS(BaseLearner):
                 + "Ensure that `sync_with_datamodule()` is called after datamodule updates."
             )
 
+        # expand head with num_rotations
         self.expand_head(incoming_expansion * self.num_rotations)
 
         self.num_old_classes = self.num_seen_classes or 0
         self.num_seen_classes = dm.num_seen_classes
 
+    # def forward(self, x: torch.Tensor) -> torch.Tensor:
+    #     """Return class-level logits for evaluation/inference."""
+    #     logits_with_rotate = self.forward_layerwise(x)["logits"]
+    #     # logits = logits_with_rotate[:, :: self.num_rotations] fusion
+    #     logits = logits_with_rotate[:, :: self.num_rotations]
+    #     return logits
+
     def forward_single_rotation(self, x: torch.Tensor, rot_id: int) -> torch.Tensor:
-        logits_with_rotate = self.forward_layerwise(x)["logits"]  # [B, C * R]
-        logits = logits_with_rotate[:, rot_id::self.num_rotations]  # [B, C]
+        """
+        对已经旋转好的输入做一次“非融合推理”，返回 class-level logits
+        x: [B, C, H, W]
+        rot_id: 当前输入对应的旋转编号
+        """
+        logits_with_rotate = self.forward_layerwise(x)["logits"]  # [B, num_seen_classes * R]
+        logits = logits_with_rotate[:, rot_id::self.num_rotations]  # [B, num_seen_classes]
         return logits
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        融合推理：
+        1. 将输入旋转 R 次
+        2. 每个旋转分别做非融合推理
+        3. 对 class-level logits 做平均融合
+        """
         logits_list = []
 
         for k in range(self.num_rotations):
             x_k = torch.rot90(x, k, dims=(2, 3))
-            logits_k = self.forward_single_rotation(x_k, rot_id=k)
+            logits_k = self.forward_single_rotation(x_k, rot_id=k)  # [B, C]
             logits_list.append(logits_k)
 
-        fused_logits = torch.stack(logits_list, dim=0).mean(dim=0)
+        fused_logits = torch.stack(logits_list, dim=0).mean(dim=0)  # [B, C]
         return fused_logits
 
     def training_step(
@@ -92,6 +107,7 @@ class PASS(BaseLearner):
 
             loss_kd = torch.dist(features, old_features, p=2)
             loss_proto = self.prototype_loss(batch_size=x.shape[0])
+            # loss_proto = self.prototype_loss(num_proto_samples=x_rot.shape[0], x_rot_feats=features, y_rot=y_rot)
             loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
         self.log_dict(
@@ -112,6 +128,7 @@ class PASS(BaseLearner):
         return loss
 
     def on_train_end(self):
+        """Update rehearsal memory and refresh old-class prototypes."""
         self.update_prototypes(self.trainer.datamodule)
 
     def rotate_batch(
@@ -120,114 +137,112 @@ class PASS(BaseLearner):
         x_rot = torch.stack(
             [torch.rot90(x, k, dims=(2, 3)) for k in range(self.num_rotations)],
             dim=1,
-        )  # [B, R, C, H, W]
-        x_rot = x_rot.flatten(0, 1)  # [B*R, C, H, W]
+        )
+        x_rot = x_rot.flatten(0, 1)
 
         y_rot = torch.stack(
             [y * self.num_rotations + k for k in range(self.num_rotations)],
             dim=1,
-        ).flatten()  # [B*R]
+        ).flatten()
         return x_rot, y_rot
+
+    # # TODO: concate features with proto features
+    # def prototype_loss(
+    #         self,
+    #         num_proto_samples: int,
+    #         x_rot_feats: torch.Tensor,
+    #         y_rot: torch.Tensor,
+    # ) -> torch.Tensor:
+    #     if self.num_old_classes == 0 or not self._prototypes:
+    #         return torch.zeros((), device=self.device)
+    #
+    #     proto_bank = torch.stack(self._prototypes[: self.num_old_classes], dim=0)
+    #
+    #     indices = torch.randint(
+    #         low=0,
+    #         high=self.num_old_classes,
+    #         size=(num_proto_samples,),
+    #         device=self.device,
+    #     )
+    #
+    #     proto_features = proto_bank[indices]
+    #     if self._radius > 0:
+    #         proto_features = proto_features + torch.randn_like(proto_features) * self._radius
+    #
+    #     proto_features = proto_features.to(self.device, non_blocking=True)
+    #     proto_targets = (indices * self.num_rotations).to(self.device, non_blocking=True)
+    #
+    #     all_features = torch.cat([x_rot_feats, proto_features], dim=0)
+    #     all_targets = torch.cat([y_rot, proto_targets], dim=0)
+    #
+    #     all_logits = self.classifier(all_features)["logits"]
+    #
+    #     return F.cross_entropy(all_logits / self.temp, all_targets)
 
     def prototype_loss(self, batch_size: int) -> torch.Tensor:
         if self.num_old_classes == 0 or not self._prototypes:
             return torch.zeros((), device=self.device)
 
-        # [num_old_classes, R, D]
-        proto_bank = torch.stack(self._prototypes[: self.num_old_classes], dim=0).to(self.device)
+        proto_bank = torch.stack(self._prototypes[: self.num_old_classes], dim=0)
 
-        # 随机采样 old class 和 rotation
-        class_indices = torch.randint(
+        indices = torch.randint(
             low=0,
             high=self.num_old_classes,
             size=(batch_size,),
             device=self.device,
         )
-        rot_indices = torch.randint(
-            low=0,
-            high=self.num_rotations,
-            size=(batch_size,),
-            device=self.device,
-        )
-
-        # [B, D]
-        proto_features = proto_bank[class_indices, rot_indices]
-
+        proto_features = proto_bank[indices]
         if self._radius > 0:
             proto_features = proto_features + torch.randn_like(proto_features) * self._radius
 
-        # target = class_id * R + rot_id
-        proto_targets = class_indices * self.num_rotations + rot_indices
+        proto_features = proto_features.to(self.device)
+        proto_targets = (indices * self.num_rotations).to(self.device)
 
         proto_logits = self.classifier(proto_features)["logits"]
-        return F.cross_entropy(proto_logits / self.temp, proto_targets)
+        return F.cross_entropy(
+            proto_logits / self.temp,
+            proto_targets,
+        )
 
-    @rank_zero_only
+    # @rank_zero_only
     def update_prototypes(self, dm) -> None:
         if self.num_seen_classes <= self.num_old_classes:
             return
-
+        # feature_tfm = dm.get_effective_transform(mode="test")
+        # task_train_dataset_feat = dm.get_filtered_dataset(
+        #     split=dm._split_train,
+        #     filter_fn=lambda e: self.num_old_classes <= e[_Y_COLUMN_NAME] < self.num_seen_classes,
+        #     transform=feature_tfm,
+        #     use_buffer=False,
+        # )
         self.eval()
         with torch.no_grad():
-            feats_all = []
-            labels_all = []
-            rots_all = []
-
+            feats, labels = [], []
             for batch in tqdm(
                     dm.train_dataloader(),
                     desc=f"Building prototypes task {dm.get_current_task()}",
             ):
                 x, y = self.unpack_batch(batch)
-                x = x.to(self.device)
-                y = y.to(self.device)
+                feats.append(self.forward_layerwise(x.to(self.device))["features"])
+                labels.append(y.to(self.device))
 
-                for rot_id in range(self.num_rotations):
-                    x_rot = torch.rot90(x, rot_id, dims=(2, 3))
-                    feats_rot = self.forward_layerwise(x_rot)["features"]  # [B, D]
+            feats = torch.cat(feats, dim=0)
+            labels = torch.cat(labels, dim=0)
 
-                    feats_all.append(feats_rot)
-                    labels_all.append(y)
-                    rots_all.append(
-                        torch.full_like(y, fill_value=rot_id, device=self.device)
-                    )
-
-            feats = torch.cat(feats_all, dim=0)     # [N*R, D]
-            labels = torch.cat(labels_all, dim=0)   # [N*R]
-            rot_ids = torch.cat(rots_all, dim=0)    # [N*R]
-
-            new_prototypes = []
-            new_radii = []
-
+            new_prototypes, new_radii = [], []
             for class_idx in range(self.num_old_classes, self.num_seen_classes):
-                class_proto_list = []
-                class_radius_list = []
-                for rot_id in range(self.num_rotations):
-                    mask = (labels == class_idx) & (rot_ids == rot_id)
-                    class_rot_feats = feats[mask]
+                class_feats = feats[labels == class_idx]
+                if len(class_feats) == 0:
+                    continue
 
-
-                    class_proto_list.append(class_rot_feats.mean(dim=0))
-
-                    if len(class_rot_feats) > 1:
-                        radius = class_rot_feats.var(dim=0, unbiased=True).mean()
-                    else:
-                        radius = torch.tensor(0.0, device=self.device)
-
-                    class_radius_list.append(radius)
-
-                # [R, D]
-                class_protos = torch.stack(class_proto_list, dim=0)
-                # [R]
-                class_radii = torch.stack(class_radius_list, dim=0)
-
-                new_prototypes.append(class_protos.detach().cpu())
-                new_radii.append(class_radii.detach().cpu())
+                new_prototypes.append(class_feats.mean(dim=0))
+                new_radii.append(
+                    float(class_feats.var(dim=0, unbiased=True).mean()) if len(class_feats) > 1 else 0.0
+                )
 
             self._prototypes.extend(new_prototypes)
             self._prototype_radii.extend(new_radii)
 
             if self._prototype_radii:
-                all_radii = torch.cat([r.flatten() for r in self._prototype_radii], dim=0).float()
-                self._radius = float(all_radii.mean().sqrt())
-
+                self._radius = float(torch.tensor(self._prototype_radii).mean().sqrt())
         self.train()
