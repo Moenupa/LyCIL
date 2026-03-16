@@ -174,33 +174,36 @@ class PODNet(BaseLearner):
         self.buffer_training = buffer_training
         self.need_snapshot_old = need_snapshot_old
 
-    def configure_optimizers(self):
-        stage_key = "buffer" if self.buffer_training else self.task_id
+    # def configure_optimizers(self):
+    #     stage_key = "buffer" if self.buffer_training else self.task_id
+    #
+    #     optim_kwargs = dict(
+    #         self.per_task_optim_args.get(stage_key)
+    #         or self.per_task_optim_args.get("default")
+    #         or {}
+    #     )
+    #     sched_kwargs = dict(
+    #         self.per_task_sched_args.get(stage_key)
+    #         or self.per_task_sched_args.get("default")
+    #         or {}
+    #     )
+    #
+    #     weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
+    #     params = self._build_param_groups(weight_decay)
+    #
+    #     optim = self._get_optimizer(params, **optim_kwargs)
+    #
+    #     if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+    #         return optim
+    #
+    #     sched = self._get_scheduler(optim, **sched_kwargs)
+    #     return {
+    #         "optimizer": optim,
+    #         "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+    #     }
 
-        optim_kwargs = dict(
-            self.per_task_optim_args.get(stage_key)
-            or self.per_task_optim_args.get("default")
-            or {}
-        )
-        sched_kwargs = dict(
-            self.per_task_sched_args.get(stage_key)
-            or self.per_task_sched_args.get("default")
-            or {}
-        )
-
-        weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
-        params = self._build_param_groups(weight_decay)
-
-        optim = self._get_optimizer(params, **optim_kwargs)
-
-        if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
-            return optim
-
-        sched = self._get_scheduler(optim, **sched_kwargs)
-        return {
-            "optimizer": optim,
-            "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
-        }
+    def _get_stage_key(self):
+        return "buffer" if self.buffer_training else self.task_id
 
 
     @property

@@ -330,6 +330,9 @@ class BaseLearner(L.LightningModule):
     #         "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
     #     }
 
+    def _get_optim_stage_key(self):
+        return self.task_id
+
     def _build_param_groups(self, weight_decay: float):
         decay, no_decay, no_decay_names = [], [], []
 
@@ -355,26 +358,23 @@ class BaseLearner(L.LightningModule):
         ]
 
     def configure_optimizers(self):
-        # Waterfall lookup: stage_key -> default -> {}
+        stage_key = self._get_optim_stage_key()
         optim_kwargs = dict(
-            self.per_task_optim_args.get(self.task_id)
+            self.per_task_optim_args.get(stage_key)
             or self.per_task_optim_args.get("default")
             or {}
         )
         sched_kwargs = dict(
-            self.per_task_sched_args.get(self.task_id)
+            self.per_task_sched_args.get(stage_key)
             or self.per_task_sched_args.get("default")
             or {}
         )
 
-        # 从 optim_kwargs 中取出全局 weight_decay，交给 param groups 控制
         weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
-
         params = self._build_param_groups(weight_decay)
 
         optim = self._get_optimizer(params, **optim_kwargs)
 
-        # If sched_kwargs is None (or explicitly disabled), return optimizer only
         if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
             return optim
 
@@ -383,6 +383,8 @@ class BaseLearner(L.LightningModule):
             "optimizer": optim,
             "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
         }
+
+
 
     @torch.no_grad()
     def snapshot_old(self):
