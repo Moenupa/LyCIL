@@ -22,19 +22,19 @@ def _as_scalar(x):
     return x.item() if isinstance(x, torch.Tensor) else x
 
 
-class AdamWThenSGD(Optimizer):
+class AdamThenSGD(Optimizer):
     """
-    一个适配 Lightning configure_optimizers() 的包装优化器：
+    适配 Lightning configure_optimizers() 的包装优化器：
 
-    - 内部用原生 torch.optim.AdamW 和 torch.optim.SGD
+    - 内部用原生 torch.optim.Adam 和 torch.optim.SGD
     - 外部只暴露一个 optimizer，方便挂同一个 scheduler
-    - scheduler 维护的是 outer param_groups 的 lr
+    - scheduler 维护 outer param_groups 的 lr
     - 每次 step 前，把 outer lr 同步到内部两个 optimizer：
-        adamw_lr = outer_lr
-        sgd_lr   = outer_lr * (sgd_init_lr / adamw_init_lr)
+        adam_lr = outer_lr
+        sgd_lr  = outer_lr * (sgd_init_lr / adam_init_lr)
 
     这样就实现了：
-    - AdamW 和 SGD 各有自己的初始 lr
+    - Adam 和 SGD 各有自己的初始 lr
     - 但两者共享同一条 scheduler 曲线（倍率不同）
     """
 
@@ -42,29 +42,29 @@ class AdamWThenSGD(Optimizer):
         self,
         params,
         *,
-        adamw: dict,
+        adam: dict,
         sgd: dict,
         switch_step: int,
         transfer_momentum: bool = False,
     ):
-        if "lr" not in adamw or "lr" not in sgd:
-            raise ValueError("Both `adamw` and `sgd` must provide `lr`.")
+        if "lr" not in adam or "lr" not in sgd:
+            raise ValueError("Both `adam` and `sgd` must provide `lr`.")
 
         outer_params = _clone_param_spec(params)
-        adamw_params = _clone_param_spec(params)
+        adam_params = _clone_param_spec(params)
         sgd_params = _clone_param_spec(params)
 
-        super().__init__(outer_params, defaults={"lr": adamw["lr"]})
+        super().__init__(outer_params, defaults={"lr": adam["lr"]})
 
-        self.adamw = torch.optim.AdamW(adamw_params, **adamw)
+        self.adam = torch.optim.Adam(adam_params, **adam)
         self.sgd = torch.optim.SGD(sgd_params, **sgd)
 
         if not (
             len(self.param_groups)
-            == len(self.adamw.param_groups)
+            == len(self.adam.param_groups)
             == len(self.sgd.param_groups)
         ):
-            raise ValueError("Outer/AdamW/SGD param_groups do not match.")
+            raise ValueError("Outer/Adam/SGD param_groups do not match.")
 
         self.switch_step = switch_step
         self.transfer_momentum = transfer_momentum
@@ -72,26 +72,26 @@ class AdamWThenSGD(Optimizer):
         self.switched = False
 
         for outer_g, adam_g, sgd_g in zip(
-            self.param_groups, self.adamw.param_groups, self.sgd.param_groups
+            self.param_groups, self.adam.param_groups, self.sgd.param_groups
         ):
             adam_lr = _as_scalar(adam_g["lr"])
             sgd_lr = _as_scalar(sgd_g["lr"])
 
             if adam_lr == 0 and sgd_lr != 0:
-                raise ValueError("adamw lr cannot be 0 when sgd lr is non-zero.")
+                raise ValueError("adam lr cannot be 0 when sgd lr is non-zero.")
 
-            outer_g["lr"] = adam_g["lr"]   # scheduler 看到的 base lr
-            outer_g["adamw_lr_scale"] = 1.0
+            outer_g["lr"] = adam_g["lr"]
+            outer_g["adam_lr_scale"] = 1.0
             outer_g["sgd_lr_scale"] = 1.0 if adam_lr == 0 else sgd_lr / adam_lr
 
         self._sync_lrs()
 
     def _sync_lrs(self):
         for outer_g, adam_g, sgd_g in zip(
-            self.param_groups, self.adamw.param_groups, self.sgd.param_groups
+            self.param_groups, self.adam.param_groups, self.sgd.param_groups
         ):
             base_lr = outer_g["lr"]
-            adam_g["lr"] = base_lr * outer_g.get("adamw_lr_scale", 1.0)
+            adam_g["lr"] = base_lr * outer_g.get("adam_lr_scale", 1.0)
             sgd_g["lr"] = base_lr * outer_g.get("sgd_lr_scale", 1.0)
 
     def _maybe_switch(self):
@@ -99,9 +99,9 @@ class AdamWThenSGD(Optimizer):
             return
 
         if self.transfer_momentum:
-            for adam_g, sgd_g in zip(self.adamw.param_groups, self.sgd.param_groups):
+            for adam_g, sgd_g in zip(self.adam.param_groups, self.sgd.param_groups):
                 for p_adam, p_sgd in zip(adam_g["params"], sgd_g["params"]):
-                    st = self.adamw.state.get(p_adam, None)
+                    st = self.adam.state.get(p_adam, None)
                     if st is not None and "exp_avg" in st:
                         self.sgd.state[p_sgd]["momentum_buffer"] = (
                             st["exp_avg"].detach().clone()
@@ -112,14 +112,12 @@ class AdamWThenSGD(Optimizer):
     def step(self, closure=None):
         self._maybe_switch()
         self._sync_lrs()
-        loss = (self.sgd if self.switched else self.adamw).step(closure)
+        loss = (self.sgd if self.switched else self.adam).step(closure)
         self.global_step += 1
         return loss
 
     def zero_grad(self, set_to_none: bool = True):
-        # 两个内部 optimizer 指向的是同一组参数，调一个其实也够；
-        # 这里两个都调，行为最直观。
-        self.adamw.zero_grad(set_to_none=set_to_none)
+        self.adam.zero_grad(set_to_none=set_to_none)
         self.sgd.zero_grad(set_to_none=set_to_none)
 
     def state_dict(self):
@@ -131,7 +129,7 @@ class AdamWThenSGD(Optimizer):
             "switched": self.switched,
             "switch_step": self.switch_step,
             "transfer_momentum": self.transfer_momentum,
-            "adamw": self.adamw.state_dict(),
+            "adam": self.adam.state_dict(),
             "sgd": self.sgd.state_dict(),
         }
 
@@ -149,6 +147,6 @@ class AdamWThenSGD(Optimizer):
                 "param_groups": state_dict["param_groups"],
             }
         )
-        self.adamw.load_state_dict(state_dict["adamw"])
+        self.adam.load_state_dict(state_dict["adam"])
         self.sgd.load_state_dict(state_dict["sgd"])
         self._sync_lrs()

@@ -24,7 +24,7 @@ from ..data.buffer import BaseExemplarBuffer
 from ..data.hfmodule import HFDataModule
 from ..data.transform import apply_dataset_transform
 
-from ..optimizer import LARS,AdamWThenSGD
+from ..optimizer import LARS,AdamThenSGD
 
 
 
@@ -285,7 +285,7 @@ class BaseLearner(L.LightningModule):
             case "lars":
                 return LARS(*args, **kwargs)
             case "adamsgd":
-                return AdamWThenSGD(*args, **kwargs)
+                return AdamThenSGD(*args, **kwargs)
             case _:
                 raise NotImplementedError(f"Unsupported optimizer: `{opt_type}`")
 

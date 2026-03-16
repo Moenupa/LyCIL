@@ -1,7 +1,7 @@
 from .lars import LARS
-from .adamsgd import AdamWThenSGD
+from .adamsgd import AdamThenSGD
 
 __all__ = [
     "LARS",
-    "AdamWThenSGD",
+    "AdamThenSGD",
 ]
