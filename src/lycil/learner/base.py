@@ -359,6 +359,33 @@ class BaseLearner(L.LightningModule):
             {"params": no_decay, "weight_decay": 0.0},
         ]
 
+    # def configure_optimizers(self):
+    #     stage_key = self._get_optim_stage_key()
+    #     optim_kwargs = dict(
+    #         self.per_task_optim_args.get(stage_key)
+    #         or self.per_task_optim_args.get("default")
+    #         or {}
+    #     )
+    #     sched_kwargs = dict(
+    #         self.per_task_sched_args.get(stage_key)
+    #         or self.per_task_sched_args.get("default")
+    #         or {}
+    #     )
+    #
+    #     weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
+    #     params = self._build_param_groups(weight_decay)
+    #
+    #     optim = self._get_optimizer(params, **optim_kwargs)
+    #
+    #     if not sched_kwargs or sched_kwargs.get("type") in (None, "none", "None"):
+    #         return optim
+    #
+    #     sched = self._get_scheduler(optim, **sched_kwargs)
+    #     return {
+    #         "optimizer": optim,
+    #         "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+    #     }
+
     def configure_optimizers(self):
         stage_key = self._get_optim_stage_key()
         optim_kwargs = dict(
@@ -372,8 +399,7 @@ class BaseLearner(L.LightningModule):
             or {}
         )
 
-        weight_decay = float(optim_kwargs.pop("weight_decay", 0.0) or 0.0)
-        params = self._build_param_groups(weight_decay)
+        params = [p for p in self.parameters() if p.requires_grad]
 
         optim = self._get_optimizer(params, **optim_kwargs)
 
