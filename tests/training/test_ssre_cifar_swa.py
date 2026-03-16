@@ -75,7 +75,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
             "default": {
                 "type": "adam",
                 "lr": 1e-3,
-                "weight_decay": 4e-5,
+                "weight_decay": 5e-4,
             },
 
         },
