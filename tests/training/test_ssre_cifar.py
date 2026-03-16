@@ -57,13 +57,33 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
     model = SSRE(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="linear",
-        per_task_optim_args={
-            # for all tasks, use the same optimizer kwargs
-            "default": {
-                "type": "adamw",
+        # per_task_optim_args={
+        #     # for all tasks, use the same optimizer kwargs
+        #     "default": {
+        #         "type": "adamw",
+        #         "lr": 1e-3,
+        #         "weight_decay": 1e-3,
+        #     },
+        #
+        # },
+        per_task_optim_args = {
+        "default": {
+            "name": "adamsgd",
+            "switch_step": 800,
+            "transfer_momentum": False,
+            "adamw": {
                 "lr": 1e-3,
-                "weight_decay": 1e-3,
+                "betas": (0.9, 0.999),
+                "eps": 1e-8,
+                "weight_decay": 5e-4,
             },
+            "sgd": {
+                "lr": 0.1,
+                "momentum": 0.9,
+                "nesterov": True,
+                "weight_decay": 5e-4,
+            },
+        }
         },
         per_task_sched_args={
             "default": {
