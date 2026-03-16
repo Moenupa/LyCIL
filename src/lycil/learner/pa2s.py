@@ -57,7 +57,6 @@ class PASS(BaseLearner):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Return class-level logits for evaluation/inference."""
         logits_with_rotate = self.forward_layerwise(x)["logits"]
-        # logits = logits_with_rotate[:, :: self.num_rotations] fusion
         logits = logits_with_rotate[:, :: self.num_rotations]
         return logits
 
