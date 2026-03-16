@@ -115,6 +115,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
                 # EMAWeightAveraging(),
                 StochasticWeightAveraging(swa_epoch_start=EPOCHS_PER_TASK-15, swa_lrs=0.001)
             ],
+            num_sanity_val_steps=-1,
 
             # gradient_clip_val=1.0
         )
