@@ -111,7 +111,7 @@ def test_ssre_cifar100(device: str, is_dummy_training: bool):
         log_statistics_to_wandb(trainer, statistics_summary)
 
         wandb.finish()
-        break
+        # break
 
 
 if __name__ == "__main__":
