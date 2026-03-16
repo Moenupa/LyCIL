@@ -1,0 +1,135 @@
+import os.path as osp
+
+import lightning as L
+import pytest
+from lightning.pytorch.loggers import WandbLogger
+
+import wandb
+from lycil.constants import _EXP_NAME
+from lycil.data.hfmodule import HFDataModule
+from lycil.learner.ssre import SSRE
+
+from tests.training.constants import (
+    CIFAR10_LABEL_COL,
+    CIFAR10_PATH,
+    CIFAR100_LABEL_COL,
+    CIFAR100_PATH,
+    CONVNET_ARGS,
+    TEST_LOADER_KWARGS,
+    VAL_LOADER_KWARGS,
+)
+from lightning.pytorch.callbacks import LearningRateMonitor
+from lycil.backbone import ConvNetArgs
+from tests.training.log_utils import log_statistics_to_wandb
+
+
+from lightning.pytorch.callbacks import StochasticWeightAveraging
+from tests.training.weightavg import WeightAveraging
+from torch.optim.swa_utils import get_ema_avg_fn
+
+# Enable Exponential Moving Average after 100 steps
+class EMAWeightAveraging(WeightAveraging):
+    def __init__(self):
+        super().__init__(avg_fn=get_ema_avg_fn())
+    def should_update(self, step_idx=None, epoch_idx=None):
+        return (epoch_idx is not None) and (epoch_idx >= 100)
+
+
+
+@pytest.mark.slow
+@pytest.mark.runs_on(["cuda"])
+@pytest.mark.xdist_group("training")
+def test_ssre_cifar100(device: str, is_dummy_training: bool):
+    if is_dummy_training:
+        DATAPATH, LABEL_COL = CIFAR10_PATH, CIFAR10_LABEL_COL
+        N_CLASS_PER_TASK = [1, 1]
+        EPOCHS_PER_TASK = 1
+    else:
+        DATAPATH = "/ppio_net0/datasets/cifar100"
+        N_CLASS_PER_TASK = [20] * 5
+        LABEL_COL = "fine_label"
+        EPOCHS_PER_TASK = 160
+        USE_PRETRAIN_WEIGHTS = False
+    if not osp.exists(DATAPATH):
+        pytest.skip("Data path does not exist.")
+        return
+
+    L.seed_everything(42)
+
+    dm = HFDataModule(
+        DATAPATH,
+        transform_name=osp.basename(DATAPATH),
+        num_classes_per_task=N_CLASS_PER_TASK,
+        label_column_name=LABEL_COL,  # 100 classes
+        train_loader_kwargs={"batch_size": 128, "shuffle": True, "num_workers": 8},
+        val_loader_kwargs=VAL_LOADER_KWARGS,
+        test_loader_kwargs=TEST_LOADER_KWARGS,
+        split_map={"train": "train", "val": "test", "test": "test"},
+        buffer_kwargs=None,
+    )
+    model = SSRE(
+        backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
+        head="linear",
+        per_task_optim_args={
+            # for all tasks, use the same optimizer kwargs
+            "default": {
+                "type": "adam",
+                "lr": 1e-3,
+                "weight_decay": 4e-5,
+            },
+
+        },
+        per_task_sched_args={
+            "default": {
+                "type": "cosine_annealing",
+                "T_max": EPOCHS_PER_TASK,
+            },
+        },
+        temp= 0.1,
+        lambda_kd = 1.0,
+        lambda_proto = 10,
+        buffer_args=None,
+    )
+
+    statistics_summary = {}
+    for task_idx, _ in enumerate(N_CLASS_PER_TASK):
+        dm.set_current_task(task_idx)
+
+        trainer = L.Trainer(
+            accelerator=device,
+            max_epochs=EPOCHS_PER_TASK,
+            sync_batchnorm=True,
+            enable_checkpointing=False,
+            enable_progress_bar=True,
+            precision="16-mixed",
+            logger=WandbLogger(
+                name=f"ssre_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                project="lycil",
+                log_model=False,
+                tags=["ssre", "cifar100"],
+                group=_EXP_NAME,
+            ),
+            check_val_every_n_epoch=1,
+            callbacks=[
+                LearningRateMonitor(logging_interval="epoch"),
+                StochasticWeightAveraging(swa_epoch_start=EPOCHS_PER_TASK-15, swa_lrs=0.001)
+            ],
+
+            # gradient_clip_val=1.0
+        )
+        trainer.fit(model, datamodule=dm)
+        test_outputs = trainer.test(
+            model=model,
+            datamodule=dm,
+            verbose=False,
+            ckpt_path=None,
+        )
+        statistics_summary[task_idx] = test_outputs
+        log_statistics_to_wandb(trainer, statistics_summary)
+
+        wandb.finish()
+        break
+
+
+if __name__ == "__main__":
+    test_ssre_cifar100(device="cuda", is_dummy_training=False)
