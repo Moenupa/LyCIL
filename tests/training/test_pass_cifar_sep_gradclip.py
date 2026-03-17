@@ -109,7 +109,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"sgd_gradclip20.0_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"sgd_gradclip7.0_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["pass", "cifar100"],
@@ -117,7 +117,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            gradient_clip_val=1.0 if task_idx==0 else 20.0,
+            gradient_clip_val=1.0 if task_idx==0 else 7.0,
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
