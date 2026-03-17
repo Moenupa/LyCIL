@@ -58,21 +58,6 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
     model = PASS(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="linear",
-        # per_task_optim_args={
-        #     # for all tasks, use the same optimizer kwargs
-        #     "default": {
-        #         "type": "adam",
-        #         "lr": 1e-3,
-        #         "weight_decay": 5e-4,
-        #     },
-        # },
-        # per_task_sched_args={
-        #     # for all tasks, use the same scheduler kwargs
-        #     "default": {
-        #         "type": "cosine_annealing",
-        #         "T_max": EPOCHS_PER_TASK,
-        #     },
-        # },
         per_task_optim_args={
             # for all tasks, use the same optimizer kwargs
             "default": {
