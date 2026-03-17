@@ -51,29 +51,29 @@ def get_transforms(name: str) -> tuple["Callable", "Callable"]:
             )
             return train_tf, test_tf
         case "cifar100":
-            # train_tf = T.Compose(
-            #     [
-            #         T.RandomCrop(32, padding=4),
-            #         T.RandomHorizontalFlip(),
-            #         T.ToTensor(),
-            #         T.Normalize(_CIFAR100_MEAN, _CIFAR100_STD),
-            #     ]
-            # )
             train_tf = T.Compose(
                 [
-                    T.RandomCrop(32, padding=4, padding_mode="reflect"),
+                    T.RandomCrop(32, padding=4),
                     T.RandomHorizontalFlip(),
-                    T.AutoAugment(policy=T.AutoAugmentPolicy.CIFAR10),
                     T.ToTensor(),
                     T.Normalize(_CIFAR100_MEAN, _CIFAR100_STD),
-                    T.RandomErasing(
-                        p=0.25,
-                        scale=(0.02, 0.2),
-                        ratio=(0.3, 3.3),
-                        value="random",
-                    ),
                 ]
             )
+            # train_tf = T.Compose(
+            #     [
+            #         T.RandomCrop(32, padding=4, padding_mode="reflect"),
+            #         T.RandomHorizontalFlip(),
+            #         T.AutoAugment(policy=T.AutoAugmentPolicy.CIFAR10),
+            #         T.ToTensor(),
+            #         T.Normalize(_CIFAR100_MEAN, _CIFAR100_STD),
+            #         T.RandomErasing(
+            #             p=0.25,
+            #             scale=(0.02, 0.2),
+            #             ratio=(0.3, 3.3),
+            #             value="random",
+            #         ),
+            #     ]
+            # )
             test_tf = T.Compose(
                 [
                     T.ToTensor(),
