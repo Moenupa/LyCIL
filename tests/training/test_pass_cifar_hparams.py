@@ -109,7 +109,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"aug_lambda1.0_sgd_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"lambda1.0_sgd_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["pass", "cifar100"],
