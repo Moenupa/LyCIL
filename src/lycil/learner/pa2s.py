@@ -80,7 +80,7 @@ class PASS(BaseLearner):
                 old_features = old_outputs["features"]
 
             loss_kd = torch.dist(features, old_features, p=2)
-            loss_proto = self.prototype_loss(batch_size=x.shape[0])
+            loss_proto = self.prototype_loss(batch_size=x_rot.shape[0])
             # loss_proto = self.prototype_loss(num_proto_samples=x_rot.shape[0], x_rot_feats=features, y_rot=y_rot)
             loss = loss + self.lambda_kd * loss_kd + self.lambda_proto * loss_proto
 
