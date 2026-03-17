@@ -77,7 +77,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         },
         temp=0.1,
         lambda_kd=1.0,
-        lambda_proto=1e4,
+        lambda_proto=1e5,
         num_rotations=4,
         buffer_args=None,
     )
@@ -94,7 +94,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"lambda1.0_proto1e4_sgd_gradclip3.0_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"lambda1.0_proto1e5_sgd_gradclip3.0_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["pass", "cifar100"],
