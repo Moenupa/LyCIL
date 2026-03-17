@@ -24,15 +24,6 @@ from tests.training.log_utils import log_statistics_to_wandb
 
 
 from lightning.pytorch.callbacks import StochasticWeightAveraging
-from tests.training.weightavg import WeightAveraging
-from torch.optim.swa_utils import get_ema_avg_fn
-
-# Enable Exponential Moving Average after 100 steps
-class EMAWeightAveraging(WeightAveraging):
-    def __init__(self):
-        super().__init__(avg_fn=get_ema_avg_fn())
-    def should_update(self, step_idx=None, epoch_idx=None):
-        return (epoch_idx is not None) and (epoch_idx >= 100)
 
 
 
