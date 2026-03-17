@@ -57,6 +57,7 @@ class SSRE(BaseLearner):
         logits = outs["logits"]
         features = outs["features"]
 
+        # loss_ce = F.cross_entropy(logits / self.temp, y, label_smoothing=0.1)
         loss_ce = F.cross_entropy(logits / self.temp, y)
         loss = loss_ce
         loss_kd = None
