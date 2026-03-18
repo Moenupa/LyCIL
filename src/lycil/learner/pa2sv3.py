@@ -120,10 +120,6 @@ class PASS(BaseLearner):
     def prototype_loss(self, batch_size: int) -> torch.Tensor:
         """
         Prototype replay with class-specific radii.
-
-        注意：
-        - 这里回放的是“类别原型”，因此采用 class-level CE 更合理。
-        - 如果你想做 rotation-level prototype replay，建议把原型存成 (class, rotation)。
         """
         if self.num_old_classes == 0 or len(self._prototypes) < self.num_old_classes:
             return torch.zeros((), device=self.device)
