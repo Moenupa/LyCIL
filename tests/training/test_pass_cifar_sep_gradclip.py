@@ -55,18 +55,35 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
         split_map={"train": "train", "val": "test", "test": "test"},
         buffer_kwargs=None,
     )
+    per_task_optim_args = {
+        "default": {
+            "type": "sgd",
+            "lr": 0.1,  # task 0
+            "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            "weight_decay": 5e-4,
+        },
+    }
+    for task_idx in range(1, len(N_CLASS_PER_TASK)):
+        per_task_optim_args[task_idx] = {
+            "type": "sgd",
+            "lr": 1e-2,  # task > 0
+            "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+            "weight_decay": 5e-4,
+        }
+
     model = PASS(
         backbone_args=ConvNetArgs(name="resnet50", pretrained=USE_PRETRAIN_WEIGHTS, cifar=True),
         head="linear",
-        per_task_optim_args={
-            # for all tasks, use the same optimizer kwargs
-            "default": {
-                "type": "sgd",
-                "lr": 0.1,
-                "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
-                "weight_decay": 5e-4,
-            },
-        },
+        # per_task_optim_args={
+        #     # for all tasks, use the same optimizer kwargs
+        #     "default": {
+        #         "type": "sgd",
+        #         "lr": 0.1,
+        #         "momentum": 0 if USE_PRETRAIN_WEIGHTS else 0.9,
+        #         "weight_decay": 5e-4,
+        #     },
+        # },
+        per_task_optim_args=per_task_optim_args,
         per_task_sched_args={
             # for all tasks, use the same scheduler kwargs
             "default": {
@@ -94,7 +111,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             enable_progress_bar=True,
             precision="16-mixed",
             logger=WandbLogger(
-                name=f"lambda0.1_proto1e5_sgd_gradclip0.1_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
+                name=f"lambda0.1_proto1e5_sgd_gradclip1.0_pass_cifar100_T{len(N_CLASS_PER_TASK)}_task{task_idx}",
                 project="lycil",
                 log_model=False,
                 tags=["pass", "cifar100"],
@@ -102,7 +119,7 @@ def test_pass_cifar100(device: str, is_dummy_training: bool):
             ),
             check_val_every_n_epoch=1,
             callbacks=[LearningRateMonitor(logging_interval="epoch")],
-            gradient_clip_val=1.0 if task_idx==0 else 0.1,
+            gradient_clip_val=1.0 if task_idx==0 else 1.0,
         )
         trainer.fit(model, datamodule=dm)
         test_outputs = trainer.test(
