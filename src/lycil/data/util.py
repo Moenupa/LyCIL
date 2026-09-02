@@ -139,8 +139,6 @@ def check_bijection(
             + f"Mapping provides {mapping} against values {values}."
         )
 
-    return
-
 
 def reverse_mapping(mapping: dict[int, Any] | list[Any]) -> dict[Any, int]:
     """Reverse a bijection mapping from keys->values to values->keys.

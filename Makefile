@@ -1,4 +1,4 @@
-.PHONY: build install style-check style quality test
+.PHONY: all help format-check format check test test-slow
 
 check_dirs := src tests
 
@@ -6,29 +6,29 @@ check_dirs := src tests
 TOOL := $(shell command -v uv >/dev/null 2>&1 && echo "uvx" || echo "")
 RUN := $(shell command -v uv >/dev/null 2>&1 && echo "uv run" || echo "")
 
-build:
-	uv build
+all: format check
 
-install:
-	$(TOOL) pre-commit install
-	$(TOOL) pre-commit run --all-files
+help:
+	@echo "Available targets:"
+	@echo "  format-check:  Check code lint/format (no fix)"
+	@echo "  format:        Run linter and formatter"
+	@echo "  check:         Run type checker"
+	@echo "  test:          Run quick tests"
+	@echo "  test-slow:     Run tests with real examples (slow)"
 
-# check for style, do nothing
-style-check:
+format-check:
 	$(TOOL) ruff check $(check_dirs)
 	$(TOOL) ruff format --check $(check_dirs)
 
-# check for style, and fix issues
-style:
+format:
 	$(TOOL) ruff check $(check_dirs) --fix
 	$(TOOL) ruff format $(check_dirs)
 
-# code quality checks
-quality:
+check:
 	$(TOOL) ty check $(check_dirs)
 
 test:
-	WANDB_MODE=disabled $(RUN) pytest tests -n auto --import-mode=importlib
+	WANDB_MODE=disabled $(RUN) pytest tests -n 8
 
 test-slow:
-	RUN_SLOW=1 WANDB_MODE=disabled $(RUN) pytest tests --import-mode=importlib
+	RUN_SLOW=1 WANDB_MODE=disabled $(RUN) pytest tests -vv

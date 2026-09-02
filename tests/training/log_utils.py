@@ -1,6 +1,5 @@
-from lightning.pytorch.utilities.rank_zero import rank_zero_only
-
 import wandb
+from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
 
 def calc_per_task_forgetting(

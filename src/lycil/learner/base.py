@@ -22,8 +22,8 @@ from ..metrics.accuracy import accuracy
 from ..scheduler import LinearWarmupCosineAnnealingLR
 
 if TYPE_CHECKING:
-    import torch.nn as nn
     from datasets import Dataset
+    from torch import nn
 
     from ..data.buffer import BaseExemplarBuffer
     from ..data.hfmodule import HFDataModule
@@ -481,7 +481,6 @@ class BaseLearner(L.LightningModule):
             self.buffer_replay_args.strategy,
         )
         self.train()
-        return
 
     @torch.no_grad()
     def _construct_exemplar(
@@ -529,7 +528,6 @@ class BaseLearner(L.LightningModule):
 
         dm.buffer.per_class_means = old_class_means | cur_class_means
         dm.buffer.update(cur_task_buffer)
-        return
 
     def _construct_exemplar_for_cur_task(
         self,

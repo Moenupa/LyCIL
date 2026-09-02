@@ -223,5 +223,3 @@ def _register_custom_formatter(
             return super()._tensorize(value)
 
     _register_formatter(CustomFormatter, name, aliases)
-
-    return None

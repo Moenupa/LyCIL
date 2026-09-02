@@ -28,7 +28,7 @@ def preprocess_for_cl(
     sample: dict[str, Any],
     label_column_name: str,
     label2idx: dict[Any, int],
-    idx2taskid: dict[int, int],
+    idx2taskid: list[int] | dict[int, int],
 ) -> dict[str, int]:
     """Map a dataset sample's label to a CL class index and task ID.
 
@@ -38,7 +38,7 @@ def preprocess_for_cl(
         sample (dict[str, Any]): A single dataset sample.
         label_column_name (str): Column name containing the original label.
         label2idx (dict[Any, int]): Mapping from original label to CL class index.
-        idx2taskid (dict[int, int]): Mapping from CL class index to task ID.
+        idx2taskid (list[int] | dict[int, int]): Mapping from CL class index to task ID.
 
     Returns:
         dict[str, int]: Dict containing ``_Y_COLUMN_NAME`` (class index) and
