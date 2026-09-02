@@ -2,10 +2,10 @@ import os.path as osp
 
 import lightning as L
 import pytest
+import wandb
 from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 
-import wandb
 from lycil.backbone import ConvNetArgs
 from lycil.constants import EXP_NAME
 from lycil.data.hfmodule import HFDataModule

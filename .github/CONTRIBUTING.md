@@ -68,10 +68,7 @@ LyCIL follows the [Google Python Style Guide][google-python-styleguide] and
 
 5. Check code before commit:
     ```bash
-    make install
-    make style && make style-check
-    make quality
-    make test
+    make && make test
     ```
 
 6. Submit changes:
